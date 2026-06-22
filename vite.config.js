@@ -3,20 +3,22 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 // Config de deploiement : React + PWA installable + service worker hors-ligne
+// STRUCTURE A PLAT : tous les fichiers (main.jsx, App.jsx, index.css, logo.svg,
+// icones...) sont a la racine du depot, PAS dans des dossiers src/ ou public/.
 export default defineConfig({
-  base: "./",
+  base: "/",
   plugins: [
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["logo.svg", "icons/icon-192.png", "icons/icon-512.png"],
+      includeAssets: ["logo.svg", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "HotelPlatform Travel",
         short_name: "HotelPlatform",
         description:
           "Reservez hotels et restaurants, decouvrez, partagez et echangez.",
-        start_url: "./index.html",
-        scope: "./",
+        start_url: "/",
+        scope: "/",
         display: "standalone",
         orientation: "portrait",
         background_color: "#09090F",
@@ -24,14 +26,13 @@ export default defineConfig({
         lang: "fr",
         categories: ["travel", "lifestyle", "food"],
         icons: [
-          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-          { src: "icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
         ]
       },
       workbox: {
-        // Met en cache l'app pour un chargement instantane + mode hors-ligne
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        globPatterns: ["**/*.{js,css,html,svg,png}"],
         cleanupOutdatedCaches: true,
         clientsClaim: true
       }
