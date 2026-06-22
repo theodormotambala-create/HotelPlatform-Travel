@@ -1,0 +1,15 @@
+# Dependances (reinstallees automatiquement par Vercel)
+node_modules/
+
+# Resultat de build (genere automatiquement)
+dist/
+dist-ssr/
+
+# Fichiers systeme
+.DS_Store
+*.local
+.vercel
+
+# Logs
+*.log
+npm-debug.log*
