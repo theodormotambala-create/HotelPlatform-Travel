@@ -256,7 +256,9 @@ var AuthService = {
       var r = await sb.auth.signUp({ email: email, password: password, options: { data: { account_type: accType } } });
       if(r.error) throw r.error;
       var status = accType !== "client" ? "pending" : "active";
-      return AuthService.buildSession(accType, status, (r.data.user&&r.data.user.email)||email, r.data.user&&r.data.user.id);
+      var s = AuthService.buildSession(accType, status, (r.data.user&&r.data.user.email)||email, r.data.user&&r.data.user.id);
+      s.needsEmailConfirm = !r.data.session;
+      return s;
     }
     var status = accType !== "client" ? "pending" : "active";
     return AuthService.buildSession(accType, status, email || "demo@platform.com");
@@ -445,26 +447,47 @@ function AuthScreen(props){
   var s9=useState("email");var faMethod=s9[0];var setFAMethod=s9[1];
   var s10=useState(false);var loading=s10[0];var setLoading=s10[1];
   var s11=useState("");var authErr=s11[0];var setAuthErr=s11[1];
-  var MOCK_2FA_CODE="847291";
+  var s12=useState("");var confirmPass=s12[0];var setConfirmPass=s12[1];
+  var s13=useState(false);var emailPending=s13[0];var setEmailPending=s13[1];
+  var s14=useState("");var formErr=s14[0];var setFormErr=s14[1];
   function submit(){
-    if(mode!=="forgot"&&!pass.trim())return;
-    if(mode==="register"&&!cgu)return;
+    setFormErr("");
+    if(mode!=="forgot"&&!email.trim()){setFormErr("Veuillez saisir votre email.");return;}
+    var emailRe=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if(!emailRe.test(email.trim())){setFormErr("Adresse email invalide.");return;}
+    if(mode!=="forgot"&&pass.length<6){setFormErr("Le mot de passe doit contenir au moins 6 caracteres.");return;}
+    if(mode==="register"&&pass!==confirmPass){setFormErr("Les mots de passe ne correspondent pas.");return;}
+    if(mode==="register"&&!cgu){setFormErr("Veuillez accepter les conditions d utilisation.");return;}
     setTwoFA(true);setAuthErr("");
   }
   async function verify2FA(){
-    if(faCode===MOCK_2FA_CODE||faCode.length===6){
+    if(faCode.length===6){
       setLoading(true);setAuthErr("");
       try{
         var session=mode==="register"
           ?await AuthService.register(accType,email,pass)
           :await AuthService.login(accType,email,pass);
-        if(session) onAuth(accType,session.accountStatus,session.email,session.userId);
+        if(session){
+          if(session.needsEmailConfirm){
+            setEmailPending(true);setTwoFA(false);
+          } else {
+            onAuth(accType,session.accountStatus,session.email,session.userId);
+          }
+        }
       }catch(e){
         var msg = e.message||"";
-        if(msg.includes("fetch")||msg.includes("network")||msg.includes("ERR_")) {
+        if(msg.includes("fetch")||msg.includes("network")||msg.includes("ERR_")||msg.includes("Failed to fetch")){
           setAuthErr("Connexion impossible. Verifiez votre connexion internet.");
-        } else if(msg.includes("Invalid login")||msg.includes("invalid_credentials")) {
+        } else if(msg.includes("Invalid login")||msg.includes("invalid_credentials")){
           setAuthErr("Email ou mot de passe incorrect.");
+        } else if(msg.includes("already registered")||msg.includes("User already registered")){
+          setAuthErr("Cet email est deja utilise. Essayez de vous connecter.");
+        } else if(msg.includes("Password should be")||msg.includes("password")){
+          setAuthErr("Le mot de passe doit contenir au moins 6 caracteres.");
+        } else if(msg.includes("Email not confirmed")){
+          setAuthErr("Confirmez votre email avant de vous connecter.");
+        } else if(msg.includes("rate limit")||msg.includes("too many")){
+          setAuthErr("Trop de tentatives. Attendez quelques minutes avant de reessayer.");
         } else {
           setAuthErr(msg||"Erreur de connexion. Veuillez reessayer.");
         }
@@ -480,18 +503,31 @@ function AuthScreen(props){
           <div style={{textAlign:"center",marginBottom:24}}>
             <div style={{width:64,height:64,borderRadius:"50%",background:DS.primarySoft,border:"2px solid "+DS.primary,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><Shield size={28} color={DS.primary}/></div>
             <div style={{fontSize:20,fontWeight:900,color:DS.text}}>Verification 2FA</div>
-            <div style={{fontSize:13,color:DS.textMuted,marginTop:6}}>Code envoye par {faMethod==="sms"?"SMS":"email"}</div>
+            <div style={{fontSize:13,color:DS.textMuted,marginTop:6}}>Code envoye a <span style={{color:DS.primary,fontWeight:700}}>{email||"votre email"}</span></div>
           </div>
           <div style={{display:"flex",gap:8,marginBottom:16}}>
             {[["email","Email"],["sms","SMS"]].map(function(_i){var m=_i[0];var l=_i[1];var isAct=faMethod===m;return <button key={m} onClick={function(){setFAMethod(m);}} style={{flex:1,padding:"8px",borderRadius:10,border:"1px solid "+(isAct?DS.primary:DS.border),background:isAct?DS.primarySoft:"transparent",color:isAct?DS.primary:DS.textMuted,fontSize:12,fontWeight:700,cursor:"pointer"}}>{l}</button>;})}
-          </div>
-          <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"10px 14px",marginBottom:8,fontSize:12,color:DS.textMuted,textAlign:"center"}}>
-            Code de demonstration : <span style={{fontWeight:800,color:DS.primary,letterSpacing:2}}>{MOCK_2FA_CODE}</span>
           </div>
           <input value={faCode} onChange={function(e){setFACode(e.target.value);}} maxLength={6} placeholder="Entrez le code a 6 chiffres" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px",fontSize:20,fontWeight:800,color:DS.text,outline:"none",textAlign:"center",letterSpacing:6,boxSizing:"border-box",marginBottom:12}}/>
           {authErr&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error,textAlign:"center"}}>{authErr}</div>}
           <button onClick={verify2FA} disabled={faCode.length<6||loading} style={{width:"100%",padding:"13px",background:faCode.length>=6&&!loading?DS.primary:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:faCode.length>=6&&!loading?"pointer":"not-allowed",marginBottom:10,opacity:faCode.length>=6&&!loading?1:.7}}>{loading?"Connexion en cours...":"Valider"}</button>
           <button onClick={function(){setTwoFA(false);setFACode("");}} style={{width:"100%",padding:"10px",background:"transparent",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Retour</button>
+        </div>
+      </div>
+    );
+  }
+  if(emailPending){
+    return(
+      <div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,animation:"hp-fade-up 0.28s ease"}}>
+        <div style={{width:"100%",maxWidth:360,textAlign:"center"}}>
+          <div style={{width:72,height:72,borderRadius:"50%",background:DS.primarySoft,border:"2px solid "+DS.primary,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px"}}><Mail size={32} color={DS.primary}/></div>
+          <div style={{fontSize:22,fontWeight:900,color:DS.text,marginBottom:10}}>Confirmez votre email</div>
+          <div style={{fontSize:14,color:DS.textMuted,lineHeight:1.7,marginBottom:24}}>Un lien de confirmation a ete envoye a <span style={{color:DS.primary,fontWeight:700}}>{email}</span>.<br/>Cliquez sur le lien pour activer votre compte.</div>
+          <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 16px",marginBottom:20,fontSize:12,color:DS.textMuted,textAlign:"left"}}>
+            <div style={{fontWeight:700,color:DS.text,marginBottom:4}}>Vous ne trouvez pas l email ?</div>
+            <div>Verifiez vos spams ou dossier promotions. Le lien expire dans 24h.</div>
+          </div>
+          <button onClick={function(){setEmailPending(false);setMode("login");setTwoFA(false);setFACode("");setPass("");setConfirmPass("");}} style={{width:"100%",padding:"13px",background:DS.primary,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Se connecter</button>
         </div>
       </div>
     );
@@ -519,12 +555,19 @@ function AuthScreen(props){
           <input type="email" value={email} onChange={function(ev){setEmail(ev.target.value);}} placeholder="Email ou telephone" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
         </div>
         {mode!=="forgot"&&(
-          <div style={{position:"relative",marginBottom:12}}>
+          <div style={{position:"relative",marginBottom:10}}>
             <Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/>
             <input type={showP?"text":"password"} value={pass} onChange={function(ev){setPass(ev.target.value);}} placeholder="Mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
             <button onClick={function(){setShowP(!showP);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",display:"flex"}}><EyeOff size={14} color={DS.textMuted}/></button>
           </div>
         )}
+        {mode==="register"&&(
+          <div style={{position:"relative",marginBottom:12}}>
+            <Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/>
+            <input type={showP?"text":"password"} value={confirmPass} onChange={function(ev){setConfirmPass(ev.target.value);}} placeholder="Confirmer le mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+(confirmPass&&confirmPass!==pass?DS.error:DS.border),borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+        )}
+        {formErr&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error,textAlign:"center"}}>{formErr}</div>}
         {mode==="register"&&accType!=="client"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:11,color:DS.warning}}>Les comptes Hotel et Restaurant sont soumis a validation avant activation.</div>}
         {mode==="register"&&(
           <div onClick={function(){setCgu(!cgu);}} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",cursor:"pointer",marginBottom:10}}>
@@ -2342,27 +2385,28 @@ export default function App() {
     return function(){ DataLayer._onUpdate = null; };
   },[]);
 
+  var s0=useState(null);  var auth=s0[0];          var setAuth=s0[1];
   // Persistance de session Supabase : restaure la session au rechargement + ecoute les changements
   useEffect(function(){
     var sb = (typeof window!=="undefined" && window.__supabase) ? window.__supabase : null;
     if(!sb) return;
-    // Verifie si une session existe deja (refresh de page)
     sb.auth.getSession().then(function(res){
       var session = res.data && res.data.session;
       if(session && session.user){
         var meta = session.user.user_metadata || {};
         var accType = meta.account_type || "client";
-        setAuth(AuthService.buildSession(accType, "active", session.user.email, session.user.id));
+        var status = accType !== "client" ? "pending" : "active";
+        setAuth(AuthService.buildSession(accType, status, session.user.email, session.user.id));
       }
     }).catch(function(){});
-    // Ecoute les changements d'etat (connexion / deconnexion / refresh token)
     var sub = sb.auth.onAuthStateChange(function(event, session){
       if(event==="SIGNED_IN" && session && session.user){
         var meta = session.user.user_metadata || {};
         var accType = meta.account_type || "client";
+        var status = accType !== "client" ? "pending" : "active";
         setAuth(function(prev){
-          if(prev) return prev; // deja connecte : ne pas ecraser
-          return AuthService.buildSession(accType, "active", session.user.email, session.user.id);
+          if(prev) return prev;
+          return AuthService.buildSession(accType, status, session.user.email, session.user.id);
         });
       } else if(event==="SIGNED_OUT"){
         setAuth(null);
@@ -2370,7 +2414,6 @@ export default function App() {
     });
     return function(){ if(sub && sub.data && sub.data.subscription) sub.data.subscription.unsubscribe(); };
   },[]);
-  var s0=useState(null);  var auth=s0[0];          var setAuth=s0[1];
   var s1=useState(false); var offline=s1[0];        var setOff=s1[1];
   var s2=useState("feed");var cTab=s2[0];           var setCTab=s2[1];
   var s3=useState("feed");var pTab=s3[0];           var setPTab=s3[1];
