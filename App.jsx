@@ -229,36 +229,49 @@ var DataLayer = {
 //   }
 // =====================================================================
 var AuthService = {
-  // Construit l'objet utilisateur de session a partir du type/statut/email
-  buildSession: function(accType, status, email){
+  _sb: function(){ return (typeof window!=="undefined"&&window.__supabase)||null; },
+  buildSession: function(accType, status, email, userId){
     return {
       type: accType,
       accountStatus: status || "active",
       email: email || "",
+      userId: userId || null,
       suspendReason: null,
       banReason: null,
       refuseReason: null
     };
   },
-  // Connexion par email (mode demo : accepte tout couple email/mot de passe non vide)
-  login: function(accType, email){
-    // FUTUR: appel reseau d'authentification ici
+  login: async function(accType, email, password){
+    var sb = AuthService._sb();
+    if(sb){
+      var r = await sb.auth.signInWithPassword({ email: email, password: password });
+      if(r.error) throw r.error;
+      return AuthService.buildSession(accType, "active", r.data.user.email, r.data.user.id);
+    }
     return AuthService.buildSession(accType, "active", email || "demo@platform.com");
   },
-  // Inscription (les comptes etablissement passent en attente de validation)
-  register: function(accType, email){
-    // FUTUR: creation de compte cote backend ici
+  register: async function(accType, email, password){
+    var sb = AuthService._sb();
+    if(sb){
+      var r = await sb.auth.signUp({ email: email, password: password, options: { data: { account_type: accType } } });
+      if(r.error) throw r.error;
+      var status = accType !== "client" ? "pending" : "active";
+      return AuthService.buildSession(accType, status, (r.data.user&&r.data.user.email)||email, r.data.user&&r.data.user.id);
+    }
     var status = accType !== "client" ? "pending" : "active";
     return AuthService.buildSession(accType, status, email || "demo@platform.com");
   },
-  // Connexion via fournisseur externe (Google, etc.)
-  loginWithProvider: function(accType, provider, email){
-    // FUTUR: OAuth (supabase.auth.signInWithOAuth) ici
-    return AuthService.buildSession(accType, "active", email || (provider + "@gmail.com"));
+  loginWithProvider: async function(accType, provider){
+    var sb = AuthService._sb();
+    if(sb){
+      await sb.auth.signInWithOAuth({ provider: provider, options: { redirectTo: window.location.origin } });
+      return null;
+    }
+    return AuthService.buildSession(accType, "active", provider + "@gmail.com");
   },
-  // Deconnexion
-  logout: function(){
-    // FUTUR: supabase.auth.signOut() ici
+  logout: async function(){
+    var sb = AuthService._sb();
+    if(sb) await sb.auth.signOut();
     return null;
   }
 };
@@ -430,16 +443,27 @@ function AuthScreen(props){
   var s7=useState("");var faCode=s7[0];var setFACode=s7[1];
   var s8=useState(false);var cgu=s8[0];var setCgu=s8[1];
   var s9=useState("email");var faMethod=s9[0];var setFAMethod=s9[1];
+  var s10=useState(false);var loading=s10[0];var setLoading=s10[1];
+  var s11=useState("");var authErr=s11[0];var setAuthErr=s11[1];
   var MOCK_2FA_CODE="847291";
   function submit(){
     if(mode!=="forgot"&&!pass.trim())return;
     if(mode==="register"&&!cgu)return;
-    setTwoFA(true);
+    setTwoFA(true);setAuthErr("");
   }
-  function verify2FA(){
+  async function verify2FA(){
     if(faCode===MOCK_2FA_CODE||faCode.length===6){
-      var session=mode==="register"?AuthService.register(accType,email):AuthService.login(accType,email);
-      onAuth(accType,session.accountStatus,session.email);
+      setLoading(true);setAuthErr("");
+      try{
+        var session=mode==="register"
+          ?await AuthService.register(accType,email,pass)
+          :await AuthService.login(accType,email,pass);
+        if(session) onAuth(accType,session.accountStatus,session.email,session.userId);
+      }catch(e){
+        setAuthErr(e.message||"Identifiants incorrects. Veuillez reessayer.");
+      }finally{
+        setLoading(false);
+      }
     }
   }
   if(twoFA){
@@ -458,7 +482,8 @@ function AuthScreen(props){
             Code de demonstration : <span style={{fontWeight:800,color:DS.primary,letterSpacing:2}}>{MOCK_2FA_CODE}</span>
           </div>
           <input value={faCode} onChange={function(e){setFACode(e.target.value);}} maxLength={6} placeholder="Entrez le code a 6 chiffres" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px",fontSize:20,fontWeight:800,color:DS.text,outline:"none",textAlign:"center",letterSpacing:6,boxSizing:"border-box",marginBottom:12}}/>
-          <button onClick={verify2FA} disabled={faCode.length<6} style={{width:"100%",padding:"13px",background:faCode.length>=6?DS.primary:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:faCode.length>=6?"pointer":"not-allowed",marginBottom:10,opacity:faCode.length>=6?1:.7}}>Valider</button>
+          {authErr&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error,textAlign:"center"}}>{authErr}</div>}
+          <button onClick={verify2FA} disabled={faCode.length<6||loading} style={{width:"100%",padding:"13px",background:faCode.length>=6&&!loading?DS.primary:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:faCode.length>=6&&!loading?"pointer":"not-allowed",marginBottom:10,opacity:faCode.length>=6&&!loading?1:.7}}>{loading?"Connexion en cours...":"Valider"}</button>
           <button onClick={function(){setTwoFA(false);setFACode("");}} style={{width:"100%",padding:"10px",background:"transparent",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Retour</button>
         </div>
       </div>
@@ -508,7 +533,7 @@ function AuthScreen(props){
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
           <div style={{flex:1,height:1,background:DS.border}}/><span style={{fontSize:11,color:DS.textDim}}>OU</span><div style={{flex:1,height:1,background:DS.border}}/>
         </div>
-        <button onClick={function(){var s=AuthService.loginWithProvider(accType,"google","google@gmail.com");onAuth(accType,s.accountStatus,s.email);}} style={{width:"100%",padding:"12px",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,color:DS.text,fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+        <button onClick={async function(){var s=await AuthService.loginWithProvider(accType,"google");if(s)onAuth(accType,s.accountStatus,s.email,s.userId);}} style={{width:"100%",padding:"12px",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,color:DS.text,fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
           <div style={{width:18,height:18,borderRadius:"50%",background:"#EA4335",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:10,color:"#fff",fontWeight:900}}>G</span></div>
           Continuer avec Google
         </button>
@@ -2302,13 +2327,41 @@ export default function App() {
     // Branche le rafraichissement de l'UI sur la couche de donnees
     DataLayer._onUpdate = function(){ setDataVersion(function(v){ return v+1; }); };
     // Declenche la synchronisation Supabase si un client est disponible.
-    // (Dans la version deployee, src/main.jsx fournit window.__supabase.)
     try{
       if(typeof window!=="undefined" && window.__supabase){
         DataLayer.syncFromSupabase(window.__supabase);
       }
     }catch(e){}
     return function(){ DataLayer._onUpdate = null; };
+  },[]);
+
+  // Persistance de session Supabase : restaure la session au rechargement + ecoute les changements
+  useEffect(function(){
+    var sb = (typeof window!=="undefined" && window.__supabase) ? window.__supabase : null;
+    if(!sb) return;
+    // Verifie si une session existe deja (refresh de page)
+    sb.auth.getSession().then(function(res){
+      var session = res.data && res.data.session;
+      if(session && session.user){
+        var meta = session.user.user_metadata || {};
+        var accType = meta.account_type || "client";
+        setAuth(AuthService.buildSession(accType, "active", session.user.email, session.user.id));
+      }
+    }).catch(function(){});
+    // Ecoute les changements d'etat (connexion / deconnexion / refresh token)
+    var sub = sb.auth.onAuthStateChange(function(event, session){
+      if(event==="SIGNED_IN" && session && session.user){
+        var meta = session.user.user_metadata || {};
+        var accType = meta.account_type || "client";
+        setAuth(function(prev){
+          if(prev) return prev; // deja connecte : ne pas ecraser
+          return AuthService.buildSession(accType, "active", session.user.email, session.user.id);
+        });
+      } else if(event==="SIGNED_OUT"){
+        setAuth(null);
+      }
+    });
+    return function(){ if(sub && sub.data && sub.data.subscription) sub.data.subscription.unsubscribe(); };
   },[]);
   var s0=useState(null);  var auth=s0[0];          var setAuth=s0[1];
   var s1=useState(false); var offline=s1[0];        var setOff=s1[1];
@@ -2390,8 +2443,9 @@ export default function App() {
   }
 
   // Logout - defini avant le routing pour eviter reference error
-  function logout(){
-    setAuth(AuthService.logout());setEstab(null);setBook(null);
+  async function logout(){
+    await AuthService.logout();
+    setAuth(null);setEstab(null);setBook(null);
     setSett(false);setNotifs(false);
     setCTab("feed");setPTab("feed");
   }
@@ -2400,8 +2454,8 @@ export default function App() {
 
   if(!auth){
     return(
-      <AuthScreen onAuth={function(t,status,email){
-        setAuth(AuthService.buildSession(t,status,email));
+      <AuthScreen onAuth={function(t,status,email,userId){
+        setAuth(AuthService.buildSession(t,status,email,userId));
       }}/>
     );
   }
