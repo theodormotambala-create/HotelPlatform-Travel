@@ -460,7 +460,14 @@ function AuthScreen(props){
           :await AuthService.login(accType,email,pass);
         if(session) onAuth(accType,session.accountStatus,session.email,session.userId);
       }catch(e){
-        setAuthErr(e.message||"Identifiants incorrects. Veuillez reessayer.");
+        var msg = e.message||"";
+        if(msg.includes("fetch")||msg.includes("network")||msg.includes("ERR_")) {
+          setAuthErr("Connexion impossible. Verifiez votre connexion internet.");
+        } else if(msg.includes("Invalid login")||msg.includes("invalid_credentials")) {
+          setAuthErr("Email ou mot de passe incorrect.");
+        } else {
+          setAuthErr(msg||"Erreur de connexion. Veuillez reessayer.");
+        }
       }finally{
         setLoading(false);
       }
