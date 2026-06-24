@@ -850,32 +850,27 @@ function ClientFeed(props){
   var selfEmail=props.selfEmail||"";
   var selfName=selfEmail?selfEmail.split("@")[0]:"Vous";
   var selfLetter=(selfName[0]||"V").toUpperCase();
-  var _initLikes={};var _initFavs=[];try{_initLikes=JSON.parse(localStorage.getItem("hp_likes")||"{}");_initFavs=JSON.parse(localStorage.getItem("hp_favs")||"[]");}catch(e){}
+  var _init=useRef(null);
+  if(!_init.current){var _lk={};var _fv=[];try{_lk=JSON.parse(localStorage.getItem("hp_likes")||"{}");_fv=JSON.parse(localStorage.getItem("hp_favs")||"[]");}catch(e){}_init.current={likes:_lk,favs:_fv};}
+  var _initLikes=_init.current.likes;var _initFavs=_init.current.favs;
   var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes+(_initLikes[p.id]?1:0),comments:[],showCmt:false});}));
   var posts=s1[0];var setPosts=s1[1];
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState({});var cmtText=s2[0];var setCmtText=s2[1];
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
-  var menuRef=useRef(null);
-  useEffect(function(){
-    if(!menuOpen)return;
-    function handleOutside(e){if(menuRef.current&&!menuRef.current.contains(e.target))setMenuOpen(null);}
-    document.addEventListener("mousedown",handleOutside,true);
-    document.addEventListener("touchstart",handleOutside,true);
-    return function(){document.removeEventListener("mousedown",handleOutside,true);document.removeEventListener("touchstart",handleOutside,true);};
-  },[menuOpen]);
   var sf=useState(_initFavs);var favPosts=sf[0];var setFavPosts=sf[1];
   var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
   var followingPosts=props.followingIds||[];
   function toggleFav(id){
+    var wasFav=favPosts.indexOf(id)>=0;
     setFavPosts(function(f){
-      var next=f.indexOf(id)>=0?f.filter(function(x){return x!==id;}):f.concat([id]);
+      var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);
       try{localStorage.setItem("hp_favs",JSON.stringify(next));}catch(e){}
       return next;
     });
     setMenuOpen(null);
-    toast(favPosts.indexOf(id)>=0?"Retire des favoris":"Ajoute aux favoris","success");
+    toast(wasFav?"Retire des favoris":"Ajoute aux favoris","success");
   }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
@@ -904,6 +899,7 @@ function ClientFeed(props){
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
       {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){toast("Signalement envoye - Merci","success");}}/>}
+      {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       {posts.map(function(post){
         var color=rC(post.type);
         return(
@@ -925,7 +921,7 @@ function ClientFeed(props){
                 </div>
               </div>
               <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-                <div ref={menuRef} style={{position:"relative"}}>
+                <div style={{position:"relative"}}>
                   <button onClick={function(ev){ev.stopPropagation();setMenuOpen(menuOpen===post.id?null:post.id);}} style={{background:"none",border:"none",cursor:"pointer",padding:"4px 6px",borderRadius:8,display:"flex",alignItems:"center"}}><MoreVertical size={18} color={DS.textMuted}/></button>
                   {menuOpen===post.id&&(
                     <div style={{position:"absolute",top:"100%",right:0,background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"6px 0",minWidth:160,zIndex:200,boxShadow:"0 8px 24px rgba(0,0,0,.4)"}}>
