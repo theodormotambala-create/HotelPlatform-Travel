@@ -702,6 +702,7 @@ function ChangePwdModal(props){
         if(r.error){setErr(r.error.message||"Erreur lors de la mise a jour.");setLoading(false);return;}
       }
       setOk(true);
+      if(onSuccess)onSuccess();
     }catch(e){setErr("Erreur de connexion.");}
     setLoading(false);
   }
@@ -1702,6 +1703,7 @@ function ProFeed(props){
     // Fix #5 : sauvegarde dans Supabase si disponible
     try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,data:newObj}]).catch(function(){});}catch(e){}
     setNewPost("");setShowNew(false);setMediaPreview(null);setMediaType(null);
+    toast("Publication publiee avec succes","success");
   }
   return(
     <div style={{background:DS.bg,paddingBottom:24}}>
@@ -1765,10 +1767,10 @@ function ProFeed(props){
         </div>
       )}
       {posts.length===0&&<Emp Icon={FileText} title="Aucune publication" sub="Vos publications apparaitront ici"/>}
-      {posts.map(function(post){
+      {posts.map(function(post,_pfi){
         var pc=rC(post.type);
         return(
-          <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28"}}>
+          <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pfi*50)+"ms"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 16px 14px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
                 <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{cursor:onProfile?"pointer":"default",flexShrink:0}}>
@@ -2424,8 +2426,8 @@ function ProResa(props){
   var s3=useState(null);var scanTarget=s3[0];var setScanTarget=s3[1];
   var tkR=useToast();var toastR=tkR.show;var ToastR=tkR.Toast;
   var filtered=filter==="all"?resas:resas.filter(function(r){return r.status===filter;});
-  var sColors={confirmed:DS.success,pending:DS.warning,completed:DS.primary,refused:DS.error,consumed:DS.textDim};
-  var sLabels={confirmed:"Confirmee",pending:"En attente",completed:"Terminee",refused:"Refusee",consumed:"Consommee"};
+  var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim};
+  var sLabels={confirmed:"Confirmee",pending:"En attente",refused:"Refusee",consumed:"Consommee"};
   function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem("hp_resas_all",JSON.stringify(updated));}catch(e){}}
   function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Reservation confirmee","success");}
   function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Reservation refusee","info");}
@@ -2536,7 +2538,7 @@ function ProProf(props){
   return(
     <div style={{paddingBottom:20}}>
       <ToastP/>
-      {showVerif&&<VerifRequestModal isPremium={premiumActive} accType={proType} verifyStatus={verifStatus} initialStep={3} prefillName={data.name} prefillCountry={data.location} onClose={function(){setShowVerif(false);}} onSubmit={function(){setVerifStatus("pending");}}/>}
+      {showVerif&&<VerifRequestModal isPremium={premiumActive} accType={proType} verifyStatus={verifStatus} initialStep={3} prefillName={data.name} prefillCountry={data.location} onClose={function(){setShowVerif(false);}} onSubmit={function(){setVerifStatus("pending");toastP("Demande de verification soumise - Examen sous 48-72h","success");}}/>}
       <div style={{position:"relative",height:120,flexShrink:0}}>
         <img src={data.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.6))"}}/>
@@ -2693,7 +2695,7 @@ export default function App() {
   var s8=useState(false); var showPremium=s8[0];    var setShowPremium=s8[1];
   var s9=useState(false); var showPrivacy=s9[0];    var setShowPrivacy=s9[1];
   var s9b=useState(function(){try{var v=localStorage.getItem("hp_privacy");return v?JSON.parse(v):{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};}catch(e){return{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};}});var privacySettings=s9b[0];var setPrivacySettings=s9b[1];
-  function updatePrivacy(patch){setPrivacySettings(function(prev){var next=Object.assign({},prev,patch);try{localStorage.setItem("hp_privacy",JSON.stringify(next));}catch(e){}return next;});}
+  function updatePrivacy(patch){setPrivacySettings(function(prev){var next=Object.assign({},prev,patch);try{localStorage.setItem("hp_privacy",JSON.stringify(next));}catch(e){}return next;});toastApp("Parametres de confidentialite mis a jour","success");}
   var s10=useState(function(){try{var v=localStorage.getItem("hp_premium");return v?JSON.parse(v):null;}catch(e){return null;}});var premiumData=s10[0];    var setPremiumData=s10[1];
   var isPremium=premiumData!==null && new Date(premiumData.expiresAt)>new Date();
   function subscribePremium(plan,durationMonths){
@@ -2734,7 +2736,7 @@ export default function App() {
   function updateNotifPrefs(patch){setNotifPrefs(function(prev){var next=Object.assign({},prev,patch);try{localStorage.setItem("hp_notif_prefs",JSON.stringify(next));}catch(e){}return next;});}
   var sCEmail=useState(false);var showChangeEmail=sCEmail[0];var setShowChangeEmail=sCEmail[1];
   var sCPwd=useState(false);var showChangePwd=sCPwd[0];var setShowChangePwd=sCPwd[1];
-  var tk=useToast(); var Toast=tk.Toast;
+  var tk=useToast(); var Toast=tk.Toast; var toastApp=tk.show;
   // === Bouton retour systeme (Android/navigateur) : ferme l'ecran courant au lieu de quitter l'app ===
   var anyOverlayOpen=(estab!==null)||(book!==null)||sett||notifsOpen||showPremium||showPrivacy||showChangeEmail||showChangePwd;
   function closeTopOverlay(){
@@ -2834,7 +2836,7 @@ export default function App() {
   }
 
   if(showChangeEmail) return <ChangeEmailModal accent={accent} onClose={function(){setShowChangeEmail(false);}}/>;
-  if(showChangePwd)   return <ChangePwdModal accent={accent} onClose={function(){setShowChangePwd(false);}}/>;
+  if(showChangePwd)   return <ChangePwdModal accent={accent} onClose={function(){setShowChangePwd(false);}} onSuccess={function(){toastApp("Mot de passe mis a jour avec succes","success");}}/>;
   if(sett)       return <Ov onClose={function(){setSett(false);}}>{function(close){return <SettingsS onBack={close} accType={auth.type} onLogout={logout} onPremium={function(){setSett(false);setShowPremium(true);}} onPrivacy={function(){setSett(false);setShowPrivacy(true);}} isPremium={isPremium} premiumData={premiumData} onChangeEmail={function(){setSett(false);setShowChangeEmail(true);}} onChangePwd={function(){setSett(false);setShowChangePwd(true);}} notifPrefs={notifPrefs} onUpdateNotifPrefs={updateNotifPrefs}/>;}}</Ov>;
   if(notifsOpen) return <Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);if(!isPro)setCTab(t);else setPTab(t);}}/>;}}</Ov>;
 
