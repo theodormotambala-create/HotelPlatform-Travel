@@ -454,10 +454,33 @@ function Ov(props){
   return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:850,maxWidth:420,margin:"0 auto",overflowY:"auto",animation:(closing?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}>{typeof props.children==="function"?props.children(handleClose):props.children}</div>);
 }
 
+function AccountTypeScreen(props){
+  var onSelect=props.onSelect;
+  return(
+    <div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,animation:"hp-fade-up 0.28s ease"}}>
+      <div style={{textAlign:"center",marginBottom:32}}>
+        <div style={{fontSize:32,fontWeight:900,color:DS.text,letterSpacing:-1}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>
+        <div style={{fontSize:13,color:DS.textMuted,marginTop:8}}>Choisissez votre type de compte</div>
+      </div>
+      <div style={{width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:14}}>
+        {[["client","Client","Voyageur · Reservations · Avis",User,DS.client],["hotel","Hotel","Gerez votre etablissement hotelier",Building2,DS.hotel],["restaurant","Restaurant","Gerez votre restaurant",Utensils,DS.restaurant]].map(function(item){
+          var t=item[0];var l=item[1];var desc=item[2];var Ic=item[3];var col=item[4];
+          return(
+            <button key={t} onClick={function(){onSelect(t);}} style={{width:"100%",padding:"18px 20px",borderRadius:16,border:"1px solid "+col+"44",background:DS.card,cursor:"pointer",display:"flex",alignItems:"center",gap:16,textAlign:"left"}}>
+              <div style={{width:48,height:48,borderRadius:14,background:col+"18",border:"1px solid "+col+"33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ic size={24} color={col}/></div>
+              <div><div style={{fontSize:15,fontWeight:800,color:DS.text,marginBottom:3}}>{l}</div><div style={{fontSize:12,color:DS.textMuted}}>{desc}</div></div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 function AuthScreen(props){
   var onAuth=props.onAuth;
+  var _initType=props.initialAccType||"client";
   var s1=useState("login");var mode=s1[0];var setMode=s1[1];
-  var s2=useState("client");var accType=s2[0];var setAccType=s2[1];
+  var s2=useState(_initType);var accType=s2[0];var setAccType=s2[1];
   var s3=useState("");var email=s3[0];var setEmail=s3[1];
   var s4=useState("");var pass=s4[0];var setPass=s4[1];
   var s5=useState(false);var showP=s5[0];var setShowP=s5[1];
@@ -562,7 +585,7 @@ function AuthScreen(props){
         <div style={{fontSize:12,color:DS.textMuted,marginTop:6}}>{mode==="login"?"Connectez-vous":mode==="register"?"Creez votre compte":"Reinitialiser le mot de passe"}</div>
       </div>
       <div style={{width:"100%",maxWidth:360}}>
-        {mode!=="forgot"&&(
+        {mode==="register"&&(
           <div style={{marginBottom:16}}>
             <div style={{fontSize:10,color:DS.textDim,fontWeight:800,letterSpacing:1.5,marginBottom:8,textAlign:"center"}}>TYPE DE COMPTE</div>
             <div style={{display:"flex",gap:8}}>
@@ -2617,6 +2640,8 @@ export default function App() {
   },[]);
 
   var s0=useState(null);  var auth=s0[0];          var setAuth=s0[1];
+  var _initNeedsOB=(function(){try{return!localStorage.getItem("hp_acc_type");}catch(e){return true;}})();
+  var sOB=useState(_initNeedsOB);var needsOnboarding=sOB[0];var setNeedsOnboarding=sOB[1];
   // Persistance de session Supabase : restaure la session au rechargement + ecoute les changements
   useEffect(function(){
     var sb = (typeof window!=="undefined" && window.__supabase) ? window.__supabase : null;
@@ -2750,16 +2775,23 @@ export default function App() {
   // Logout - defini avant le routing pour eviter reference error
   async function logout(){
     await AuthService.logout();
+    try{localStorage.removeItem("hp_acc_type");}catch(e){}
     setAuth(null);setEstab(null);setBook(null);
     setSett(false);setNotifs(false);
     setCTab("feed");setPTab("feed");
+    setNeedsOnboarding(true);
   }
 
   // === ROUTING =====================================================
 
   if(!auth){
+    if(needsOnboarding){
+      return(<AccountTypeScreen onSelect={function(t){try{localStorage.setItem("hp_acc_type",t);}catch(e){}setNeedsOnboarding(false);}}/>);
+    }
+    var _storedAccType="client";try{_storedAccType=localStorage.getItem("hp_acc_type")||"client";}catch(e){}
     return(
-      <AuthScreen onAuth={function(t,status,email,userId){
+      <AuthScreen initialAccType={_storedAccType} onAuth={function(t,status,email,userId){
+        try{localStorage.setItem("hp_acc_type",t);}catch(e){}
         setAuth(AuthService.buildSession(t,status,email,userId));
       }}/>
     );
