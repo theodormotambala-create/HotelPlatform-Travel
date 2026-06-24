@@ -2806,10 +2806,11 @@ export default function App() {
 
   // === ROUTING =====================================================
 
-  // Mode dev : court-circuit l'auth sans rien casser
+  // Mode dev : court-circuit l'auth + sélecteur de compte visible dans l'app
+  var sDevType=useState(DEV_ACCOUNT_TYPE);var devType=sDevType[0];var setDevType=sDevType[1];
   var _resolvedAuth = auth;
   if(!auth && DEV_BYPASS_AUTH){
-    _resolvedAuth = AuthService.buildSession(DEV_ACCOUNT_TYPE, "active", "demo@hotelplatform.travel", "dev-user-001");
+    _resolvedAuth = AuthService.buildSession(devType, "active", "demo@hotelplatform.travel", "dev-user-001");
   }
 
   if(!_resolvedAuth){
@@ -2855,6 +2856,19 @@ export default function App() {
   if(sett)       return <Ov onClose={function(){setSett(false);}}>{function(close){return <SettingsS onBack={close} accType={auth.type} onLogout={logout} onPremium={function(){setSett(false);setShowPremium(true);}} onPrivacy={function(){setSett(false);setShowPrivacy(true);}} isPremium={isPremium} premiumData={premiumData} onChangeEmail={function(){setSett(false);setShowChangeEmail(true);}} onChangePwd={function(){setSett(false);setShowChangePwd(true);}} notifPrefs={notifPrefs} onUpdateNotifPrefs={updateNotifPrefs}/>;}}</Ov>;
   if(notifsOpen) return <Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);if(!isPro)setCTab(t);else setPTab(t);}}/>;}}</Ov>;
 
+  // === BANDEAU DEV (visible uniquement si DEV_BYPASS_AUTH = true) ===
+  var devBanner=DEV_BYPASS_AUTH?(
+    <div style={{background:"#1a1a00",borderBottom:"1px solid #F59E0B55",padding:"6px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0}}>
+      <span style={{fontSize:10,color:"#F59E0B",fontWeight:800}}>⚠ MODE TEST</span>
+      <div style={{display:"flex",gap:4}}>
+        {[["client","Client"],["hotel","Hôtel"],["restaurant","Resto"]].map(function(_i){
+          var t=_i[0];var l=_i[1];var isAct=devType===t;
+          return <button key={t} onClick={function(){setDevType(t);setAuth(null);}} style={{padding:"3px 10px",borderRadius:20,border:"1px solid "+(isAct?"#F59E0B":"#444"),background:isAct?"#F59E0B":"transparent",color:isAct?"#000":"#F59E0B",fontSize:10,fontWeight:800,cursor:"pointer"}}>{l}</button>;
+        })}
+      </div>
+    </div>
+  ):null;
+
   // === HEADER RIGHT (notifications + offline toggle) ===============
   var headerRight=(
     <div style={{display:"flex",gap:14,alignItems:"center"}}>
@@ -2882,6 +2896,7 @@ export default function App() {
           left={<div style={{fontSize:16,fontWeight:900,color:DS.text,letterSpacing:-0.5}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>}
           right={headerRight}
         />
+        {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
           {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email}/></div>}
@@ -2923,6 +2938,7 @@ export default function App() {
         }
         right={headerRight}
       />
+      {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
         {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email}/></div>}
