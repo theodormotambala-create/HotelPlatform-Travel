@@ -33,7 +33,7 @@ function fmtK(n){
   return String(n);
 }
 
-const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}@keyframes hp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes hp-item-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}button{transition:opacity .18s cubic-bezier(0.22,1,0.36,1),transform .16s cubic-bezier(0.22,1,0.36,1),background .2s ease}button:active{transform:scale(.96);opacity:.85}.hp-scroll{-webkit-overflow-scrolling:touch}.hp-card{transition:box-shadow .18s ease,transform .16s ease}.hp-card:active{transform:scale(.985)}";
+const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}@keyframes hp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes hp-item-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}@keyframes hp-heart-pop{0%{transform:scale(1)}20%{transform:scale(1.45)}40%{transform:scale(1.1)}60%{transform:scale(1.28)}80%{transform:scale(.97)}100%{transform:scale(1)}}@keyframes hp-bounce-in{0%{opacity:0;transform:scale(.87) translateY(10px)}55%{opacity:1;transform:scale(1.03)}75%{transform:scale(.99)}100%{opacity:1;transform:scale(1)}}@keyframes hp-toast-in{from{opacity:0;transform:translateX(-50%) translateY(18px) scale(.93)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}@keyframes hp-slide-down{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}button{transition:opacity .16s cubic-bezier(0.22,1,0.36,1),transform .14s cubic-bezier(0.22,1,0.36,1),background .18s ease,color .18s ease}button:active{transform:scale(.94);opacity:.82}.hp-scroll{-webkit-overflow-scrolling:touch}.hp-card{transition:box-shadow .18s ease,transform .16s ease}.hp-card:active{transform:scale(.984)}.hp-img{opacity:0;transition:opacity .38s ease}.hp-img-loaded{opacity:1}.hp-input-focus{outline:none;box-shadow:0 0 0 2.5px #6366F133;border-color:#6366F1!important}.hp-sk{background:linear-gradient(90deg,#17171F 25%,#252533 50%,#17171F 75%);background-size:600px 100%;animation:hp-shimmer 1.5s infinite linear;border-radius:8px}";
 function useAnimations(){useEffect(function(){if(document.getElementById("hp-a"))return;var s=document.createElement("style");s.id="hp-a";s.textContent=ANIM_CSS;document.head.appendChild(s);},[]);}
 
 const HOTELS=[
@@ -397,7 +397,8 @@ function useToast(){
   function Toast(){
     if(!toast)return null;
     var bg={success:DS.success,error:DS.error,info:DS.info,warning:DS.warning}[toast.type]||DS.card;
-    return(<div onClick={function(){setToast(null);}} style={{position:"fixed",bottom:88,left:"50%",transform:"translateX(-50%)",zIndex:9999,background:bg,color:"#fff",padding:"10px 22px",borderRadius:30,fontSize:13,fontWeight:700,whiteSpace:"nowrap",cursor:"pointer"}}>{toast.msg}</div>);
+    var icon={success:"✓",error:"✕",info:"ℹ",warning:"⚠"}[toast.type]||"";
+    return(<div onClick={function(){setToast(null);}} style={{position:"fixed",bottom:96,left:"50%",transform:"translateX(-50%)",zIndex:9999,background:bg,color:"#fff",padding:"11px 22px",borderRadius:30,fontSize:13,fontWeight:700,whiteSpace:"nowrap",cursor:"pointer",display:"flex",alignItems:"center",gap:8,boxShadow:"0 8px 32px rgba(0,0,0,.45)",animation:"hp-toast-in .28s cubic-bezier(0.22,1,0.36,1)"}}>{icon&&<span style={{fontSize:14}}>{icon}</span>}{toast.msg}</div>);
   }
   return {show:show,Toast:Toast};
 }
@@ -421,6 +422,8 @@ function Av(props){
 function Stars(props){var r=props.r||0;var sz=props.sz||14;return(<span style={{display:"inline-flex",gap:2}}>{[1,2,3,4,5].map(function(i){return <Star key={i} size={sz} fill={i<=r?"#F59E0B":"none"} color={i<=r?"#F59E0B":DS.border} strokeWidth={1.5}/>;})}</span>);}
 
 function Emp(props){var Icon=props.Icon||Package;var title=props.title||"";var sub=props.sub||"";return(<div style={{padding:"48px 20px",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}><Icon size={40} color={DS.textDim} strokeWidth={1}/><div style={{fontSize:15,fontWeight:700,color:DS.textMuted}}>{title}</div>{sub&&<div style={{fontSize:12,color:DS.textDim,maxWidth:240}}>{sub}</div>}</div>);}
+function Sk(props){var w=props.w||"100%";var h=props.h||14;var r=props.r||8;return(<div className="hp-sk" style={{width:w,height:h,borderRadius:r,flexShrink:0}}/>);}
+function FeedSkeleton(){return(<div style={{animation:"hp-fade .2s ease"}}>{[0,1,2].map(function(i){return(<div key={i} style={{background:DS.surface,marginBottom:10,padding:"18px 16px",borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28"}}><div style={{display:"flex",gap:12,marginBottom:14}}><div className="hp-sk" style={{width:52,height:52,borderRadius:"50%",flexShrink:0}}/><div style={{flex:1,display:"flex",flexDirection:"column",gap:8}}><Sk h={13} w="55%"/><Sk h={10} w="35%"/><Sk h={9} w="20%"/></div></div><Sk h={13} w="90%" r={6}/><div style={{marginTop:6}}><Sk h={13} w="70%" r={6}/></div><div className="hp-sk" style={{width:"100%",height:220,borderRadius:0,margin:"14px 0 0"}}/><div style={{display:"flex",gap:8,marginTop:14}}><Sk h={10} w="25%"/><Sk h={10} w="25%"/><Sk h={10} w="20%"/></div></div>);})}</div>);}
 
 function AdBanner(){
   var si=useState(0);var adIdx=si[0];var setAdIdx=si[1];
@@ -444,7 +447,12 @@ function TopBar(props){return(<div style={{display:"flex",alignItems:"center",ju
 
 function BotNav(props){
   var tabs=props.tabs;var active=props.active;var set=props.set;var accent=props.accent;var onHomeRefresh=props.onHomeRefresh;
-  return(<div style={{position:"sticky",bottom:0,background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",zIndex:100}}>{tabs.map(function(tab){var Icon=tab.icon;var id=tab.id;var isAct=active===id;return(<button key={id} onClick={function(){if(id==="feed"&&isAct&&onHomeRefresh)onHomeRefresh();else set(id);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 0 6px",background:"none",border:"none",cursor:"pointer",gap:2}}><Icon size={22} color={isAct?accent:DS.textMuted} strokeWidth={isAct?2.5:1.5}/><div style={{fontSize:9,fontWeight:isAct?700:400,color:isAct?accent:DS.textMuted}}>{tab.label}</div><div style={{width:isAct?16:0,height:2,borderRadius:1,background:accent,transition:"width 0.2s ease",overflow:"hidden"}}/></button>);})}</div>);
+  var sTap=useState(null);var tapped=sTap[0];var setTapped=sTap[1];
+  function tap(id){
+    setTapped(id);setTimeout(function(){setTapped(null);},200);
+    if(id==="feed"&&active===id&&onHomeRefresh)onHomeRefresh();else set(id);
+  }
+  return(<div style={{position:"sticky",bottom:0,background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}}>{tabs.map(function(tab){var Icon=tab.icon;var id=tab.id;var isAct=active===id;var isTapped=tapped===id;return(<button key={id} onClick={function(){tap(id);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"9px 0 7px",background:"none",border:"none",cursor:"pointer",gap:3,transform:isTapped?"scale(.88)":"scale(1)",transition:"transform .14s cubic-bezier(0.22,1,0.36,1)"}}><Icon size={22} color={isAct?accent:DS.textMuted} strokeWidth={isAct?2.5:1.5}/><div style={{fontSize:9,fontWeight:isAct?800:400,color:isAct?accent:DS.textMuted,transition:"color .18s"}}>{tab.label}</div><div style={{width:isAct?18:0,height:2.5,borderRadius:2,background:accent,transition:"width .25s cubic-bezier(0.22,1,0.36,1)"}}/></button>);})}</div>);
 }
 
 function Ov(props){
@@ -1022,9 +1030,14 @@ function ClientFeed(props){
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
     toast("Commentaire supprime","success");
   }
+  var sLoad=useState(true);var loading=sLoad[0];var setLoading=sLoad[1];
+  useEffect(function(){var t=setTimeout(function(){setLoading(false);},350);return function(){clearTimeout(t);};},[]);
+  var sHeart=useState(null);var heartAnim=sHeart[0];var setHeartAnim=sHeart[1];
+  function triggerHeart(id){setHeartAnim(id);setTimeout(function(){setHeartAnim(null);},500);}
   return(
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
+      {loading&&<FeedSkeleton/>}
       {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       {posts.length===0&&<Emp Icon={Home} title="Aucune publication" sub="Les publications des etablissements apparaitront ici"/>}
@@ -1066,17 +1079,17 @@ function ClientFeed(props){
               </div>
             </div>
             <div style={{padding:"0 16px 16px",fontSize:15,color:DS.text,lineHeight:1.7}}>{post.text}</div>
-            {post.img&&<img src={post.img} alt="" onError={function(e){e.target.style.display="none";}} style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}
+            {post.img&&<img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.style.display="none";}} style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px 2px",fontSize:12,color:DS.textDim}}>
               <span>{post.likes} reaction{post.likes!==1?"s":""}</span>
               <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
             <div style={{display:"flex",borderTop:"1px solid "+DS.border+"30",marginTop:8}}>
-              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLike(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
+              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLike(post.id);triggerHeart(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
                 var lb=_i[0];var Icon=_i[1];var col=_i[2];var fn=_i[3];
                 return(
                   <button key={lb} onClick={fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"13px 0",background:"none",border:"none",cursor:"pointer",color:col,fontSize:13,fontWeight:lb==="Liker"&&post.liked?700:500}}>
-                    <Icon size={20} fill={lb==="Liker"&&post.liked?DS.error:"none"} color={col}/>{lb}
+                    <Icon size={20} fill={lb==="Liker"&&post.liked?DS.error:"none"} color={col} style={lb==="Liker"&&heartAnim===post.id?{animation:"hp-heart-pop .5s cubic-bezier(0.22,1,0.36,1)"}:{}}/>{lb}
                   </button>
                 );
               })}
@@ -1679,6 +1692,10 @@ function ProFeed(props){
   var followingPosts=props.followingIds||[];
   function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
   function toggleLike(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});});}
+  var sLoadPro=useState(true);var loadingPro=sLoadPro[0];var setLoadingPro=sLoadPro[1];
+  useEffect(function(){var t=setTimeout(function(){setLoadingPro(false);},350);return function(){clearTimeout(t);};},[]);
+  var sHeartPro=useState(null);var heartAnimPro=sHeartPro[0];var setHeartAnimPro=sHeartPro[1];
+  function triggerHeartPro(id){setHeartAnimPro(id);setTimeout(function(){setHeartAnimPro(null);},500);}
   // Fix #6 : persistance likes Pro
   function toggleLikePro(id){
     setPosts(function(ps){
@@ -1773,6 +1790,7 @@ function ProFeed(props){
           </div>
         </div>
       )}
+      {loadingPro&&<FeedSkeleton/>}
       {posts.length===0&&<Emp Icon={FileText} title="Aucune publication" sub="Vos publications apparaitront ici"/>}
       {posts.map(function(post,_pfi){
         var pc=rC(post.type);
@@ -1810,17 +1828,17 @@ function ProFeed(props){
               </div>
             </div>
             <div style={{padding:"0 16px 16px",fontSize:15,color:DS.text,lineHeight:1.7}}>{post.text}</div>
-            {post.img&&<img src={post.img} alt="" onError={function(e){e.target.style.display="none";}} style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}{post.video&&<video src={post.video} controls style={{width:"100%",maxHeight:620,display:"block",background:"#000"}}/>}
+            {post.img&&<img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.style.display="none";}} style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}{post.video&&<video src={post.video} controls style={{width:"100%",maxHeight:620,display:"block",background:"#000"}}/>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px 2px",fontSize:12,color:DS.textDim}}>
               <span>{post.likes} reaction{post.likes!==1?"s":""}</span>
               <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
             <div style={{display:"flex",borderTop:"1px solid "+DS.border+"30",marginTop:8}}>
-              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLikePro(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
+              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLikePro(post.id);triggerHeartPro(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
                 var lb=_i[0];var Icon=_i[1];var col=_i[2];var fn=_i[3];
                 return(
                   <button key={lb} onClick={fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"13px 0",background:"none",border:"none",cursor:"pointer",color:col,fontSize:13}}>
-                    <Icon size={20} fill={lb==="Liker"&&post.liked?DS.error:"none"} color={col}/>{lb}
+                    <Icon size={20} fill={lb==="Liker"&&post.liked?DS.error:"none"} color={col} style={lb==="Liker"&&heartAnimPro===post.id?{animation:"hp-heart-pop .5s cubic-bezier(0.22,1,0.36,1)"}:{}}/>{lb}
                   </button>
                 );
               })}
