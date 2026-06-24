@@ -1005,10 +1005,10 @@ function CommentsSheet(props){
     }
     prevCmtLen.current=post.comments.length;
   },[post.comments.length]);
-  var backdropStyle={position:"fixed",inset:0,background:closing?"rgba(0,0,0,0)":"rgba(0,0,0,.55)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center",transition:closing?"background .26s ease":"none"};
+  var backdropStyle={position:"fixed",top:52,left:0,right:0,bottom:0,background:closing?"rgba(0,0,0,0)":"rgba(0,0,0,.45)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center",transition:closing?"background .26s ease":"none",maxWidth:420,marginLeft:"auto",marginRight:"auto"};
   var sheetAnim=closing?"hp-sheet-out 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-up 0.32s cubic-bezier(0.22,1,0.36,1)";
   return(<div style={backdropStyle}>
-    <div style={{width:"100%",maxWidth:480,height:"70vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:sheetAnim,transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
+    <div style={{width:"100%",maxWidth:420,height:"60vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:sheetAnim,transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
       {/* Poignee drag */}
       <div onTouchStart={onHeadTouchStart} onTouchMove={onHeadTouchMove} onTouchEnd={onHeadTouchEnd} onMouseDown={onHeadMouseDown} style={{flexShrink:0,paddingTop:9,paddingBottom:4,cursor:"grab",userSelect:"none",touchAction:"none",textAlign:"center"}}>
         <div style={{width:40,height:4,borderRadius:2,background:DS.textDim,display:"inline-block"}}/>
