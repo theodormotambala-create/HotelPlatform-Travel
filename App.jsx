@@ -29,7 +29,7 @@ function fmtK(n){
   return String(n);
 }
 
-const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}button{transition:opacity .18s cubic-bezier(0.22,1,0.36,1),transform .16s cubic-bezier(0.22,1,0.36,1),background .2s ease}button:active{transform:scale(.96);opacity:.85}.hp-scroll{-webkit-overflow-scrolling:touch}";
+const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}@keyframes hp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}button{transition:opacity .18s cubic-bezier(0.22,1,0.36,1),transform .16s cubic-bezier(0.22,1,0.36,1),background .2s ease}button:active{transform:scale(.96);opacity:.85}.hp-scroll{-webkit-overflow-scrolling:touch}";
 function useAnimations(){useEffect(function(){if(document.getElementById("hp-a"))return;var s=document.createElement("style");s.id="hp-a";s.textContent=ANIM_CSS;document.head.appendChild(s);},[]);}
 
 const HOTELS=[
@@ -308,22 +308,20 @@ var AuthService = {
 //   }
 // =====================================================================
 var BookingService = {
-  // Genere un identifiant de reservation unique
+  _all: (function(){try{return JSON.parse(localStorage.getItem("hp_resas_all")||"[]");}catch(e){return [];}}()),
   generateId: function(){
     return "R" + Date.now().toString().slice(-8);
   },
-  // Cree une reservation a partir des donnees du parcours (objet deja construit)
-  // Retourne l'objet final (avec garde-fous). FUTUR: persistance backend ici.
   createBooking: function(resa){
     if(!resa) return null;
-    // garantir un id et un horodatage
     if(!resa.id){ resa.id = BookingService.generateId(); }
     if(!resa.createdAt){ resa.createdAt = new Date().toISOString(); }
-    // Persistance Supabase optionnelle, en arriere-plan (n'affecte pas l'UI)
+    BookingService._all.push(resa);
+    try{localStorage.setItem("hp_resas_all",JSON.stringify(BookingService._all));}catch(e){}
     try{ if(DataLayer._client){ DataLayer.saveReservation(resa).then(function(){}); } }catch(e){}
     return resa;
   },
-  // Ajoute une reservation a l'historique (logique d'etat pure, reutilisable)
+  getAll: function(){ return BookingService._all.slice(); },
   appendToHistory: function(history, resa){
     return (history || []).concat([resa]);
   }
@@ -982,16 +980,19 @@ function ClientDisc(props){
   var items=tab==="hotels"?DataLayer.getHotels():DataLayer.getRestaurants();
   var filtered=items.filter(function(i){return i.name.toLowerCase().indexOf(search.toLowerCase())>=0||i.location.toLowerCase().indexOf(search.toLowerCase())>=0;});
   var color=tab==="hotels"?DS.hotel:DS.restaurant;
-  return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{padding:"0 14px",paddingBottom:16}}>{filtered.length===0?<Emp Icon={Search} title="Aucun resultat"/>:filtered.map(function(item){return(<div key={item.id} style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.verified&&<div style={{position:"absolute",top:8,left:8}}><VBadge sz={20}/></div>}{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){if(item.svcMode==="combined"){if(onProfile)onProfile(item.id,item.type);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>Reserver</button></div></div>);})}</div></div>);
+  return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{padding:"0 14px",paddingBottom:16}}>{filtered.length===0?<Emp Icon={Search} title="Aucun resultat"/>:filtered.map(function(item){return(<div key={item.id} style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.verified&&<div style={{position:"absolute",top:8,left:8}}><VBadge sz={20}/></div>}{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){if(item.svcMode==="combined"){if(onProfile)onProfile(item.id,item.type);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>{item.svcMode==="combined"?"Voir options":"Reserver"}</button></div></div>);})}</div></div>);
 }
 
 function ClientProf(props){
   var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var followingCount=props.followingCount||0;
   var selfEmail=props.selfEmail||"";var displayName=selfEmail?selfEmail.split("@")[0]:"Mon profil";var displayLetter=(displayName[0]||"M").toUpperCase();
+  var _allEstabs=DataLayer.getHotels().concat(DataLayer.getRestaurants());
+  var favEstabIds=props.favEstabIds||[];
+  var favEstabs=favEstabIds.map(function(id){return _allEstabs.find(function(x){return x.id===id;});}).filter(Boolean);
   var s1=useState("reservations");var tab=s1[0];var setTab=s1[1];
   var sq=useState(null);var activeQR=sq[0];var setActiveQR=sq[1];
 
-  return(<div style={{paddingBottom:20}}><LoyaltyWidget points={620} level="silver"/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><Av sz={72} letter={displayLetter}/><div style={{fontSize:18,fontWeight:800,color:DS.text,marginTop:10}}>{displayName}</div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{selfEmail||""}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],["5","Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
+  return(<div style={{paddingBottom:20}}><LoyaltyWidget points={620} level="silver"/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><Av sz={72} letter={displayLetter}/><div style={{fontSize:18,fontWeight:800,color:DS.text,marginTop:10}}>{displayName}</div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{selfEmail||""}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
           (resaHistory&&resaHistory.length>0)?resaHistory.map(function(r,i){
             var showQR=activeQR===i;
             var st=r.status||"pending";
@@ -1049,8 +1050,8 @@ function ClientProf(props){
                         </div>
                       );})}
                     </div>
-                    {st==="pending"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:8,padding:"6px 10px",marginBottom:10,fontSize:10,color:DS.warning,fontWeight:700}}>Code en attente d activation - sera valide des acceptation</div>}
-                    <div style={{display:"inline-flex",padding:12,background:"#fff",borderRadius:12,marginBottom:12,opacity:st==="consumed"?0.5:(st==="pending"?0.55:1)}}>
+                    {st==="pending"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:8,padding:"6px 10px",marginBottom:10,fontSize:10,color:DS.warning,fontWeight:700}}>En attente de confirmation - presentez ce code a l etablissement</div>}
+                    <div style={{display:"inline-flex",padding:12,background:"#fff",borderRadius:12,marginBottom:12,opacity:st==="consumed"?0.4:1}}>
                       <div style={{width:110,height:110,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
                         {[1,1,1,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,0,1,1,1,1,1,0,1,0,1,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,1,1,0,1,0,1,1,1].map(function(px,pi){return <div key={pi} style={{background:px?"#000":"#fff"}}/>;  })}
                       </div>
@@ -1069,7 +1070,7 @@ function ClientProf(props){
           })
           : <Emp Icon={Calendar} title="Aucune reservation" sub="Vos reservations apparaitront ici apres votre premiere reservation"/>
         )}
-        {tab==="favoris"&&<Emp Icon={Heart} title="Aucun favori"/>}</div></div>);
+        {tab==="favoris"&&(favEstabs.length>0?favEstabs.map(function(est){return(<div key={est.id} style={{background:DS.card,borderRadius:14,marginBottom:10,border:"1px solid "+DS.border,overflow:"hidden"}}><div style={{height:80,position:"relative"}}><img src={est.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{est.verified&&<div style={{position:"absolute",top:6,left:8}}><VBadge sz={16}/></div>}</div><div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:800,color:DS.text}}>{est.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{est.location}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><Stars r={est.rating} sz={10}/><span style={{fontSize:10,color:DS.textMuted}}>({est.reviewCount})</span></div></div><div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{est.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div></div>);}):<Emp Icon={Heart} title="Aucun favori" sub="Appuyez sur le coeur d un etablissement pour l ajouter"/>)}</div></div>);
 }
 
 function ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro){
@@ -1111,13 +1112,16 @@ function EstabM(props){
   var isFollowing=followingIds.indexOf(e.id)>=0;
   var followersCount=(e.followers||0)+(isFollowing?1:0);
   function toggleFollow(){if(props.onToggleFollow)props.onToggleFollow(e.id);}
+  var favEstabIds=props.favEstabIds||[];
+  var isFavEstab=favEstabIds.indexOf(e.id)>=0;
+  function toggleFavEstab(){if(props.onToggleFavEstab)props.onToggleFavEstab(e.id);}
   var color=rC(e.type);var isHotel=e.type==="hotel";
   var isCombinedEstab=isHotel&&e.svcMode==="combined";
   var comboMealsTotal=(e.meals||[]).filter(function(m){return comboMeals.indexOf(m.id)>=0;}).reduce(function(s,m){return s+m.price;},0);
   var comboTotal=(comboRoom?comboRoom.price:0)+comboMealsTotal;
   return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:900,maxWidth:420,margin:"0 auto",overflowY:"auto",animation:(closingE?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}><Toast/><div style={{position:"relative",height:220,flexShrink:0}}><img src={e.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/><div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.2),rgba(0,0,0,.6))"}}/><div style={{position:"absolute",top:12,left:12}}><BackBtn onClick={onClose} light={true}/></div>{e.verified&&<div style={{position:"absolute",bottom:12,left:12,display:"flex",alignItems:"center",gap:5}}><VBadge sz={22}/><span style={{fontSize:11,color:"#fff",fontWeight:700}}>Verifie</span></div>}</div><div style={{padding:"16px 16px 8px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{fontSize:20,fontWeight:900,color:DS.text}}>{e.name}</div><div onClick={function(){window.open("https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location));}} style={{fontSize:12,color:DS.primary,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><MapPin size={11}/>{e.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:18,fontWeight:900,color:DS.gold}}>A partir de {e.priceFrom} EUR</div></div></div><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><Stars r={e.rating} sz={15}/><span style={{fontSize:13,fontWeight:800,color:DS.text}}>{e.rating}</span><span style={{fontSize:13,color:DS.textDim}}>-</span><span style={{fontSize:13,fontWeight:700,color:DS.text}}>{fmtK(followersCount)}</span><span style={{fontSize:12,color:DS.textMuted}}>abonnes</span></div><div style={{display:"flex",gap:8,marginBottom:16}}>{viewerIsPro
                 ? <div style={{flex:2,padding:"9px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textDim,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:5,minHeight:36}}><Lock size={12}/>Reservation indisponible</div>
-                : <button onClick={function(){if(isCombinedEstab){setTab(resaType==="restaurant"?"menu":resaType==="combined"?"combo":"rooms");}else if(onBook){onBook(e);}}} style={{flex:2,padding:"9px 14px",background:color,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,minHeight:36}}><Calendar size={13}/>Reserver</button>}<button onClick={function(){if(onChat)onChat(e);if(onClose)onClose();}} style={{flex:viewerIsPro?2:1,padding:"9px 8px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textMuted,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}><MessageCircle size={13}/>Chat</button><button onClick={function(){window.open("https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location));}} style={{width:36,height:36,background:DS.card,border:"1px solid "+DS.border,borderRadius:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Voir sur la carte"><MapPin size={15} color={DS.primary}/></button><button onClick={toggleFollow} style={{flex:1,padding:"9px 8px",background:isFollowing?color+"18":DS.card,border:"1px solid "+(isFollowing?color:DS.border),borderRadius:20,color:isFollowing?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}>{isFollowing?<UserCheck size={14} color={color}/>:<UserPlus size={14} color={DS.textMuted}/>}{isFollowing?"Suivi":"Suivre"}</button><button style={{width:36,height:36,background:DS.card,border:"1px solid "+DS.border,borderRadius:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Heart size={15} color={DS.error}/></button></div>{isCombinedEstab&&!viewerIsPro&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:6}}>TYPE DE RESERVATION</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{[["hotel","Hotel uniquement"],["restaurant","Restaurant uniquement"],["combined","Reservation combinee (Hotel + Restaurant)"]].map(function(_i){var v=_i[0];var l=_i[1];var isSel=resaType===v;return(<button key={v} onClick={function(){setResaType(v);setTab(v==="restaurant"?"menu":v==="combined"?"combo":"rooms");}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:"pointer",textAlign:"left"}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isSel?color:DS.border),background:isSel?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel&&<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>}</div><span style={{fontSize:12,color:isSel?color:DS.text,fontWeight:isSel?700:400}}>{l}</span></button>);})}</div></div>}<div style={{display:"flex",gap:4,marginBottom:16}}>{ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro).map(function(_i){var t2=_i[0];var l=_i[1];var isAct=tab===t2;return <button key={t2} onClick={function(){setTab(t2);}} style={{flex:1,padding:"8px 4px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})} </div>{tab==="about"&&<div><div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6}}>{e.description}</div></div>}{tab==="amenities"&&<div>{(e.services||[]).filter(function(s){return typeof s==="string"||s.active!==false;}).map(function(s,i){var nm=typeof s==="string"?s:s.name;var Ic=getIcon(nm);var actSvcs=(e.services||[]).filter(function(x){return typeof x==="string"||x.active!==false;});return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:i<actSvcs.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{width:28,height:28,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><span style={{fontSize:12,color:DS.text}}>{nm}</span></div>);})}</div>}{tab==="rooms"&&isHotel&&(e.rooms||[]).map(function(r){return(<div key={r.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:10,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{r.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{r.capacity} personnes</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{r.price} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>par nuit</div></div></div>{viewerIsPro
+                : <button onClick={function(){if(isCombinedEstab){setTab(resaType==="restaurant"?"menu":resaType==="combined"?"combo":"rooms");}else if(onBook){onBook(e);}}} style={{flex:2,padding:"9px 14px",background:color,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,minHeight:36}}><Calendar size={13}/>Reserver</button>}<button onClick={function(){if(onChat)onChat(e);if(onClose)onClose();}} style={{flex:viewerIsPro?2:1,padding:"9px 8px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textMuted,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}><MessageCircle size={13}/>Chat</button><button onClick={function(){window.open("https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location));}} style={{width:36,height:36,background:DS.card,border:"1px solid "+DS.border,borderRadius:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Voir sur la carte"><MapPin size={15} color={DS.primary}/></button><button onClick={toggleFollow} style={{flex:1,padding:"9px 8px",background:isFollowing?color+"18":DS.card,border:"1px solid "+(isFollowing?color:DS.border),borderRadius:20,color:isFollowing?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}>{isFollowing?<UserCheck size={14} color={color}/>:<UserPlus size={14} color={DS.textMuted}/>}{isFollowing?"Suivi":"Suivre"}</button><button onClick={toggleFavEstab} style={{width:36,height:36,background:isFavEstab?DS.error+"18":DS.card,border:"1px solid "+(isFavEstab?DS.error+"55":DS.border),borderRadius:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"background .2s,border .2s"}}><Heart size={15} color={DS.error} fill={isFavEstab?DS.error:"none"}/></button></div>{isCombinedEstab&&!viewerIsPro&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:6}}>TYPE DE RESERVATION</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{[["hotel","Hotel uniquement"],["restaurant","Restaurant uniquement"],["combined","Reservation combinee (Hotel + Restaurant)"]].map(function(_i){var v=_i[0];var l=_i[1];var isSel=resaType===v;return(<button key={v} onClick={function(){setResaType(v);setTab(v==="restaurant"?"menu":v==="combined"?"combo":"rooms");}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:"pointer",textAlign:"left"}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isSel?color:DS.border),background:isSel?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel&&<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>}</div><span style={{fontSize:12,color:isSel?color:DS.text,fontWeight:isSel?700:400}}>{l}</span></button>);})}</div></div>}<div style={{display:"flex",gap:4,marginBottom:16}}>{ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro).map(function(_i){var t2=_i[0];var l=_i[1];var isAct=tab===t2;return <button key={t2} onClick={function(){setTab(t2);}} style={{flex:1,padding:"8px 4px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})} </div>{tab==="about"&&<div><div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6}}>{e.description}</div></div>}{tab==="amenities"&&<div>{(e.services||[]).filter(function(s){return typeof s==="string"||s.active!==false;}).map(function(s,i){var nm=typeof s==="string"?s:s.name;var Ic=getIcon(nm);var actSvcs=(e.services||[]).filter(function(x){return typeof x==="string"||x.active!==false;});return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:i<actSvcs.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{width:28,height:28,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><span style={{fontSize:12,color:DS.text}}>{nm}</span></div>);})}</div>}{tab==="rooms"&&isHotel&&(e.rooms||[]).map(function(r){return(<div key={r.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:10,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{r.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{r.capacity} personnes</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{r.price} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>par nuit</div></div></div>{viewerIsPro
                     ? <div style={{width:"100%",padding:"8px",background:"transparent",border:"1px solid "+DS.border,borderRadius:8,color:DS.textDim,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><Lock size={11}/>Reservation indisponible</div>
                     : <button onClick={function(){if(r.available&&onBook)onBook(Object.assign({},e,{selectedRoom:r}));}} style={{width:"100%",padding:"8px",background:r.available?color:"transparent",border:"1px solid "+(r.available?color:DS.textDim),borderRadius:8,color:r.available?"#fff":DS.textDim,fontSize:12,fontWeight:700,cursor:r.available?"pointer":"not-allowed"}}>{r.available?"Reserver":"Non disponible"}</button>}</div>);})}{tab==="combo"&&isCombinedEstab&&(
             <div>
@@ -1153,7 +1157,7 @@ function EstabM(props){
                     <div style={{fontSize:12,color:DS.textMuted}}>{comboRoom?"1 chambre":"Aucune chambre"} + {comboMeals.length} repas{comboTable?" + table":""}</div>
                     <div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{comboTotal.toFixed(0)} EUR / nuit</div>
                   </div>
-                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboTable:comboTable,comboTotal:comboTotal,isCombo:true}));else toast("Choisissez une chambre","error");}} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboTable:comboTable,comboTotal:comboTotal,isCombo:true}));else toast("Selectionnez d abord une chambre","error");}} style={{width:"100%",padding:"11px",background:comboRoom?color:DS.textDim,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:comboRoom?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:comboRoom?1:0.6,transition:"background .2s,opacity .2s"}}>
                     <Calendar size={14}/>Reserver le sejour combine
                   </button>
                 </div>
@@ -1203,6 +1207,10 @@ function EstabM(props){
             }<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier"/></div>}</div></div>);
 }
 
+function genQRPixels(id){
+  var s=0;for(var ci=0;ci<id.length;ci++){s=((s*31+id.charCodeAt(ci))&0x7FFFFFFF)>>>0;}
+  return Array.from({length:100},function(_,j){s=((s*1664525+1013904223)&0x7FFFFFFF)>>>0;return (s>>>15)&1;});
+}
 function BookM(props){
   var e=props.e;var onClose=props.onClose;
   if(!e)return null;
@@ -1216,13 +1224,13 @@ function BookM(props){
   function computeDateOut(din,nc){if(!din)return"";var d=new Date(din);d.setDate(d.getDate()+nc);return d.toISOString().slice(0,10);}
   var s5=useState("sans");var payMode=s5[0];var setPayMode=s5[1];
   var s6=useState("mobile");var payMethod=s6[0];var setPayMethod=s6[1];
-  var s7=useState(false);var confirmed=s7[0];var setConfirmed=s7[1];
+  var spay=useState(false);var paying=spay[0];var setPaying=spay[1];
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
-  var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
-  var sf=useState([]);var favPosts=sf[0];var setFavPosts=sf[1];
-  var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
-  function toggleFav(id){setFavPosts(function(f){return f.indexOf(id)>=0?f.filter(function(x){return x!==id;}):f.concat([id]);});setMenuOpen(null);toast(favPosts.indexOf(id)>=0?"Retire des favoris":"Ajoute aux favoris","success");}
-  function openReport(post){setMenuOpen(null);setReportTarget(post);}
+  var _ridRef=useRef(null);if(!_ridRef.current){_ridRef.current="HP-"+Math.floor(100000+Math.random()*900000);}
+  var resaId=_ridRef.current;
+  var _today=new Date().toISOString().slice(0,10);
+  var selfEmail=props.selfEmail||"";
+  var clientName=selfEmail.split("@")[0]||"Client";
   var isCombo=e.isCombo===true;
   var hasDishes=e.selectedDishes&&e.selectedDishes.length>0;
   var isHotelBooking=e.type==="hotel";
@@ -1231,10 +1239,10 @@ function BookM(props){
   var dateOut=isHotelBooking?(dateIn?computeDateOut(dateIn,nightsCount):""):dateIn;
   var basePrice=isCombo?e.comboTotal:(hasDishes?e.dishTotal:(e.selectedRoom?e.selectedRoom.price:e.priceFrom));
   var totalPrice=isCombo?basePrice*nights:(hasDishes?basePrice*tableCount:(isHotelBooking?basePrice*nights*roomCount:basePrice*tableCount));
-  var resaId="HP-"+Math.floor(100000+Math.random()*900000);
   var serviceLabel=isCombo?("Sejour combine - "+e.selectedRoom.name):(hasDishes?(e.selectedDishes.length+" plat"+(e.selectedDishes.length>1?"s":"")+" selectionne"+(e.selectedDishes.length>1?"s":"")):(e.selectedRoom?e.selectedRoom.name:(e.type==="hotel"?"Chambre Standard":"Reservation")));
   var guestsLabel=isRestaurantBooking?"NOMBRE DE CONVIVES":"NOMBRE DE VOYAGEURS";
   var dateLabel=isRestaurantBooking?"DATE DE RESERVATION":"DATE D ARRIVEE";
+  var qrPixels=genQRPixels(resaId);
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1100,display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"hp-fade 0.2s ease"}}>
       <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"94vh",overflowY:"auto",animation:"hp-slide-up 0.3s ease"}}>
@@ -1259,7 +1267,7 @@ function BookM(props){
                 <div style={{display:"flex",gap:10,marginBottom:14}}>
                   <div style={{flex:1}}>
                     <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>{dateLabel}</div>
-                    <input type="date" value={dateIn} onChange={function(ev){setDateIn(ev.target.value);}} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 12px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+                    <input type="date" min={_today} value={dateIn} onChange={function(ev){setDateIn(ev.target.value);}} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 12px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
                   </div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>NOMBRE DE NUITS</div>
@@ -1273,7 +1281,7 @@ function BookM(props){
               ):(
                 <div style={{marginBottom:14}}>
                   <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>{dateLabel}</div>
-                  <input type="date" value={dateIn} onChange={function(ev){setDateIn(ev.target.value);}} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 12px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+                  <input type="date" min={_today} value={dateIn} onChange={function(ev){setDateIn(ev.target.value);}} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 12px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
                   <div style={{fontSize:10,color:DS.textDim,marginTop:5}}>Reservation pour une date unique, sans nuitee</div>
                 </div>
               )}
@@ -1376,12 +1384,20 @@ function BookM(props){
               <div style={{display:"flex",gap:8,marginTop:8}}>
                 <button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
                 <button onClick={function(){
-                  var initStatus=payMode==="avec"?"confirmed":"pending";
-                  var resa={id:resaId,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
-                  setStep(3);toast(payMode==="avec"?"Reservation confirmee !":"Demande envoyee a l etablissement !","success");
-                  if(props.onBooked)props.onBooked(BookingService.createBooking(resa));
-                }} style={{flex:2,padding:"11px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:900,cursor:"pointer"}}>
-                  {payMode==="avec"?"Payer "+totalPrice.toFixed(0)+" EUR":"Confirmer la reservation"}
+                  if(paying)return;
+                  setPaying(true);
+                  var delay=payMode==="avec"?1100:500;
+                  setTimeout(function(){
+                    var initStatus=payMode==="avec"?"confirmed":"pending";
+                    var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                    setPaying(false);
+                    setStep(3);
+                    toast(payMode==="avec"?"Reservation confirmee !":"Demande envoyee a l etablissement !","success");
+                    if(props.onBooked)props.onBooked(BookingService.createBooking(resa));
+                  },delay);
+                }} style={{flex:2,padding:"11px",background:paying?DS.textDim:color,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:900,cursor:paying?"not-allowed":"pointer",transition:"background .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  {paying?<span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite"}}/>:null}
+                  {paying?"Traitement en cours...":(payMode==="avec"?"Payer "+totalPrice.toFixed(0)+" EUR":"Confirmer la reservation")}
                 </button>
               </div>
             </div>
@@ -1427,14 +1443,14 @@ function BookM(props){
                   <div style={{fontSize:10,color:DS.textMuted,marginBottom:10}}>CODE QR - A PRESENTER A L ETABLISSEMENT</div>
                   <div style={{display:"inline-flex",padding:12,background:"#fff",borderRadius:12,margin:"0 auto"}}>
                     <div style={{width:120,height:120,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                      {[1,1,1,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,0,1,1,1,1,1,0,1,0,1,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,1,1,0,1,0,1,1,1].map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff",borderRadius:1}}/>;  })}
+                      {qrPixels.map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff",borderRadius:1}}/>;  })}
                     </div>
                   </div>
                   <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace"}}>{resaId}</div>
                 </div>
               </div>
-              <div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:DS.warning,lineHeight:1.5}}>
-                {isRestaurantBooking?"Ce ticket reste valide jusqu a la date de reservation. L etablissement scannera votre QR code a votre arrivee.":"Ce ticket reste valide jusqu a la date d arrivee. L etablissement scannera votre QR code pour confirmer votre arrivee."}
+              <div style={{background:DS.successSoft,border:"1px solid "+DS.success+"33",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:DS.success,lineHeight:1.5,display:"flex",alignItems:"center",gap:8}}>
+                <CheckCircle size={13} color={DS.success}/>{isRestaurantBooking?"Ce ticket est valide jusqu a votre arrivee. L etablissement scannera votre QR code.":"Ce ticket est valide jusqu a votre arrivee. L etablissement scannera votre QR code pour confirmer."}
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={function(){setStep(4);}} style={{flex:1,padding:"11px",background:DS.primarySoft,border:"1px solid "+DS.primary+"33",borderRadius:12,color:DS.primary,fontSize:12,fontWeight:700,cursor:"pointer"}}>Voir le ticket</button>
@@ -1477,14 +1493,17 @@ function BookM(props){
                 <div style={{textAlign:"center",padding:"16px",borderTop:"1px solid "+DS.border+"30",background:DS.surface}}>
                   <div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}>
                     <div style={{width:100,height:100,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                      {[1,1,1,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,0,1,1,1,1,1,0,1,0,1,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,1,1,0,1,0,1,1,1].map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
+                      {qrPixels.map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
                     </div>
                   </div>
                   <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace",letterSpacing:1}}>{resaId}</div>
-                  <div style={{fontSize:10,color:DS.textDim,marginTop:4}}>Valide jusqu au {dateIn||"--"}</div>
+                  <div style={{fontSize:10,color:DS.textDim,marginTop:4}}>Valide jusqu au scannage de l etablissement</div>
                 </div>
               </div>
-              <button onClick={onClose} style={{width:"100%",padding:"12px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer"}}>Fermer</button>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={function(){setStep(3);}} style={{flex:1,padding:"12px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Retour</button>
+                <button onClick={onClose} style={{flex:2,padding:"12px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer"}}>Fermer</button>
+              </div>
             </div>
           )}
         </div>
@@ -2246,13 +2265,17 @@ function RestOff(props){
 function ProResa(props){
   var proType=props.proType;var onOpenChat=props.onOpenChat;
   var clientPrivacySettings=props.clientPrivacySettings||{locked:false,msgPermission:"everyone"};
-  var CONNECTED_CLIENT_NAME="Moussa Konate";
+  var selfEmail=props.selfEmail||"";
+  var CONNECTED_CLIENT_NAME=selfEmail.split("@")[0]||"Client";
   var color=rC(proType);
-  var s1=useState([
-    {id:"R001",client:"Moussa Konate",service:"Suite Presidentielle",dateIn:"2025-07-24",dateOut:"2025-07-27",nights:3,guests:2,total:1350,payMode:"avec",status:"confirmed",qrScanned:false},
-    {id:"R002",client:"Aicha Mbaye",service:"Chambre Superieure",dateIn:"2025-07-22",dateOut:"2025-07-24",nights:2,guests:4,total:480,payMode:"avec",status:"pending",qrScanned:false},
-    {id:"R003",client:"Ibrahima Diop",service:"Chambre Deluxe",dateIn:"2025-07-21",dateOut:"2025-07-22",nights:1,guests:1,total:0,payMode:"sans",status:"completed",qrScanned:true},
-  ]);
+  var _liveResas=BookingService.getAll().map(function(r){return {id:r.id,client:r.clientName||CONNECTED_CLIENT_NAME,service:r.service||"Reservation",dateIn:r.dateIn||"",dateOut:r.dateOut||r.dateIn||"",nights:r.nights||1,guests:r.guests||1,total:r.total||0,payMode:r.payMode||"sans",status:r.status||"pending",qrScanned:r.status==="consumed"};});
+  var s1=useState(function(){
+    return _liveResas.concat([
+      {id:"R001",client:"Aicha Mbaye",service:"Suite Presidentielle",dateIn:"2025-07-24",dateOut:"2025-07-27",nights:3,guests:2,total:1350,payMode:"avec",status:"confirmed",qrScanned:false},
+      {id:"R002",client:"Ibrahima Diop",service:"Chambre Superieure",dateIn:"2025-07-22",dateOut:"2025-07-24",nights:2,guests:4,total:480,payMode:"avec",status:"pending",qrScanned:false},
+      {id:"R003",client:"Fatou Sene",service:"Chambre Deluxe",dateIn:"2025-07-21",dateOut:"2025-07-22",nights:1,guests:1,total:0,payMode:"sans",status:"completed",qrScanned:true},
+    ]);
+  });
   var resas=s1[0];var setResas=s1[1];
   var s2=useState("all");var filter=s2[0];var setFilter=s2[1];
   var s3=useState(null);var scanTarget=s3[0];var setScanTarget=s3[1];
@@ -2512,8 +2535,12 @@ export default function App() {
     setPremiumData(null);
     tk.show("Abonnement Premium annule","success");
   }
-  var s11=useState([]);   var resaHistory=s11[0];   var setResaHistory=s11[1];
-  var s12=useState([]);   var followingIds=s12[0];  var setFollowingIds=s12[1];
+  var s11=useState(function(){try{return JSON.parse(localStorage.getItem("hp_resas")||"[]");}catch(e){return[];}});
+  var resaHistory=s11[0];   var setResaHistory=s11[1];
+  var s12=useState(function(){try{return JSON.parse(localStorage.getItem("hp_following")||"[]");}catch(e){return[];}});
+  var followingIds=s12[0];  var setFollowingIds=s12[1];
+  var s13fav=useState(function(){try{return JSON.parse(localStorage.getItem("hp_fav_estabs")||"[]");}catch(e){return[];}});
+  var favEstabIds=s13fav[0]; var setFavEstabIds=s13fav[1];
   var tk=useToast(); var Toast=tk.Toast;
   // === Bouton retour systeme (Android/navigateur) : ferme l'ecran courant au lieu de quitter l'app ===
   var anyOverlayOpen=(estab!==null)||(book!==null)||sett||notifsOpen||showPremium||showPrivacy;
@@ -2553,8 +2580,13 @@ export default function App() {
   },[anyOverlayOpen]);
   function toggleFollowGlobal(id){
     var was=followingIds.indexOf(id)>=0;
-    setFollowingIds(function(f){return was?f.filter(function(x){return x!==id;}):f.concat([id]);});
-    tk.show(was?"Vous ne suivez plus":"Vous suivez desormais","success");
+    setFollowingIds(function(f){var next=was?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_following",JSON.stringify(next));}catch(e){}return next;});
+    tk.show(was?"Vous ne suivez plus cet etablissement":"Vous suivez cet etablissement","success");
+  }
+  function toggleFavEstab(id){
+    var wasFav=favEstabIds.indexOf(id)>=0;
+    setFavEstabIds(function(f){var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_fav_estabs",JSON.stringify(next));}catch(e){}return next;});
+    tk.show(wasFav?"Retire des favoris":"Ajoute aux favoris","success");
   }
 
   // Logout - defini avant le routing pour eviter reference error
@@ -2631,11 +2663,11 @@ export default function App() {
           {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV"/>}
-          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email}/>}
+          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
-        {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} viewerIsPro={false}/>}
-        {book&&<BookM e={book} onClose={function(){setBook(null);}} onBooked={function(resa){setResaHistory(function(h){return BookingService.appendToHistory(h,resa);});setBook(null);}}/>}
+        {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false}/>}
+        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});setBook(null);}}/>}
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
         <Toast/>
@@ -2672,13 +2704,13 @@ export default function App() {
         {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
-        {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings}/>}
+        {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
         {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]}/>}
         {pTab==="profile"      &&<ProProf proType={auth.type} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
-      {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} viewerIsPro={true}/>}
-      {book&&<BookM e={book} onClose={function(){setBook(null);}} onBooked={function(resa){setResaHistory(function(h){return BookingService.appendToHistory(h,resa);});setBook(null);}}/>}
+      {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true}/>}
+      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});setBook(null);}}/>}
       {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
       <Toast/>
