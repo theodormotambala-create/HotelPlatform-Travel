@@ -1,4 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+
+// ⚠️ MODE DEV — mettre à false pour réactiver l'authentification
+const DEV_BYPASS_AUTH = true;
+const DEV_ACCOUNT_TYPE = "client"; // "client" | "hotel" | "restaurant"
 import {
   Home, Search, MessageCircle, User, Bell, Settings, Star, Heart,
   Share2, Link2, MapPin, ArrowLeft, X, Plus, Trash2, Edit2, Eye, Calendar,
@@ -2802,7 +2806,13 @@ export default function App() {
 
   // === ROUTING =====================================================
 
-  if(!auth){
+  // Mode dev : court-circuit l'auth sans rien casser
+  var _resolvedAuth = auth;
+  if(!auth && DEV_BYPASS_AUTH){
+    _resolvedAuth = AuthService.buildSession(DEV_ACCOUNT_TYPE, "active", "demo@hotelplatform.travel", "dev-user-001");
+  }
+
+  if(!_resolvedAuth){
     if(needsOnboarding){
       return(<AccountTypeScreen onSelect={function(t){try{localStorage.setItem("hp_acc_type",t);}catch(e){}setNeedsOnboarding(false);}}/>);
     }
@@ -2814,6 +2824,8 @@ export default function App() {
       }} onBack={function(){try{localStorage.removeItem("hp_acc_type");}catch(e){}setNeedsOnboarding(true);}}/>
     );
   }
+
+  var auth=_resolvedAuth; // alias final — écrase le useState auth si dev bypass actif
 
   var BLOCKED_STATUSES=["pending","suspended","banned","refused","disabled"];
   if(BLOCKED_STATUSES.indexOf(auth.accountStatus)>=0){
