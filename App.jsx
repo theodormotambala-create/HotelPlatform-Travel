@@ -2759,21 +2759,24 @@ export default function App() {
   }
   var overlayRef=useRef(false);
   overlayRef.current=anyOverlayOpen;
+  // Ref toujours a jour vers closeTopOverlay — evite la closure gelee dans useEffect
+  var closeTopOverlayRef=useRef(null);
+  closeTopOverlayRef.current=closeTopOverlay;
   var guardPushed=useRef(false);
-  // Installe UN SEUL listener popstate pour toute la duree de vie de l'app
+  // Installe UN SEUL listener popstate — utilise les refs pour lire l'etat courant
   useEffect(function(){
+    // Arme une entree initiale pour capturer le premier retour
+    try{window.history.pushState({hpGuard:true},"");}catch(e){}
     function onPop(){
       if(overlayRef.current){
-        // Un ecran est ouvert : on le ferme ET on re-arme une entree d'historique
-        // pour que le PROCHAIN retour soit aussi capture (et ne quitte pas l'app)
-        closeTopOverlay();
+        closeTopOverlayRef.current();
         try{window.history.pushState({hpGuard:true},"");}catch(e){}
       }
     }
     window.addEventListener("popstate",onPop);
     return function(){window.removeEventListener("popstate",onPop);};
   },[]);
-  // Arme une entree d'historique des qu'un ecran s'ouvre (une seule fois)
+  // Re-arme l'entree d'historique a chaque ouverture d'ecran
   useEffect(function(){
     if(anyOverlayOpen&&!guardPushed.current){
       guardPushed.current=true;
