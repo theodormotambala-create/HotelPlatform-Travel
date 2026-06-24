@@ -9,7 +9,7 @@ import {
   CreditCard, Users, AlertTriangle, LogOut, Lock, Mail, Send,
   MoreVertical, CheckCircle, XCircle, ChevronRight, FileText, Flag, Activity,
   Building2, Utensils, Shield, ShieldCheck, Phone, Package, Waves,
-  EyeOff, Car, Dumbbell, Tag, Wifi, Bookmark, Clock, UserPlus, UserCheck
+  EyeOff, Car, Dumbbell, Tag, Wifi, Bookmark, Clock, UserPlus, UserCheck, Camera
 } from "lucide-react";
 
 const DS = {
