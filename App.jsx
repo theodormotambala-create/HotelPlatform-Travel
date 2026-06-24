@@ -2652,6 +2652,9 @@ export default function App() {
         var meta = session.user.user_metadata || {};
         var accType = meta.account_type || "client";
         var status = accType !== "client" ? "pending" : "active";
+        // Sync hp_acc_type with Supabase metadata to avoid onboarding flash
+        try{localStorage.setItem("hp_acc_type", accType);}catch(e){}
+        setNeedsOnboarding(false);
         setAuth(AuthService.buildSession(accType, status, session.user.email, session.user.id));
       }
     }).catch(function(){});
@@ -2660,6 +2663,8 @@ export default function App() {
         var meta = session.user.user_metadata || {};
         var accType = meta.account_type || "client";
         var status = accType !== "client" ? "pending" : "active";
+        try{localStorage.setItem("hp_acc_type", accType);}catch(e){}
+        setNeedsOnboarding(false);
         setAuth(function(prev){
           if(prev) return prev;
           return AuthService.buildSession(accType, status, session.user.email, session.user.id);
