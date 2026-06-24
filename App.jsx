@@ -139,26 +139,38 @@ var DataLayer = {
           DataLayer._seedPosts(supabase);
         }
       });
-    }catch(e){ /* hors-ligne ou non configure : on garde la demo */ }
+    }catch(e){ /* hors-ligne ou non configure : on garde la demo */
+      // Fix #9 : retry apres 8 secondes si echec au demarrage
+      setTimeout(function(){ try{ DataLayer.syncFromSupabase(supabase); }catch(e2){} }, 8000);
+    }
   },
   // Alimente la base avec les etablissements de demo (premier deploiement)
   _seedEstablishments: function(supabase){
-    try{
-      var rows = HOTELS.concat(RESTAURANTS).map(function(e){
-        return { id:e.id, type:e.type, name:e.name, location:e.location,
-                 verified:!!e.verified, is_premium:!!e.isPremium, data:e };
-      });
-      supabase.from("establishments").insert(rows).then(function(){}); 
-    }catch(e){}
+    // Fix #8 : attendre une session active avant de seeder
+    supabase.auth.getSession().then(function(){
+      try{
+        var rows = HOTELS.concat(RESTAURANTS).map(function(e){
+          return { id:e.id, type:e.type, name:e.name, location:e.location,
+                   verified:!!e.verified, is_premium:!!e.isPremium, data:e };
+        });
+        // Fix #7 : re-synchroniser apres insertion pour confirmer
+        supabase.from("establishments").insert(rows).then(function(r){
+          if(!r.error) DataLayer.syncFromSupabase(supabase);
+        });
+      }catch(e){}
+    }).catch(function(){});
   },
-  // Alimente la base avec les posts de demo
   _seedPosts: function(supabase){
-    try{
-      var rows = FEED.map(function(p){
-        return { id:p.id, author:p.author, type:p.type, data:p };
-      });
-      supabase.from("posts").insert(rows).then(function(){});
-    }catch(e){}
+    supabase.auth.getSession().then(function(){
+      try{
+        var rows = FEED.map(function(p){
+          return { id:p.id, author:p.author, type:p.type, data:p };
+        });
+        supabase.from("posts").insert(rows).then(function(r){
+          if(!r.error) DataLayer.syncFromSupabase(supabase);
+        });
+      }catch(e){}
+    }).catch(function(){});
   },
 
   // =================================================================
@@ -975,10 +987,11 @@ function ClientDisc(props){
 
 function ClientProf(props){
   var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var followingCount=props.followingCount||0;
+  var selfEmail=props.selfEmail||"";var displayName=selfEmail?selfEmail.split("@")[0]:"Mon profil";var displayLetter=(displayName[0]||"M").toUpperCase();
   var s1=useState("reservations");var tab=s1[0];var setTab=s1[1];
   var sq=useState(null);var activeQR=sq[0];var setActiveQR=sq[1];
 
-  return(<div style={{paddingBottom:20}}><LoyaltyWidget points={620} level="silver"/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><Av sz={72} letter="M"/><div style={{fontSize:18,fontWeight:800,color:DS.text,marginTop:10}}>Moussa Konate</div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>Dakar, Senegal</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],["5","Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
+  return(<div style={{paddingBottom:20}}><LoyaltyWidget points={620} level="silver"/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><Av sz={72} letter={displayLetter}/><div style={{fontSize:18,fontWeight:800,color:DS.text,marginTop:10}}>{displayName}</div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{selfEmail||""}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],["5","Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
           (resaHistory&&resaHistory.length>0)?resaHistory.map(function(r,i){
             var showQR=activeQR===i;
             var st=r.status||"pending";
@@ -1481,7 +1494,16 @@ function BookM(props){
 }
 function ProFeed(props){
   var proType=props.proType;var isPremium=props.isPremium||false;var onPremium=props.onPremium;var onProfile=props.onProfile;
-  var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:false,comments:[],showCmt:false});}));
+  // Fix #3 : data declare en premier pour eviter crash dans addCmt
+  var color=rC(proType);
+  var _allData=proType==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
+  var selfEmail=props.selfEmail||"";
+  var data=_allData.length>0?_allData[0]:{name:selfEmail.split("@")[0]||"Pro",verified:false,followers:0,rating:0,reviewCount:0};
+  // Fix #6 : localStorage pour likes et favs
+  var _initPro=useRef(null);
+  if(!_initPro.current){var _lkP={};var _fvP=[];try{_lkP=JSON.parse(localStorage.getItem("hp_pro_likes")||"{}");_fvP=JSON.parse(localStorage.getItem("hp_pro_favs")||"[]");}catch(e){}_initPro.current={likes:_lkP,favs:_fvP};}
+  var _initLikesPro=_initPro.current.likes;var _initFavsPro=_initPro.current.favs;
+  var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikesPro[p.id],likes:p.likes+(_initLikesPro[p.id]?1:0),comments:[],showCmt:false});}));
   var posts=s1[0];var setPosts=s1[1];
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState("");var newPost=s2[0];var setNewPost=s2[1];
@@ -1499,15 +1521,28 @@ function ProFeed(props){
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
     toast("Commentaire supprime","success");
   }
-  var color=rC(proType);var data=proType==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
-  var sf=useState([]);var favPosts=sf[0];var setFavPosts=sf[1];
+  var sf=useState(_initFavsPro);var favPosts=sf[0];var setFavPosts=sf[1];
   var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
-  function toggleFav(id){setFavPosts(function(f){return f.indexOf(id)>=0?f.filter(function(x){return x!==id;}):f.concat([id]);});setMenuOpen(null);toast(favPosts.indexOf(id)>=0?"Retire des favoris":"Ajoute aux favoris","success");}
+  // Fix #2 : toast favoris dans le bon sens
+  function toggleFav(id){
+    var wasFav=favPosts.indexOf(id)>=0;
+    setFavPosts(function(f){var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_pro_favs",JSON.stringify(next));}catch(e){}return next;});
+    setMenuOpen(null);
+    toast(wasFav?"Retire des favoris":"Ajoute aux favoris","success");
+  }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   var followingPosts=props.followingIds||[];
   function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
   function toggleLike(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});});}
+  // Fix #6 : persistance likes Pro
+  function toggleLikePro(id){
+    setPosts(function(ps){
+      var next=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});
+      try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem("hp_pro_likes",JSON.stringify(lk));}catch(e){}
+      return next;
+    });
+  }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
   function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partage avec succes","success");}
@@ -1525,13 +1560,18 @@ function ProFeed(props){
   function removeMedia(){setMediaPreview(null);setMediaType(null);}
   function publish(){
     if(!newPost.trim()&&!mediaPreview)return;
-    setPosts(function(ps){return [{id:Date.now(),author:data.name,type:proType,time:"maintenant",text:newPost,img:mediaType==="image"?mediaPreview:null,video:mediaType==="video"?mediaPreview:null,likes:0,comments:[],showCmt:false,verified:data.verified}].concat(ps);});
+    var newId="post-"+Date.now();
+    var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:newPost,img:mediaType==="image"?mediaPreview:null,video:mediaType==="video"?mediaPreview:null,likes:0,comments:[],showCmt:false,verified:data.verified};
+    setPosts(function(ps){return [newObj].concat(ps);});
+    // Fix #5 : sauvegarde dans Supabase si disponible
+    try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,data:newObj}]).catch(function(){});}catch(e){}
     setNewPost("");setShowNew(false);setMediaPreview(null);setMediaType(null);
   }
   return(
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
       {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){toast("Signalement envoye - Merci","success");}}/>}
+      {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",background:DS.surface,borderBottom:"1px solid "+DS.border,marginBottom:10}}>
         {[[fmtK(data.followers),"Abonnes",color],[data.rating+" *","Note",DS.gold],[fmtK(data.reviewCount),"Avis",DS.success]].map(function(_i,i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{padding:"14px 4px",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><div style={{fontSize:20,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
       </div>
@@ -1630,7 +1670,7 @@ function ProFeed(props){
               <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
             <div style={{display:"flex",borderTop:"1px solid "+DS.border+"30",marginTop:8}}>
-              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLike(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
+              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLikePro(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
                 var lb=_i[0];var Icon=_i[1];var col=_i[2];var fn=_i[3];
                 return(
                   <button key={lb} onClick={fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"13px 0",background:"none",border:"none",cursor:"pointer",color:col,fontSize:13}}>
@@ -2591,7 +2631,7 @@ export default function App() {
           {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV"/>}
-          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length}/>}
+          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} viewerIsPro={false}/>}
@@ -2629,7 +2669,7 @@ export default function App() {
       />
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal}/></div>}
+        {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings}/>}
