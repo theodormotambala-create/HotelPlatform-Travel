@@ -482,8 +482,10 @@ function AuthScreen(props){
           setAuthErr("Email ou mot de passe incorrect.");
         } else if(msg.includes("already registered")||msg.includes("User already registered")){
           setAuthErr("Cet email est deja utilise. Essayez de vous connecter.");
+        } else if(msg.includes("longer than 72")||msg.includes("72 characters")){
+          setAuthErr("Mot de passe trop long. Maximum 72 caracteres.");
         } else if(msg.includes("Password should be")||msg.includes("password")){
-          setAuthErr("Le mot de passe doit contenir au moins 6 caracteres.");
+          setAuthErr("Le mot de passe doit contenir entre 6 et 72 caracteres.");
         } else if(msg.includes("Email not confirmed")){
           setAuthErr("Confirmez votre email avant de vous connecter.");
         } else if(msg.includes("rate limit")||msg.includes("too many")){
