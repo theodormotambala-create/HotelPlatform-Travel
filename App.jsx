@@ -55,6 +55,11 @@ const FEED=[
   {id:"res2",author:"Chez Mamie Fatou",type:"restaurant",time:"8h",img:"https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=70",text:"Aujourd hui : Thieboudienne special avec poissons du jour.",likes:89,comments:5,shares:4,followers:1540,verified:false},
 ];
 const AD={active:true,label:"PUBLICITE",text:"Decouvrez nos etablissements partenaires"};
+const ADS_POOL=[
+  {active:true,label:"PUBLICITE",text:"Decouvrez nos etablissements partenaires"},
+  {active:true,label:"PROMO",text:"Offre speciale : -20% sur votre premiere reservation Premium"},
+  {active:true,label:"NOUVEAUTE",text:"Nouveaux restaurants africains disponibles sur la plateforme"},
+];
 
 // =====================================================================
 // COUCHE DE DONNEES CENTRALISEE (DataLayer)
@@ -413,7 +418,12 @@ function Stars(props){var r=props.r||0;var sz=props.sz||14;return(<span style={{
 
 function Emp(props){var Icon=props.Icon||Package;var title=props.title||"";var sub=props.sub||"";return(<div style={{padding:"48px 20px",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}><Icon size={40} color={DS.textDim} strokeWidth={1}/><div style={{fontSize:15,fontWeight:700,color:DS.textMuted}}>{title}</div>{sub&&<div style={{fontSize:12,color:DS.textDim,maxWidth:240}}>{sub}</div>}</div>);}
 
-function AdBanner(){var AD=DataLayer.getAd();if(!AD.active)return null;return(<div style={{margin:"6px 14px",padding:"7px 14px",background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,display:"flex",alignItems:"center",gap:8}}><Tag size={11} color={DS.primary}/><span style={{fontSize:9,fontWeight:800,color:DS.primary,letterSpacing:1}}>{AD.label} </span><span style={{fontSize:11,color:DS.textMuted}}>{AD.text}</span></div>);}
+function AdBanner(){
+  var si=useState(0);var adIdx=si[0];var setAdIdx=si[1];
+  useEffect(function(){var t=setInterval(function(){setAdIdx(function(i){return(i+1)%ADS_POOL.length;});},8000);return function(){clearInterval(t);};},[]);
+  var AD=ADS_POOL[adIdx];if(!AD.active)return null;
+  return(<div key={adIdx} style={{margin:"6px 14px",padding:"7px 14px",background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,display:"flex",alignItems:"center",gap:8,animation:"hp-fade 0.4s ease"}}><Tag size={11} color={DS.primary}/><span style={{fontSize:9,fontWeight:800,color:DS.primary,letterSpacing:1}}>{AD.label} </span><span style={{fontSize:11,color:DS.textMuted}}>{AD.text}</span></div>);
+}
 
 function OffB(props){return(<button onClick={props.onPress} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid "+DS.border+"20",background:"none",border:"none",cursor:"pointer",textAlign:"left"}}><span style={{fontSize:14,color:DS.text}}>{props.label}</span><ChevronRight size={16} color={DS.textMuted}/></button>);}
 
@@ -642,24 +652,37 @@ function ChangeEmailModal(props){
 
 function ChangePwdModal(props){
   var onClose=props.onClose;var accent=props.accent||DS.primary;
+  var sc=useState("");var curPwd=sc[0];var setCurPwd=sc[1];
   var sp=useState("");var pwd=sp[0];var setPwd=sp[1];
   var sp2=useState("");var pwd2=sp2[0];var setPwd2=sp2[1];
   var sl=useState(false);var loading=sl[0];var setLoading=sl[1];
   var serr=useState("");var err=serr[0];var setErr=serr[1];
   var sok=useState(false);var ok=sok[0];var setOk=sok[1];
   var sv=useState(false);var show=sv[0];var setShow=sv[1];
+  var svc=useState(false);var showCur=svc[0];var setShowCur=svc[1];
+  var canSubmit=curPwd.length>=1&&pwd.length>=6&&pwd===pwd2;
   async function submit(){
-    if(pwd.length<6){setErr("Le mot de passe doit contenir au moins 6 caracteres.");return;}
-    if(pwd!==pwd2){setErr("Les mots de passe ne correspondent pas.");return;}
+    if(!curPwd){setErr("Veuillez saisir votre mot de passe actuel.");return;}
+    if(pwd.length<6){setErr("Le nouveau mot de passe doit contenir au moins 6 caracteres.");return;}
+    if(pwd!==pwd2){setErr("Les nouveaux mots de passe ne correspondent pas.");return;}
     setLoading(true);setErr("");
     try{
       var sb=(typeof window!=="undefined"&&window.__supabase)||null;
-      if(sb){var r=await sb.auth.updateUser({password:pwd});if(r.error){setErr(r.error.message||"Erreur lors de la mise a jour.");setLoading(false);return;}}
+      if(sb){
+        var sess=await sb.auth.getSession();
+        var email=sess&&sess.data&&sess.data.session?sess.data.session.user.email:"";
+        if(email){
+          var verif=await sb.auth.signInWithPassword({email:email,password:curPwd});
+          if(verif.error){setErr("Mot de passe actuel incorrect.");setLoading(false);return;}
+        }
+        var r=await sb.auth.updateUser({password:pwd});
+        if(r.error){setErr(r.error.message||"Erreur lors de la mise a jour.");setLoading(false);return;}
+      }
       setOk(true);
     }catch(e){setErr("Erreur de connexion.");}
     setLoading(false);
   }
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:20,animation:"hp-slide-up 0.28s ease"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Changer de mot de passe</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div>{ok?(<div style={{textAlign:"center",padding:"20px 0"}}><CheckCircle size={40} color={DS.success} style={{margin:"0 auto 12px",display:"block"}}/><div style={{fontSize:14,color:DS.text,fontWeight:700,marginBottom:6}}>Mot de passe mis a jour</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:16}}>Votre mot de passe a ete modifie avec succes.</div><button onClick={onClose} style={{width:"100%",padding:"11px",background:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div>):(<div><div style={{marginBottom:10,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={show?"text":"password"} value={pwd} onChange={function(ev){setPwd(ev.target.value);}} placeholder="Nouveau mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/><button onClick={function(){setShow(!show);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer"}}><EyeOff size={14} color={DS.textMuted}/></button></div><div style={{marginBottom:10,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={show?"text":"password"} value={pwd2} onChange={function(ev){setPwd2(ev.target.value);}} placeholder="Confirmer le mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+(pwd2&&pwd2!==pwd?DS.error:DS.border),borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/></div>{err&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error}}>{err}</div>}<div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button><button onClick={submit} disabled={loading||pwd.length<6} style={{flex:2,padding:"11px",background:loading||pwd.length<6?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:loading||pwd.length<6?"not-allowed":"pointer",opacity:loading||pwd.length<6?.6:1}}>{loading?"Mise a jour...":"Confirmer"}</button></div></div>)}</div></div>);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:20,animation:"hp-slide-up 0.28s ease"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Changer de mot de passe</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div>{ok?(<div style={{textAlign:"center",padding:"20px 0"}}><CheckCircle size={40} color={DS.success} style={{margin:"0 auto 12px",display:"block"}}/><div style={{fontSize:14,color:DS.text,fontWeight:700,marginBottom:6}}>Mot de passe mis a jour</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:16}}>Votre mot de passe a ete modifie avec succes.</div><button onClick={onClose} style={{width:"100%",padding:"11px",background:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div>):(<div><div style={{marginBottom:6,fontSize:11,color:DS.textMuted,paddingLeft:2}}>Mot de passe actuel</div><div style={{marginBottom:14,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={showCur?"text":"password"} value={curPwd} onChange={function(ev){setCurPwd(ev.target.value);}} placeholder="Saisissez votre mot de passe actuel" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/><button onClick={function(){setShowCur(!showCur);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer"}}>{showCur?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button></div><div style={{height:1,background:DS.border,marginBottom:14}}/><div style={{marginBottom:6,fontSize:11,color:DS.textMuted,paddingLeft:2}}>Nouveau mot de passe</div><div style={{marginBottom:10,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={show?"text":"password"} value={pwd} onChange={function(ev){setPwd(ev.target.value);}} placeholder="Au moins 6 caracteres" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/><button onClick={function(){setShow(!show);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer"}}>{show?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button></div><div style={{marginBottom:14,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={show?"text":"password"} value={pwd2} onChange={function(ev){setPwd2(ev.target.value);}} placeholder="Confirmer le nouveau mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+(pwd2&&pwd2!==pwd?DS.error:DS.border),borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/></div>{err&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error}}>{err}</div>}<div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button><button onClick={submit} disabled={loading||!canSubmit} style={{flex:2,padding:"11px",background:loading||!canSubmit?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:loading||!canSubmit?"not-allowed":"pointer",opacity:loading||!canSubmit?.6:1}}>{loading?"Verification...":"Confirmer"}</button></div></div>)}</div></div>);
 }
 
 function NotifP(props){
@@ -971,7 +994,7 @@ function ClientFeed(props){
   return(
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
-      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){toast("Signalement envoye - Merci","success");}}/>}
+      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       {posts.map(function(post){
         var color=rC(post.type);
@@ -1048,14 +1071,21 @@ function ClientDisc(props){
 
 function ClientProf(props){
   var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var followingCount=props.followingCount||0;
-  var selfEmail=props.selfEmail||"";var displayName=selfEmail?selfEmail.split("@")[0]:"Mon profil";var displayLetter=(displayName[0]||"M").toUpperCase();
+  var privacySettings=props.privacySettings||{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};
+  var selfEmail=props.selfEmail||"";
+  var _rawName=selfEmail?selfEmail.split("@")[0]:"Mon profil";
+  var displayName=privacySettings.pseudo?"Voyageur":_rawName;
+  var displayLetter=(displayName[0]||"M").toUpperCase();
+  var _visLabels={public:"Profil public","friends":"Amis uniquement","private":"Profil prive"};
+  var _visColors={public:DS.success,"friends":DS.warning,"private":DS.error};
   var _allEstabs=DataLayer.getHotels().concat(DataLayer.getRestaurants());
   var favEstabIds=props.favEstabIds||[];
   var favEstabs=favEstabIds.map(function(id){return _allEstabs.find(function(x){return x.id===id;});}).filter(Boolean);
   var s1=useState("reservations");var tab=s1[0];var setTab=s1[1];
   var sq=useState(null);var activeQR=sq[0];var setActiveQR=sq[1];
 
-  return(<div style={{paddingBottom:20}}><LoyaltyWidget points={620} level="silver"/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><Av sz={72} letter={displayLetter}/><div style={{fontSize:18,fontWeight:800,color:DS.text,marginTop:10}}>{displayName}</div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{selfEmail||""}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
+  var _locked=privacySettings.locked||false;
+  return(<div style={{paddingBottom:20}}><LoyaltyWidget points={620} level="silver"/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><div style={{filter:_locked?"blur(3px)":"none",transition:"filter .3s",display:"inline-block"}}><Av sz={72} letter={displayLetter}/></div><div style={{fontSize:18,fontWeight:800,color:DS.text,marginTop:10,filter:_locked&&!privacySettings.pseudo?"blur(2px)":"none"}}>{displayName}</div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{(privacySettings.pseudo||_locked)?"":selfEmail||""}</div><div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,padding:"3px 8px",borderRadius:20,border:"1px solid "+(_visColors[privacySettings.vis]||DS.success)+"44",background:(_visColors[privacySettings.vis]||DS.success)+"12"}}><Eye size={10} color={_visColors[privacySettings.vis]||DS.success}/><span style={{fontSize:9,fontWeight:700,color:_visColors[privacySettings.vis]||DS.success}}>{_visLabels[privacySettings.vis]||"Profil public"}</span>{_locked&&<><Lock size={8} color={DS.warning}/><span style={{fontSize:9,fontWeight:700,color:DS.warning}}>Verrouille</span></>}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
           (resaHistory&&resaHistory.length>0)?resaHistory.map(function(r,i){
             var showQR=activeQR===i;
             var st=r.status||"pending";
@@ -1116,7 +1146,7 @@ function ClientProf(props){
                     {st==="pending"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:8,padding:"6px 10px",marginBottom:10,fontSize:10,color:DS.warning,fontWeight:700}}>En attente de confirmation - presentez ce code a l etablissement</div>}
                     <div style={{display:"inline-flex",padding:12,background:"#fff",borderRadius:12,marginBottom:12,opacity:st==="consumed"?0.4:1}}>
                       <div style={{width:110,height:110,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                        {[1,1,1,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,0,1,1,1,1,1,0,1,0,1,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,1,1,0,1,0,1,1,1].map(function(px,pi){return <div key={pi} style={{background:px?"#000":"#fff"}}/>;  })}
+                        {genQRPixels(r.id||"HP-000000").map(function(px,pi){return <div key={pi} style={{background:px?"#000":"#fff"}}/>;  })}
                       </div>
                     </div>
                     <div style={{fontSize:10,color:DS.textDim,fontFamily:"monospace",letterSpacing:1,marginBottom:4}}>{r.id||"HP-000000"}</div>
@@ -1161,6 +1191,9 @@ function EstabM(props){
   function onClose(){if(closingE)return;setClosingE(true);setTimeout(function(){if(rawOnClose)rawOnClose();},260);}
   var s1=useState("about");var tab=s1[0];var setTab=s1[1];
   var s2=useState(0);var rating=s2[0];var setRating=s2[1];
+  var s2t=useState("");var reviewText=s2t[0];var setReviewText=s2t[1];
+  var _rvKey="hp_reviews_"+(e&&e.id||"x");
+  var s2r=useState(function(){try{var v=localStorage.getItem(_rvKey);return v?JSON.parse(v):[];}catch(ex){return[];}});var localReviews=s2r[0];var setLocalReviews=s2r[1];
   var s9=useState([]);var selectedDishes=s9[0];var setSelectedDishes=s9[1];
   var allItems=(e&&e.menu||[]).reduce(function(acc,cat){return acc.concat(cat.items.map(function(it){return Object.assign({},it,{cat:cat.cat});}));},[]); 
   var selectedDishesTotal=allItems.filter(function(it){return selectedDishes.indexOf(it.cat+"-"+it.name)>=0;}).reduce(function(sum,it){return sum+(it.price||0);},0);
@@ -1264,10 +1297,7 @@ function EstabM(props){
                 </div>
               )}
             </div>
-          )}{tab==="reviews"&&<div>{e.isPremium
-              ? <div><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><div style={{marginTop:8,display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){toast("Avis publie","success");setRating(0);}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>
-              : <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}><Lock size={16} color={DS.textDim}/><span style={{fontSize:11,color:DS.textMuted}}>Cet etablissement n a pas d abonnement Premium actif et ne peut pas encore recevoir d avis</span></div>
-            }<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier"/></div>}</div></div>);
+          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}toast("Avis publie","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier a partager votre experience"/>}</div>}</div></div>);
 }
 
 function genQRPixels(id){
@@ -1652,7 +1682,7 @@ function ProFeed(props){
   return(
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
-      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){toast("Signalement envoye - Merci","success");}}/>}
+      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",background:DS.surface,borderBottom:"1px solid "+DS.border,marginBottom:10}}>
         {[[fmtK(data.followers),"Abonnes",color],[data.rating+" *","Note",DS.gold],[fmtK(data.reviewCount),"Avis",DS.success]].map(function(_i,i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{padding:"14px 4px",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><div style={{fontSize:20,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
@@ -1786,7 +1816,11 @@ function ReportM(props){
     ["scam","Escroquerie ou arnaque"],
     ["other","Autre raison"],
   ];
-  function submit(){if(onSubmit)onSubmit(reason,details);setStep(3);}
+  function submit(){
+    var report={id:"rpt"+Date.now(),target:targetName,reason:reason,details:details,date:new Date().toISOString()};
+    try{var existing=JSON.parse(localStorage.getItem("hp_reports")||"[]");localStorage.setItem("hp_reports",JSON.stringify(existing.concat([report])));}catch(ex){}
+    if(onSubmit)onSubmit(reason,details);setStep(3);
+  }
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"88vh",overflowY:"auto",animation:"hp-slide-up 0.3s ease"}}>
@@ -2083,34 +2117,37 @@ function VerifRequestModal(props){
 function HotelSvc(props){
   var data=props.data||DataLayer.getHotels()[0];
   var color=DS.hotel;
-  var s1=useState(data.rooms||[]);var rooms=s1[0];var setRooms=s1[1];
+  var s1=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_rooms");return v?JSON.parse(v):(data.rooms||[]);}catch(e){return data.rooms||[];}});var rooms=s1[0];var setRooms=s1[1];
   var s2=useState(null);var editItem=s2[0];var setEditItem=s2[1];
   var s3=useState(false);var showAdd=s3[0];var setShowAdd=s3[1];
   var s4=useState(data.svcMode||"hotel");var svcMode=s4[0];var setSvcMode=s4[1];
   var hasResto=svcMode==="combined";
-  var s5=useState([]);var menu=s5[0];var setMenu=s5[1];
+  var s5=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_dishes");return v?JSON.parse(v):[];}catch(e){return[];}});var menu=s5[0];var setMenu=s5[1];
   var s6=useState(data.svcMode==="restaurant"?"menu":"rooms");var tab=s6[0];var setTab=s6[1];
-  var sa=useState((data.services||[]).map(function(s,i){return typeof s==="object"?Object.assign({},s):{id:"svc"+i,name:s,active:true};}));
+  var sa=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_amenities");return v?JSON.parse(v):(data.services||[]).map(function(s,i){return typeof s==="object"?Object.assign({},s):{id:"svc"+i,name:s,active:true};});}catch(e){return(data.services||[]).map(function(s,i){return typeof s==="object"?Object.assign({},s):{id:"svc"+i,name:s,active:true};});}});
   var amenities=sa[0];var setAmenities=sa[1];
   var sb=useState(false);var addSvc=sb[0];var setAddSvc=sb[1];
   var sc=useState("");var newSvcName=sc[0];var setNewSvcName=sc[1];
-  function toggleAmenity(id){setAmenities(function(am){return am.map(function(a){return a.id===id?Object.assign({},a,{active:!a.active}):a;});});}
-  function addAmenity(){if(!newSvcName.trim())return;var am=amenities.concat([{id:"svc"+Date.now(),name:newSvcName.trim(),active:true}]);setAmenities(am);setNewSvcName("");setAddSvc(false);}
-  function removeAmenity(id){setAmenities(function(am){return am.filter(function(a){return a.id!==id;});});}
-  function toggleAvail(id){setRooms(function(rs){return rs.map(function(r){return r.id===id?Object.assign({},r,{available:!r.available}):r;});});}
-  function toggleMenuAvail(id){setMenu(function(ms){return ms.map(function(m){return m.id===id?Object.assign({},m,{available:!m.available}):m;});});}
+  function _saveRooms(rs){try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}}
+  function _saveDishes(ms){try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ms));}catch(e){}}
+  function _saveAmenities(am){try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}}
+  function toggleAmenity(id){setAmenities(function(am){var next=am.map(function(a){return a.id===id?Object.assign({},a,{active:!a.active}):a;});_saveAmenities(next);return next;});}
+  function addAmenity(){if(!newSvcName.trim())return;var am=amenities.concat([{id:"svc"+Date.now(),name:newSvcName.trim(),active:true}]);setAmenities(am);_saveAmenities(am);setNewSvcName("");setAddSvc(false);}
+  function removeAmenity(id){setAmenities(function(am){var next=am.filter(function(a){return a.id!==id;});_saveAmenities(next);return next;});}
+  function toggleAvail(id){setRooms(function(rs){var next=rs.map(function(r){return r.id===id?Object.assign({},r,{available:!r.available}):r;});_saveRooms(next);return next;});}
+  function toggleMenuAvail(id){setMenu(function(ms){var next=ms.map(function(m){return m.id===id?Object.assign({},m,{available:!m.available}):m;});_saveDishes(next);return next;});}
   function saveRoom(item){
-    if(editItem){setRooms(function(rs){return rs.map(function(r){return r.id===item.id?item:r;});});}
-    else{setRooms(function(rs){return rs.concat([item]);});}
+    if(editItem){setRooms(function(rs){var next=rs.map(function(r){return r.id===item.id?item:r;});_saveRooms(next);return next;});}
+    else{setRooms(function(rs){var next=rs.concat([item]);_saveRooms(next);return next;});}
     setEditItem(null);setShowAdd(false);
   }
   function saveDish(item){
-    if(editItem){setMenu(function(ms){return ms.map(function(m){return m.id===item.id?item:m;});});}
-    else{setMenu(function(ms){return ms.concat([item]);});}
+    if(editItem){setMenu(function(ms){var next=ms.map(function(m){return m.id===item.id?item:m;});_saveDishes(next);return next;});}
+    else{setMenu(function(ms){var next=ms.concat([item]);_saveDishes(next);return next;});}
     setEditItem(null);setShowAdd(false);
   }
-  function deleteRoom(id){setRooms(function(rs){return rs.filter(function(r){return r.id!==id;});});}
-  function deleteDish(id){setMenu(function(ms){return ms.filter(function(m){return m.id!==id;});});}
+  function deleteRoom(id){setRooms(function(rs){var next=rs.filter(function(r){return r.id!==id;});_saveRooms(next);return next;});}
+  function deleteDish(id){setMenu(function(ms){var next=ms.filter(function(m){return m.id!==id;});_saveDishes(next);return next;});}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
       {(showAdd||editItem)&&<ServiceConfigModal mode={tab==="rooms"?"room":"dish"} color={tab==="rooms"?DS.hotel:DS.restaurant} initial={editItem} onClose={function(){setShowAdd(false);setEditItem(null);}} onSave={tab==="rooms"?saveRoom:saveDish}/>}
@@ -2239,20 +2276,29 @@ function HotelSvc(props){
 function RestOff(props){
   var data=props.data||DataLayer.getRestaurants()[0];
   var color=DS.restaurant;
-  var s1=useState((data.menu||[]).reduce(function(acc,cat){return acc.concat(cat.items.map(function(item){return Object.assign({},item,{id:"d"+Date.now()+Math.random(),category:cat.cat,available:true});}));},[]));
+  var _defaultItems=(data.menu||[]).reduce(function(acc,cat){return acc.concat(cat.items.map(function(item){return Object.assign({},item,{id:"d_"+cat.cat+"_"+item.name.replace(/\s/g,""),category:cat.cat,available:true});}));},  []);
+  var s1=useState(function(){try{var v=localStorage.getItem("hp_restoff_items");return v?JSON.parse(v):_defaultItems;}catch(e){return _defaultItems;}});
   var items=s1[0];var setItems=s1[1];
   var s2=useState(null);var editItem=s2[0];var setEditItem=s2[1];
   var s3=useState(false);var showAdd=s3[0];var setShowAdd=s3[1];
-  var s4=useState((data.offers||[]).map(function(o,i){return Object.assign({},{id:"o"+i,name:typeof o==="string"?o:o.name,price:typeof o==="object"&&o.price?o.price:null,available:true});}));
+  var _defaultOffers=(data.offers||[]).map(function(o,i){return Object.assign({},{id:"o"+i,name:typeof o==="string"?o:o.name,price:typeof o==="object"&&o.price?o.price:null,available:true});});
+  var s4=useState(function(){try{var v=localStorage.getItem("hp_restoff_offers");return v?JSON.parse(v):_defaultOffers;}catch(e){return _defaultOffers;}});
   var offers=s4[0];var setOffers=s4[1];
+  var s4a=useState(false);var showAddOffer=s4a[0];var setShowAddOffer=s4a[1];
+  var s4b=useState("");var newOfferName=s4b[0];var setNewOfferName=s4b[1];
+  var s4c=useState("");var newOfferPrice=s4c[0];var setNewOfferPrice=s4c[1];
   var s5=useState("menu");var tab=s5[0];var setTab=s5[1];
+  function _saveOffers(next){try{localStorage.setItem("hp_restoff_offers",JSON.stringify(next));}catch(e){}}
+  function addOffer(){if(!newOfferName.trim())return;var o={id:"o"+Date.now(),name:newOfferName.trim(),price:newOfferPrice?parseFloat(newOfferPrice)||null:null,available:true};var next=offers.concat([o]);setOffers(next);_saveOffers(next);setNewOfferName("");setNewOfferPrice("");setShowAddOffer(false);}
+  function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next);}
+  function _saveItems(next){try{localStorage.setItem("hp_restoff_items",JSON.stringify(next));}catch(e){}}
   function saveItem(item){
-    if(editItem){setItems(function(is){return is.map(function(i){return i.id===item.id?item:i;});});}
-    else{setItems(function(is){return is.concat([item]);});}
+    if(editItem){setItems(function(is){var next=is.map(function(i){return i.id===item.id?item:i;});_saveItems(next);return next;});}
+    else{setItems(function(is){var next=is.concat([item]);_saveItems(next);return next;});}
     setEditItem(null);setShowAdd(false);
   }
-  function deleteItem(id){setItems(function(is){return is.filter(function(i){return i.id!==id;});});}
-  function toggleAvail(id){setItems(function(is){return is.map(function(i){return i.id===id?Object.assign({},i,{available:!i.available}):i;});});}
+  function deleteItem(id){setItems(function(is){var next=is.filter(function(i){return i.id!==id;});_saveItems(next);return next;});}
+  function toggleAvail(id){setItems(function(is){var next=is.map(function(i){return i.id===id?Object.assign({},i,{available:!i.available}):i;});_saveItems(next);return next;});}
   var categories=items.reduce(function(acc,item){if(item.category&&acc.indexOf(item.category)<0)acc.push(item.category);return acc;},[]);
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
@@ -2312,13 +2358,22 @@ function RestOff(props){
         )}
         {tab==="offres"&&(
           <div>
+            <button onClick={function(){setShowAddOffer(!showAddOffer);}} style={{width:"100%",padding:"10px 14px",background:color+"18",border:"1px dashed "+color,borderRadius:12,color:color,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}><Plus size={16}/>Ajouter une offre</button>
+            {showAddOffer&&<div style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:12,border:"1px solid "+DS.border}}>
+              <input value={newOfferName} onChange={function(e){setNewOfferName(e.target.value);}} placeholder="Nom de l offre (ex: Menu Decouverte)" style={{width:"100%",background:DS.bg,border:"1px solid "+DS.border,borderRadius:8,padding:"8px 12px",fontSize:12,color:DS.text,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+              <div style={{display:"flex",gap:8}}>
+                <input value={newOfferPrice} onChange={function(e){setNewOfferPrice(e.target.value);}} placeholder="Prix EUR (optionnel)" type="number" min="0" style={{flex:1,background:DS.bg,border:"1px solid "+DS.border,borderRadius:8,padding:"8px 12px",fontSize:12,color:DS.text,outline:"none"}}/>
+                <button onClick={addOffer} style={{padding:"8px 16px",background:color,border:"none",borderRadius:8,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>Ajouter</button>
+              </div>
+            </div>}
             {offers.map(function(o){return(
               <div key={o.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:10,border:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:36,height:36,borderRadius:10,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Tag size={16} color={color}/></div>
                 <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{o.name}</div>{o.price&&<div style={{fontSize:12,color:DS.gold,fontWeight:700}}>{o.price} EUR</div>}</div>
+                <button onClick={function(){deleteOffer(o.id);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,color:DS.error}}><X size={14} color={DS.error}/></button>
               </div>
             );})}
-            {offers.length===0&&<Emp Icon={Tag} title="Aucune offre" sub="Les offres speciales apparaitront ici"/>}
+            {offers.length===0&&<Emp Icon={Tag} title="Aucune offre" sub="Ajoutez vos offres speciales"/>}
           </div>
         )}
       </div>
@@ -2333,11 +2388,7 @@ function ProResa(props){
   var color=rC(proType);
   var _liveResas=BookingService.getAll().map(function(r){return {id:r.id,client:r.clientName||CONNECTED_CLIENT_NAME,service:r.service||"Reservation",dateIn:r.dateIn||"",dateOut:r.dateOut||r.dateIn||"",nights:r.nights||1,guests:r.guests||1,total:r.total||0,payMode:r.payMode||"sans",status:r.status||"pending",qrScanned:r.status==="consumed"};});
   var s1=useState(function(){
-    return _liveResas.concat([
-      {id:"R001",client:"Aicha Mbaye",service:"Suite Presidentielle",dateIn:"2025-07-24",dateOut:"2025-07-27",nights:3,guests:2,total:1350,payMode:"avec",status:"confirmed",qrScanned:false},
-      {id:"R002",client:"Ibrahima Diop",service:"Chambre Superieure",dateIn:"2025-07-22",dateOut:"2025-07-24",nights:2,guests:4,total:480,payMode:"avec",status:"pending",qrScanned:false},
-      {id:"R003",client:"Fatou Sene",service:"Chambre Deluxe",dateIn:"2025-07-21",dateOut:"2025-07-22",nights:1,guests:1,total:0,payMode:"sans",status:"completed",qrScanned:true},
-    ]);
+    return _liveResas;
   });
   var resas=s1[0];var setResas=s1[1];
   var s2=useState("all");var filter=s2[0];var setFilter=s2[1];
@@ -2345,9 +2396,10 @@ function ProResa(props){
   var filtered=filter==="all"?resas:resas.filter(function(r){return r.status===filter;});
   var sColors={confirmed:DS.success,pending:DS.warning,completed:DS.primary,refused:DS.error,consumed:DS.textDim};
   var sLabels={confirmed:"Confirmee",pending:"En attente",completed:"Terminee",refused:"Refusee",consumed:"Consommee"};
-  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});}
-  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});}
-  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});setScanTarget(null);}
+  function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem("hp_resas_all",JSON.stringify(updated));}catch(e){}}
+  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});}
+  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});}
+  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
       {scanTarget&&(
@@ -2362,7 +2414,7 @@ function ProResa(props){
                 <div style={{fontSize:12,color:DS.textMuted,marginBottom:12}}>Zone de scan (simulation)</div>
                 <div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}>
                   <div style={{width:100,height:100,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                    {[1,1,1,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,0,1,1,1,1,1,0,1,0,1,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,1,1,0,1,0,1,1,1].map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
+                    {genQRPixels(scanTarget.id).map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
                   </div>
                 </div>
                 <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace"}}>{scanTarget.id}</div>
@@ -2430,7 +2482,9 @@ function ProProf(props){
   var data=proType==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];var color=rC(proType);
   var s1=useState("about");var tab=s1[0];var setTab=s1[1];
   var s2=useState(false);var showVerif=s2[0];var setShowVerif=s2[1];
-  var s3=useState(null);var verifStatus=s3[0];var setVerifStatus=s3[1];
+  var _vfKey="hp_verif_status_"+(proType||"hotel");
+  var s3=useState(function(){try{return localStorage.getItem(_vfKey)||null;}catch(e){return null;}});var verifStatus=s3[0];var _setVerifStatusRaw=s3[1];
+  function setVerifStatus(v){_setVerifStatusRaw(v);try{if(v)localStorage.setItem(_vfKey,v);else localStorage.removeItem(_vfKey);}catch(e){}}
   useEffect(function(){
     if(verifStatus==="pending"){
       var timer=setTimeout(function(){
@@ -2440,11 +2494,12 @@ function ProProf(props){
       return function(){clearTimeout(timer);};
     }
   },[verifStatus]);
-  var sd=useState(data.description);var description=sd[0];var setDescription=sd[1];
+  var _descKey="hp_pro_desc_"+(proType||"hotel");
+  var sd=useState(function(){try{var v=localStorage.getItem(_descKey);return v||data.description;}catch(e){return data.description;}});var description=sd[0];var setDescription=sd[1];
   var se=useState(false);var editingAbout=se[0];var setEditingAbout=se[1];
-  var sdv=useState(data.description);var draftDesc=sdv[0];var setDraftDesc=sdv[1];
+  var sdv=useState(description);var draftDesc=sdv[0];var setDraftDesc=sdv[1];
   var tkp=useToast();var toastP=tkp.show;var ToastP=tkp.Toast;
-  function saveAbout(){if(!draftDesc.trim())return;setDescription(draftDesc.trim());setEditingAbout(false);toastP("A propos mis a jour","success");}
+  function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}setEditingAbout(false);toastP("A propos mis a jour","success");}
   var premiumActive=isPremium||data.isPremium;
   var isVerified=data.verified||(verifStatus==="approved");
   return(
@@ -2510,8 +2565,25 @@ function ProProf(props){
             </div>
           )
         )}
-        {tab==="services"&&(data.services||data.offers||[]).map(function(s,i){var name=typeof s==="string"?s:s.name;var Ic=getIcon(name);return <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid "+DS.border+"20"}}><div style={{width:30,height:30,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><div style={{fontSize:12,color:DS.text}}>{name}</div></div>;})}
-        {tab==="stats"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{[["Vues","1,247",color],["Reservations","89",DS.success],["Conversion","7.1%",DS.gold],["Avis ce mois","12",DS.primary]].map(function(_i){var l=_i[0];var v=_i[1];var col=_i[2];return <div key={l} style={{background:DS.card,borderRadius:10,padding:"10px",border:"1px solid "+DS.border}}><div style={{fontSize:16,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted}}>{l}</div></div>;})} </div>}
+        {tab==="services"&&(function(){
+          var _svcs=[];
+          try{
+            if(proType==="hotel"){var va=localStorage.getItem("hp_hotelsvc_amenities");_svcs=va?JSON.parse(va).filter(function(a){return a.active;}):(data.services||[]);}
+            else{var vb=localStorage.getItem("hp_restoff_offers");_svcs=vb?JSON.parse(vb):(data.offers||[]);}
+          }catch(ex){_svcs=data.services||data.offers||[];}
+          if(!_svcs.length)_svcs=data.services||data.offers||[];
+          return _svcs.map(function(s,i){var name=typeof s==="string"?s:s.name;var Ic=getIcon(name);return <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid "+DS.border+"20"}}><div style={{width:30,height:30,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><div style={{fontSize:12,color:DS.text}}>{name}</div></div>;});
+        })()}
+        {tab==="stats"&&(function(){
+          var _resas=BookingService.getAll();
+          var _nbResas=_resas.length;
+          var _confirmed=_resas.filter(function(r){return r.status==="confirmed"||r.status==="consumed";}).length;
+          var _conversion=_nbResas>0?Math.round((_confirmed/_nbResas)*1000)/10:0;
+          var _rvKey="hp_reviews_"+(data&&data.id||"x");
+          var _nbAvis=0;try{var _rv=JSON.parse(localStorage.getItem(_rvKey)||"[]");_nbAvis=_rv.length;}catch(ex){}
+          var _revenue=_resas.filter(function(r){return r.payMode==="avec";}).reduce(function(s,r){return s+(r.total||0);},0);
+          return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{[["Reservations",String(_nbResas),color],[_revenue>0?_revenue.toFixed(0)+" EUR":"—","Revenus",DS.gold],[_conversion+"%","Conversion",DS.success],[String(_nbAvis),"Avis recus",DS.primary]].map(function(_i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={l} style={{background:DS.card,borderRadius:10,padding:"10px",border:"1px solid "+DS.border}}><div style={{fontSize:16,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted}}>{l}</div></div>;})} </div>);
+        })()}
       </div>
     </div>
   );
@@ -2666,6 +2738,7 @@ export default function App() {
   function toggleFollowGlobal(id){
     var was=followingIds.indexOf(id)>=0;
     setFollowingIds(function(f){var next=was?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_following",JSON.stringify(next));}catch(e){}return next;});
+    if(!was&&!isPro){addNotif({id:"notif_follow_"+Date.now(),Icon:Users,color:DS.hotel,title:"Nouvel abonne",body:"Un utilisateur suit maintenant votre etablissement.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
     tk.show(was?"Vous ne suivez plus cet etablissement":"Vous suivez cet etablissement","success");
   }
   function toggleFavEstab(id){
@@ -2752,7 +2825,7 @@ export default function App() {
           {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV"/>}
-          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds}/>}
+          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds} privacySettings={privacySettings}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false}/>}
