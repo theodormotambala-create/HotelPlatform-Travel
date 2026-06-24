@@ -33,7 +33,7 @@ function fmtK(n){
   return String(n);
 }
 
-const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}@keyframes hp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes hp-item-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}@keyframes hp-heart-pop{0%{transform:scale(1)}20%{transform:scale(1.45)}40%{transform:scale(1.1)}60%{transform:scale(1.28)}80%{transform:scale(.97)}100%{transform:scale(1)}}@keyframes hp-bounce-in{0%{opacity:0;transform:scale(.87) translateY(10px)}55%{opacity:1;transform:scale(1.03)}75%{transform:scale(.99)}100%{opacity:1;transform:scale(1)}}@keyframes hp-toast-in{from{opacity:0;transform:translateX(-50%) translateY(18px) scale(.93)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}@keyframes hp-slide-down{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-msg-in{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes hp-success-ring{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.12);opacity:1}80%{transform:scale(.96)}100%{transform:scale(1);opacity:1}}button{transition:opacity .16s cubic-bezier(0.22,1,0.36,1),transform .14s cubic-bezier(0.22,1,0.36,1),background .18s ease,color .18s ease}button:active{transform:scale(.94);opacity:.82}.hp-scroll{-webkit-overflow-scrolling:touch}.hp-card{transition:box-shadow .18s ease,transform .16s ease}.hp-card:active{transform:scale(.984)}.hp-img{opacity:0;transition:opacity .38s ease}.hp-img-loaded{opacity:1}.hp-input-focus{outline:none!important;box-shadow:0 0 0 2.5px #6366F133!important;border-color:#6366F1!important;transition:box-shadow .18s ease,border-color .18s ease}.hp-sk{background:linear-gradient(90deg,#17171F 25%,#252533 50%,#17171F 75%);background-size:600px 100%;animation:hp-shimmer 1.5s infinite linear;border-radius:8px}input,textarea{transition:box-shadow .18s ease,border-color .18s ease}";
+const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}@keyframes hp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes hp-item-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}@keyframes hp-heart-pop{0%{transform:scale(1)}20%{transform:scale(1.45)}40%{transform:scale(1.1)}60%{transform:scale(1.28)}80%{transform:scale(.97)}100%{transform:scale(1)}}@keyframes hp-bounce-in{0%{opacity:0;transform:scale(.87) translateY(10px)}55%{opacity:1;transform:scale(1.03)}75%{transform:scale(.99)}100%{opacity:1;transform:scale(1)}}@keyframes hp-toast-in{from{opacity:0;transform:translateX(-50%) translateY(18px) scale(.93)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}@keyframes hp-slide-down{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-sheet-out{from{transform:translateY(0);opacity:1}to{transform:translateY(100%);opacity:.4}}from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes hp-success-ring{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.12);opacity:1}80%{transform:scale(.96)}100%{transform:scale(1);opacity:1}}button{transition:opacity .16s cubic-bezier(0.22,1,0.36,1),transform .14s cubic-bezier(0.22,1,0.36,1),background .18s ease,color .18s ease}button:active{transform:scale(.94);opacity:.82}.hp-scroll{-webkit-overflow-scrolling:touch}.hp-card{transition:box-shadow .18s ease,transform .16s ease}.hp-card:active{transform:scale(.984)}.hp-img{opacity:0;transition:opacity .38s ease}.hp-img-loaded{opacity:1}.hp-input-focus{outline:none!important;box-shadow:0 0 0 2.5px #6366F133!important;border-color:#6366F1!important;transition:box-shadow .18s ease,border-color .18s ease}.hp-sk{background:linear-gradient(90deg,#17171F 25%,#252533 50%,#17171F 75%);background-size:600px 100%;animation:hp-shimmer 1.5s infinite linear;border-radius:8px}input,textarea{transition:box-shadow .18s ease,border-color .18s ease}";
 function useAnimations(){useEffect(function(){if(document.getElementById("hp-a"))return;var s=document.createElement("style");s.id="hp-a";s.textContent=ANIM_CSS;document.head.appendChild(s);},[]);}
 
 const HOTELS=[
@@ -918,21 +918,24 @@ function CommentsSheet(props){
   var post=props.post;var cmtText=props.cmtText;var setCmtText=props.setCmtText;var addCmt=props.addCmt;var delCmt=props.delCmt;var onClose=props.onClose;var selfLetter=props.selfLetter||"V";
   var menuC=useState(null);var menuCm=menuC[0];var setMenuCm=menuC[1];
   var selfName=props.selfName||"Vous";
+  var sClosing=useState(false);var closing=sClosing[0];var setClosing=sClosing[1];
+  var closeTimer=useRef(null);
+  function handleClose(){if(closing)return;setClosing(true);closeTimer.current=setTimeout(function(){onClose();},260);}
+  useEffect(function(){return function(){if(closeTimer.current)clearTimeout(closeTimer.current);};}, []);
   var lpTimer=useRef(null);
   function lpStart(cm,e){if(cm.author!==selfName)return;lpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuCm(cm);},480);}
   function lpCancel(){if(lpTimer.current){clearTimeout(lpTimer.current);lpTimer.current=null;}}
   var sd=useState(0);var dragY=sd[0];var setDragY=sd[1];
   var dragging=useState(false);var isDragging=dragging[0];var setIsDragging=dragging[1];
   var st=useRef(null);var cur=useRef(0);var scrollerRef=useRef(null);var fromScroller=useRef(false);
+  useEffect(function(){if(scrollerRef.current)scrollerRef.current.scrollTop=0;},[post.id]);
   function beginDrag(y,viaScroller){st.current=y;cur.current=0;fromScroller.current=!!viaScroller;setIsDragging(true);}
   function moveDrag(y){if(st.current===null)return;var dy=y-st.current;cur.current=dy>0?dy:0;setDragY(cur.current);}
-  function endDrag(){if(cur.current>90){onClose();return;}st.current=null;cur.current=0;fromScroller.current=false;setDragY(0);setIsDragging(false);}
-  // Drag depuis la poignee / en-tete (toujours actif)
+  function endDrag(){if(cur.current>90){handleClose();return;}st.current=null;cur.current=0;fromScroller.current=false;setDragY(0);setIsDragging(false);}
   function onHeadTouchStart(e){beginDrag(e.touches[0].clientY,false);}
   function onHeadTouchMove(e){if(st.current!==null){e.preventDefault();moveDrag(e.touches[0].clientY);}}
   function onHeadTouchEnd(){endDrag();}
   function onHeadMouseDown(e){beginDrag(e.clientY,false);}
-  // Drag depuis la liste : seulement si on est tout en haut et qu'on tire vers le bas
   var listStartY=useRef(null);
   function onListTouchStart(e){listStartY.current=e.touches[0].clientY;}
   function onListTouchMove(e){
@@ -952,8 +955,10 @@ function CommentsSheet(props){
     window.addEventListener("mouseup",mu);
     return function(){window.removeEventListener("mousemove",mm);window.removeEventListener("mouseup",mu);};
   },[isDragging]);
-  return(<div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-    <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:480,height:"90vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:isDragging?"none":"hp-slide-up 0.3s ease",transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
+  var sheetAnim=closing?"hp-sheet-out 0.26s cubic-bezier(0.4,0,1,1) forwards":(isDragging?"none":"hp-slide-up 0.32s cubic-bezier(0.22,1,0.36,1)");
+  var backdropStyle={position:"fixed",inset:0,background:closing?"rgba(0,0,0,0)":"rgba(0,0,0,.6)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center",transition:closing?"background .26s ease":"none"};
+  return(<div onClick={handleClose} style={backdropStyle}>
+    <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:480,height:"90vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:sheetAnim,transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
       <div onTouchStart={onHeadTouchStart} onTouchMove={onHeadTouchMove} onTouchEnd={onHeadTouchEnd} onMouseDown={onHeadMouseDown} style={{flexShrink:0,cursor:"grab",userSelect:"none",touchAction:"none"}}>
         <div style={{padding:"10px 0 8px"}}>
           <div style={{width:44,height:5,borderRadius:3,background:DS.textDim,margin:"0 auto"}}/>
