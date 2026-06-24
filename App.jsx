@@ -847,25 +847,51 @@ function CommentsSheet(props){
 
 function ClientFeed(props){
   var onProfile=props.onProfile;
-  var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:false,comments:[],showCmt:false});}));
+  var selfEmail=props.selfEmail||"";
+  var selfName=selfEmail?selfEmail.split("@")[0]:"Vous";
+  var selfLetter=(selfName[0]||"V").toUpperCase();
+  var _initLikes={};var _initFavs=[];try{_initLikes=JSON.parse(localStorage.getItem("hp_likes")||"{}");_initFavs=JSON.parse(localStorage.getItem("hp_favs")||"[]");}catch(e){}
+  var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes+(_initLikes[p.id]?1:0),comments:[],showCmt:false});}));
   var posts=s1[0];var setPosts=s1[1];
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState({});var cmtText=s2[0];var setCmtText=s2[1];
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
-  var sf=useState([]);var favPosts=sf[0];var setFavPosts=sf[1];
+  var menuRef=useRef(null);
+  useEffect(function(){
+    if(!menuOpen)return;
+    function handleOutside(e){if(menuRef.current&&!menuRef.current.contains(e.target))setMenuOpen(null);}
+    document.addEventListener("mousedown",handleOutside,true);
+    document.addEventListener("touchstart",handleOutside,true);
+    return function(){document.removeEventListener("mousedown",handleOutside,true);document.removeEventListener("touchstart",handleOutside,true);};
+  },[menuOpen]);
+  var sf=useState(_initFavs);var favPosts=sf[0];var setFavPosts=sf[1];
   var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
   var followingPosts=props.followingIds||[];
-  function toggleFav(id){setFavPosts(function(f){return f.indexOf(id)>=0?f.filter(function(x){return x!==id;}):f.concat([id]);});setMenuOpen(null);toast(favPosts.indexOf(id)>=0?"Retire des favoris":"Ajoute aux favoris","success");}
+  function toggleFav(id){
+    setFavPosts(function(f){
+      var next=f.indexOf(id)>=0?f.filter(function(x){return x!==id;}):f.concat([id]);
+      try{localStorage.setItem("hp_favs",JSON.stringify(next));}catch(e){}
+      return next;
+    });
+    setMenuOpen(null);
+    toast(favPosts.indexOf(id)>=0?"Retire des favoris":"Ajoute aux favoris","success");
+  }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
-  function toggleLike(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});});}
+  function toggleLike(id){
+    setPosts(function(ps){
+      var next=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});
+      try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem("hp_likes",JSON.stringify(lk));}catch(e){}
+      return next;
+    });
+  }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
   function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partage avec succes","success");}
   function addCmt(id){
     var text=(cmtText[id]||"").trim();if(!text)return;
-    var cm={id:Date.now(),author:"Vous",text:text,time:"maintenant"};
+    var cm={id:Date.now(),author:selfName,text:text,time:"maintenant"};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
     toast("Commentaire publie","success");
@@ -899,7 +925,7 @@ function ClientFeed(props){
                 </div>
               </div>
               <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-                <div style={{position:"relative"}}>
+                <div ref={menuRef} style={{position:"relative"}}>
                   <button onClick={function(ev){ev.stopPropagation();setMenuOpen(menuOpen===post.id?null:post.id);}} style={{background:"none",border:"none",cursor:"pointer",padding:"4px 6px",borderRadius:8,display:"flex",alignItems:"center"}}><MoreVertical size={18} color={DS.textMuted}/></button>
                   {menuOpen===post.id&&(
                     <div style={{position:"absolute",top:"100%",right:0,background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"6px 0",minWidth:160,zIndex:200,boxShadow:"0 8px 24px rgba(0,0,0,.4)"}}>
@@ -916,7 +942,7 @@ function ClientFeed(props){
               </div>
             </div>
             <div style={{padding:"0 16px 16px",fontSize:15,color:DS.text,lineHeight:1.7}}>{post.text}</div>
-            {post.img&&<img src={post.img} alt="" style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}
+            {post.img&&<img src={post.img} alt="" onError={function(e){e.target.style.display="none";}} style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px 2px",fontSize:12,color:DS.textDim}}>
               <span>{post.likes} reaction{post.likes!==1?"s":""}</span>
               <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
@@ -932,7 +958,7 @@ function ClientFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName="Vous" onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -952,11 +978,11 @@ function ClientDisc(props){
 }
 
 function ClientProf(props){
-  var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;
+  var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var followingCount=props.followingCount||0;
   var s1=useState("reservations");var tab=s1[0];var setTab=s1[1];
   var sq=useState(null);var activeQR=sq[0];var setActiveQR=sq[1];
 
-  return(<div style={{paddingBottom:20}}><LoyaltyWidget points={620} level="silver"/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><Av sz={72} letter="M"/><div style={{fontSize:18,fontWeight:800,color:DS.text,marginTop:10}}>Moussa Konate</div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>Dakar, Senegal</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[["12","Suivis",null],["5","Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
+  return(<div style={{paddingBottom:20}}><LoyaltyWidget points={620} level="silver"/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><Av sz={72} letter="M"/><div style={{fontSize:18,fontWeight:800,color:DS.text,marginTop:10}}>Moussa Konate</div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>Dakar, Senegal</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],["5","Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
           (resaHistory&&resaHistory.length>0)?resaHistory.map(function(r,i){
             var showQR=activeQR===i;
             var st=r.status||"pending";
@@ -1602,7 +1628,7 @@ function ProFeed(props){
               </div>
             </div>
             <div style={{padding:"0 16px 16px",fontSize:15,color:DS.text,lineHeight:1.7}}>{post.text}</div>
-            {post.img&&<img src={post.img} alt="" style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}{post.video&&<video src={post.video} controls style={{width:"100%",maxHeight:620,display:"block",background:"#000"}}/>}
+            {post.img&&<img src={post.img} alt="" onError={function(e){e.target.style.display="none";}} style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}{post.video&&<video src={post.video} controls style={{width:"100%",maxHeight:620,display:"block",background:"#000"}}/>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px 2px",fontSize:12,color:DS.textDim}}>
               <span>{post.likes} reaction{post.likes!==1?"s":""}</span>
               <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
@@ -2566,10 +2592,10 @@ export default function App() {
         />
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal}/></div>}
+          {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV"/>}
-          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory}/>}
+          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} viewerIsPro={false}/>}
