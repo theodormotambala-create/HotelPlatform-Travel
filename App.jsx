@@ -456,6 +456,7 @@ function AuthScreen(props){
     var emailRe=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if(!emailRe.test(email.trim())){setFormErr("Adresse email invalide.");return;}
     if(mode!=="forgot"&&pass.length<6){setFormErr("Le mot de passe doit contenir au moins 6 caracteres.");return;}
+    if(mode!=="forgot"&&pass.length>72){setFormErr("Le mot de passe est trop long (maximum 72 caracteres).");return;}
     if(mode==="register"&&pass!==confirmPass){setFormErr("Les mots de passe ne correspondent pas.");return;}
     if(mode==="register"&&!cgu){setFormErr("Veuillez accepter les conditions d utilisation.");return;}
     setTwoFA(true);setAuthErr("");
