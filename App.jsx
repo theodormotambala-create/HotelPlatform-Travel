@@ -916,78 +916,82 @@ function ShareSheet(props){
 }
 function CommentsSheet(props){
   var post=props.post;var cmtText=props.cmtText;var setCmtText=props.setCmtText;var addCmt=props.addCmt;var delCmt=props.delCmt;var onClose=props.onClose;var selfLetter=props.selfLetter||"V";
-  var menuC=useState(null);var menuCm=menuC[0];var setMenuCm=menuC[1];
   var selfName=props.selfName||"Vous";
+  var menuC=useState(null);var menuCm=menuC[0];var setMenuCm=menuC[1];
+  var lpTimer=useRef(null);
+  function lpStart(cm,e){if(cm.author!==selfName)return;lpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuCm(cm);},480);}
+  function lpCancel(){if(lpTimer.current){clearTimeout(lpTimer.current);lpTimer.current=null;}}
+  // Closing animation
   var sClosing=useState(false);var closing=sClosing[0];var setClosing=sClosing[1];
   var closeTimer=useRef(null);
   function handleClose(){if(closing)return;setClosing(true);closeTimer.current=setTimeout(function(){onClose();},260);}
   useEffect(function(){return function(){if(closeTimer.current)clearTimeout(closeTimer.current);};}, []);
-  var lpTimer=useRef(null);
-  function lpStart(cm,e){if(cm.author!==selfName)return;lpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuCm(cm);},480);}
-  function lpCancel(){if(lpTimer.current){clearTimeout(lpTimer.current);lpTimer.current=null;}}
+  // Drag handle ONLY (no list drag = no unintended movement)
   var sd=useState(0);var dragY=sd[0];var setDragY=sd[1];
   var dragging=useState(false);var isDragging=dragging[0];var setIsDragging=dragging[1];
-  var st=useRef(null);var cur=useRef(0);var scrollerRef=useRef(null);var fromScroller=useRef(false);
-  useEffect(function(){if(scrollerRef.current)scrollerRef.current.scrollTop=0;},[post.id]);
-  function beginDrag(y,viaScroller){st.current=y;cur.current=0;fromScroller.current=!!viaScroller;setIsDragging(true);}
+  var st=useRef(null);var cur=useRef(0);
+  function beginDrag(y){st.current=y;cur.current=0;setIsDragging(true);}
   function moveDrag(y){if(st.current===null)return;var dy=y-st.current;cur.current=dy>0?dy:0;setDragY(cur.current);}
-  function endDrag(){if(cur.current>90){handleClose();return;}st.current=null;cur.current=0;fromScroller.current=false;setDragY(0);setIsDragging(false);}
-  function onHeadTouchStart(e){beginDrag(e.touches[0].clientY,false);}
+  function endDrag(){if(cur.current>80){handleClose();return;}st.current=null;cur.current=0;setDragY(0);setIsDragging(false);}
+  function onHeadTouchStart(e){beginDrag(e.touches[0].clientY);}
   function onHeadTouchMove(e){if(st.current!==null){e.preventDefault();moveDrag(e.touches[0].clientY);}}
-  function onHeadTouchEnd(){endDrag();}
-  function onHeadMouseDown(e){beginDrag(e.clientY,false);}
-  var listStartY=useRef(null);
-  function onListTouchStart(e){listStartY.current=e.touches[0].clientY;}
-  function onListTouchMove(e){
-    var sc=scrollerRef.current;if(!sc)return;
-    var y=e.touches[0].clientY;
-    if(st.current!==null){e.preventDefault();moveDrag(y);return;}
-    if(listStartY.current===null)return;
-    var dy=y-listStartY.current;
-    if(sc.scrollTop<=0&&dy>6){e.preventDefault();beginDrag(listStartY.current,true);moveDrag(y);}
-  }
-  function onListTouchEnd(){listStartY.current=null;if(st.current!==null)endDrag();}
+  function onHeadTouchEnd(){if(st.current!==null)endDrag();}
+  function onHeadMouseDown(e){beginDrag(e.clientY);}
   useEffect(function(){
     if(!isDragging)return;
     function mm(e){moveDrag(e.clientY);}
-    function mu(){endDrag();}
-    window.addEventListener("mousemove",mm);
-    window.addEventListener("mouseup",mu);
+    function mu(){if(st.current!==null)endDrag();}
+    window.addEventListener("mousemove",mm);window.addEventListener("mouseup",mu);
     return function(){window.removeEventListener("mousemove",mm);window.removeEventListener("mouseup",mu);};
   },[isDragging]);
-  var sheetAnim=closing?"hp-sheet-out 0.26s cubic-bezier(0.4,0,1,1) forwards":(isDragging?"none":"hp-slide-up 0.32s cubic-bezier(0.22,1,0.36,1)");
-  var backdropStyle={position:"fixed",inset:0,background:closing?"rgba(0,0,0,0)":"rgba(0,0,0,.6)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center",transition:closing?"background .26s ease":"none"};
+  // Scroll management
+  var scrollerRef=useRef(null);
+  var prevCmtLen=useRef(post.comments.length);
+  var initCmtCount=useRef(post.comments.length);
+  // Reset scroll on first open
+  useEffect(function(){if(scrollerRef.current)scrollerRef.current.scrollTop=0;},[]);
+  // Scroll to bottom when new comment added
+  useEffect(function(){
+    if(post.comments.length>prevCmtLen.current&&scrollerRef.current){
+      scrollerRef.current.scrollTop=scrollerRef.current.scrollHeight;
+    }
+    prevCmtLen.current=post.comments.length;
+  },[post.comments.length]);
+  var backdropStyle={position:"fixed",inset:0,background:closing?"rgba(0,0,0,0)":"rgba(0,0,0,.55)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center",transition:closing?"background .26s ease":"none"};
+  var sheetAnim=closing?"hp-sheet-out 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-up 0.32s cubic-bezier(0.22,1,0.36,1)";
   return(<div onClick={handleClose} style={backdropStyle}>
-    <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:480,height:"90vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:sheetAnim,transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
-      <div onTouchStart={onHeadTouchStart} onTouchMove={onHeadTouchMove} onTouchEnd={onHeadTouchEnd} onMouseDown={onHeadMouseDown} style={{flexShrink:0,cursor:"grab",userSelect:"none",touchAction:"none"}}>
-        <div style={{padding:"10px 0 8px"}}>
-          <div style={{width:44,height:5,borderRadius:3,background:DS.textDim,margin:"0 auto"}}/>
-          <div style={{textAlign:"center",fontSize:10,color:DS.textDim,marginTop:5}}>Glisser vers le bas pour fermer</div>
-        </div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"4px 16px 12px",borderBottom:"1px solid "+DS.border+"40"}}>
-          <span style={{fontSize:16,fontWeight:800,color:DS.text}}>Commentaires{post.comments.length>0?" ("+post.comments.length+")":""}</span>
-        </div>
+    <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:480,height:"65vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:sheetAnim,transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
+      {/* Poignee drag */}
+      <div onTouchStart={onHeadTouchStart} onTouchMove={onHeadTouchMove} onTouchEnd={onHeadTouchEnd} onMouseDown={onHeadMouseDown} style={{flexShrink:0,paddingTop:9,paddingBottom:4,cursor:"grab",userSelect:"none",touchAction:"none",textAlign:"center"}}>
+        <div style={{width:40,height:4,borderRadius:2,background:DS.textDim,display:"inline-block"}}/>
       </div>
-      <div ref={scrollerRef} onTouchStart={onListTouchStart} onTouchMove={onListTouchMove} onTouchEnd={onListTouchEnd} style={{flex:1,minHeight:0,overflowY:"auto",overflowX:"hidden",padding:"14px 16px",overscrollBehavior:"none"}}>
-        {post.comments.length===0&&<div style={{textAlign:"center",color:DS.textDim,fontSize:13,padding:"30px 0"}}>Aucun commentaire pour le moment. Soyez le premier !</div>}
-        {post.comments.map(function(cm,i){var mine=cm.author===selfName;return(
-          <div key={i} style={{display:"flex",gap:8,marginBottom:12,animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}>
-            <Av sz={30} letter={cm.author[0]}/>
+      {/* Header LinkedIn */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 16px 10px",borderBottom:"1px solid "+DS.border+"40",flexShrink:0}}>
+        <div style={{fontSize:15,fontWeight:800,color:DS.text}}>Commentaires{post.comments.length>0?" ("+post.comments.length+")":""}</div>
+        <button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border+"60",borderRadius:"50%",width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><X size={13} color={DS.textMuted}/></button>
+      </div>
+      {/* Liste commentaires */}
+      <div ref={scrollerRef} style={{flex:1,minHeight:0,overflowY:"auto",overflowX:"hidden",padding:"12px 16px",overscrollBehavior:"contain"}}>
+        {post.comments.length===0&&<div style={{textAlign:"center",color:DS.textDim,fontSize:13,padding:"24px 0"}}>Aucun commentaire. Soyez le premier !</div>}
+        {post.comments.map(function(cm,i){var mine=cm.author===selfName;var isNew=i>=initCmtCount.current;return(
+          <div key={cm.id||i} style={{display:"flex",gap:10,marginBottom:14,animation:isNew?"hp-item-in 0.25s ease both":"none"}}>
+            <Av sz={32} letter={cm.author[0]}/>
             <div style={{flex:1}}>
-              <div onTouchStart={function(e){lpStart(cm,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(cm);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(mine)setMenuCm(cm);}} style={{background:DS.card,borderRadius:"0 12px 12px 12px",padding:"8px 12px",cursor:mine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>
-                <div style={{fontSize:12,fontWeight:700,color:DS.text,marginBottom:2}}>{cm.author}</div>
-                <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.45}}>{cm.text}</div>
+              <div onTouchStart={function(e){lpStart(cm,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(cm);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(mine)setMenuCm(cm);}} style={{background:DS.card,borderRadius:"0 14px 14px 14px",padding:"8px 12px",cursor:mine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>
+                <div style={{fontSize:12,fontWeight:700,color:DS.text,marginBottom:3}}>{cm.author}</div>
+                <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.5}}>{cm.text}</div>
               </div>
-              <div style={{fontSize:9,color:DS.textDim,marginTop:3,paddingLeft:6}}>{cm.time}{mine?" - maintenir pour supprimer":""}</div>
+              <div style={{fontSize:9,color:DS.textDim,marginTop:3,paddingLeft:4}}>{cm.time}{mine?" · maintenir pour supprimer":""}</div>
             </div>
           </div>
         );})}
       </div>
-      <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 16px",borderTop:"1px solid "+DS.border+"40",flexShrink:0,background:DS.surface}}>
+      {/* Input */}
+      <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",borderTop:"1px solid "+DS.border+"40",flexShrink:0,background:DS.surface}}>
         <Av sz={30} letter={selfLetter}/>
         <div style={{flex:1,position:"relative"}}>
-          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter")addCmt(post.id);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Ajouter un commentaire..." style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"11px 50px 11px 16px",fontSize:14,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
-          <button onClick={function(){addCmt(post.id);}} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={14} color="#fff"/></button>
+          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter")addCmt(post.id);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Ajouter un commentaire..." style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          <button onClick={function(){addCmt(post.id);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
         </div>
       </div>
     </div>
