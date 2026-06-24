@@ -1007,6 +1007,18 @@ function CommentsSheet(props){
   </div>);
 }
 
+function FeedText(props){
+  var text=props.text||"";
+  var sExp=useState(false);var exp=sExp[0];var setExp=sExp[1];
+  var LIMIT=180;
+  var isLong=text.length>LIMIT;
+  var shown=exp||!isLong?text:text.slice(0,LIMIT).trimEnd();
+  return(
+    <div style={{padding:"0 16px 12px",fontSize:15,color:DS.text,lineHeight:1.65}}>
+      {shown}{!exp&&isLong&&<span>… <span onClick={function(){setExp(true);}} style={{color:DS.textMuted,fontWeight:700,cursor:"pointer",fontSize:13}}>Voir plus</span></span>}
+    </div>
+  );
+}
 function ClientFeed(props){
   var onProfile=props.onProfile;
   var selfEmail=props.selfEmail||"";
@@ -1071,8 +1083,8 @@ function ClientFeed(props){
       {posts.map(function(post,_pi){
         var color=rC(post.type);
         return(
-          <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pi*50)+"ms"}}>
-            <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 16px 14px"}}>
+          <div key={post.id} style={{background:DS.surface,marginBottom:8,borderTop:"1px solid "+DS.border+"22",borderBottom:"1px solid "+DS.border+"22",animation:"hp-item-in 0.38s cubic-bezier(0.22,1,0.36,1) both",animationDelay:(_pi*45)+"ms"}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px 10px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
                 <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{cursor:"pointer",flexShrink:0}}>
                   <Av sz={52} letter={post.author[0]} verified={post.verified}/>
@@ -1105,18 +1117,18 @@ function ClientFeed(props){
                 </div>
               </div>
             </div>
-            <div style={{padding:"0 16px 16px",fontSize:15,color:DS.text,lineHeight:1.7}}>{post.text}</div>
-            {post.img&&<img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.style.display="none";}} style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px 2px",fontSize:12,color:DS.textDim}}>
+            <FeedText text={post.text}/>
+            {post.img&&<div style={{position:"relative",overflow:"hidden",background:DS.card}}><img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.parentNode.style.display="none";}} style={{width:"100%",height:"min(500px,62vh)",objectFit:"cover",display:"block",willChange:"transform"}}/></div>}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 16px 2px",fontSize:12,color:DS.textDim}}>
               <span>{post.likes} reaction{post.likes!==1?"s":""}</span>
               <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
-            <div style={{display:"flex",borderTop:"1px solid "+DS.border+"30",marginTop:8}}>
+            <div style={{display:"flex",borderTop:"1px solid "+DS.border+"28",marginTop:6}}>
               {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLike(post.id);triggerHeart(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
                 var lb=_i[0];var Icon=_i[1];var col=_i[2];var fn=_i[3];
                 return(
-                  <button key={lb} onClick={fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"13px 0",background:"none",border:"none",cursor:"pointer",color:col,fontSize:13,fontWeight:lb==="Liker"&&post.liked?700:500}}>
-                    <Icon size={20} fill={lb==="Liker"&&post.liked?DS.error:"none"} color={col} style={lb==="Liker"&&heartAnim===post.id?{animation:"hp-heart-pop .5s cubic-bezier(0.22,1,0.36,1)"}:{}}/>{lb}
+                  <button key={lb} onClick={fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"11px 0",background:"none",border:"none",cursor:"pointer",color:col,fontSize:13,fontWeight:lb==="Liker"&&post.liked?700:500}}>
+                    <Icon size={19} fill={lb==="Liker"&&post.liked?DS.error:"none"} color={col} style={lb==="Liker"&&heartAnim===post.id?{animation:"hp-heart-pop .5s cubic-bezier(0.22,1,0.36,1)"}:{}}/>{lb}
                   </button>
                 );
               })}
