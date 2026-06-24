@@ -969,7 +969,7 @@ function CommentsSheet(props){
   var st=useRef(null);var cur=useRef(0);
   function beginDrag(y){st.current=y;cur.current=0;setIsDragging(true);}
   function moveDrag(y){if(st.current===null)return;var dy=y-st.current;cur.current=dy>0?dy:0;setDragY(cur.current);}
-  function endDrag(){if(cur.current>80){handleClose();return;}st.current=null;cur.current=0;setDragY(0);setIsDragging(false);}
+  function endDrag(){if(cur.current>120){handleClose();return;}st.current=null;cur.current=0;setDragY(0);setIsDragging(false);}
   function onHeadTouchStart(e){beginDrag(e.touches[0].clientY);}
   function onHeadTouchMove(e){if(st.current!==null){e.preventDefault();moveDrag(e.touches[0].clientY);}}
   function onHeadTouchEnd(){if(st.current!==null)endDrag();}
@@ -996,8 +996,8 @@ function CommentsSheet(props){
   },[post.comments.length]);
   var backdropStyle={position:"fixed",inset:0,background:closing?"rgba(0,0,0,0)":"rgba(0,0,0,.55)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center",transition:closing?"background .26s ease":"none"};
   var sheetAnim=closing?"hp-sheet-out 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-up 0.32s cubic-bezier(0.22,1,0.36,1)";
-  return(<div onClick={handleClose} style={backdropStyle}>
-    <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:480,height:"65vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:sheetAnim,transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
+  return(<div style={backdropStyle}>
+    <div style={{width:"100%",maxWidth:480,height:"70vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:sheetAnim,transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
       {/* Poignee drag */}
       <div onTouchStart={onHeadTouchStart} onTouchMove={onHeadTouchMove} onTouchEnd={onHeadTouchEnd} onMouseDown={onHeadMouseDown} style={{flexShrink:0,paddingTop:9,paddingBottom:4,cursor:"grab",userSelect:"none",touchAction:"none",textAlign:"center"}}>
         <div style={{width:40,height:4,borderRadius:2,background:DS.textDim,display:"inline-block"}}/>
