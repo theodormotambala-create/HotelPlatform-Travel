@@ -477,7 +477,7 @@ function AccountTypeScreen(props){
   );
 }
 function AuthScreen(props){
-  var onAuth=props.onAuth;
+  var onAuth=props.onAuth;var onBack=props.onBack;
   var _initType=props.initialAccType||"client";
   var s1=useState("login");var mode=s1[0];var setMode=s1[1];
   var s2=useState(_initType);var accType=s2[0];var setAccType=s2[1];
@@ -580,6 +580,9 @@ function AuthScreen(props){
   }
   return(
     <div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,animation:"hp-fade-up 0.28s ease"}}>
+      {onBack&&<button onClick={mode==="forgot"?function(){setMode("login");}:onBack} style={{position:"absolute",top:18,left:18,background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"7px 12px",display:"flex",alignItems:"center",gap:6,cursor:"pointer",color:DS.textMuted,fontSize:12,fontWeight:700}}>
+        <ArrowLeft size={14} color={DS.textMuted}/>{mode==="forgot"?"Retour":"Changer de compte"}
+      </button>}
       <div style={{textAlign:"center",marginBottom:20}}>
         <div style={{fontSize:32,fontWeight:900,color:DS.text,letterSpacing:-1}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>
         <div style={{fontSize:12,color:DS.textMuted,marginTop:6}}>{mode==="login"?"Connectez-vous":mode==="register"?"Creez votre compte":"Reinitialiser le mot de passe"}</div>
@@ -2808,7 +2811,7 @@ export default function App() {
       <AuthScreen initialAccType={_storedAccType} onAuth={function(t,status,email,userId){
         try{localStorage.setItem("hp_acc_type",t);}catch(e){}
         setAuth(AuthService.buildSession(t,status,email,userId));
-      }}/>
+      }} onBack={function(){try{localStorage.removeItem("hp_acc_type");}catch(e){}setNeedsOnboarding(true);}}/>
     );
   }
 
