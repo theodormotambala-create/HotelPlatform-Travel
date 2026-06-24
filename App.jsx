@@ -29,7 +29,7 @@ function fmtK(n){
   return String(n);
 }
 
-const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}@keyframes hp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}button{transition:opacity .18s cubic-bezier(0.22,1,0.36,1),transform .16s cubic-bezier(0.22,1,0.36,1),background .2s ease}button:active{transform:scale(.96);opacity:.85}.hp-scroll{-webkit-overflow-scrolling:touch}";
+const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}@keyframes hp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes hp-item-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}button{transition:opacity .18s cubic-bezier(0.22,1,0.36,1),transform .16s cubic-bezier(0.22,1,0.36,1),background .2s ease}button:active{transform:scale(.96);opacity:.85}.hp-scroll{-webkit-overflow-scrolling:touch}.hp-card{transition:box-shadow .18s ease,transform .16s ease}.hp-card:active{transform:scale(.985)}";
 function useAnimations(){useEffect(function(){if(document.getElementById("hp-a"))return;var s=document.createElement("style");s.id="hp-a";s.textContent=ANIM_CSS;document.head.appendChild(s);},[]);}
 
 const HOTELS=[
@@ -1019,10 +1019,11 @@ function ClientFeed(props){
       <Toast/>
       {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
-      {posts.map(function(post){
+      {posts.length===0&&<Emp Icon={Home} title="Aucune publication" sub="Les publications des etablissements apparaitront ici"/>}
+      {posts.map(function(post,_pi){
         var color=rC(post.type);
         return(
-          <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28"}}>
+          <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pi*50)+"ms"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 16px 14px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
                 <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{cursor:"pointer",flexShrink:0}}>
@@ -1089,7 +1090,7 @@ function ClientDisc(props){
   var items=tab==="hotels"?DataLayer.getHotels():DataLayer.getRestaurants();
   var filtered=items.filter(function(i){return i.name.toLowerCase().indexOf(search.toLowerCase())>=0||i.location.toLowerCase().indexOf(search.toLowerCase())>=0;});
   var color=tab==="hotels"?DS.hotel:DS.restaurant;
-  return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{padding:"0 14px",paddingBottom:16}}>{filtered.length===0?<Emp Icon={Search} title="Aucun resultat"/>:filtered.map(function(item){return(<div key={item.id} style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.verified&&<div style={{position:"absolute",top:8,left:8}}><VBadge sz={20}/></div>}{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){if(item.svcMode==="combined"){if(onProfile)onProfile(item.id,item.type);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>{item.svcMode==="combined"?"Voir options":"Reserver"}</button></div></div>);})}</div></div>);
+  return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{padding:"0 14px",paddingBottom:16}}>{filtered.length===0?<Emp Icon={Search} title="Aucun resultat"/>:filtered.map(function(item,_idx){return(<div key={item.id} style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border,animation:"hp-item-in 0.32s ease both",animationDelay:(_idx*60)+"ms"}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.verified&&<div style={{position:"absolute",top:8,left:8}}><VBadge sz={20}/></div>}{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){if(item.svcMode==="combined"){if(onProfile)onProfile(item.id,item.type);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>{item.svcMode==="combined"?"Voir options":"Reserver"}</button></div></div>);})}</div></div>);
 }
 
 function ClientProf(props){
@@ -1708,7 +1709,7 @@ function ProFeed(props){
       {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",background:DS.surface,borderBottom:"1px solid "+DS.border,marginBottom:10}}>
-        {[[fmtK(data.followers),"Abonnes",color],[data.rating+" *","Note",DS.gold],[fmtK(data.reviewCount),"Avis",DS.success]].map(function(_i,i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{padding:"14px 4px",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><div style={{fontSize:20,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
+        {[[fmtK(data.followers),"Abonnes",color],[data.rating+" ★","Note",DS.gold],[fmtK(data.reviewCount),"Avis",DS.success]].map(function(_i,i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{padding:"14px 4px",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><div style={{fontSize:20,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
       </div>
       <div style={{background:DS.surface,borderBottom:"1px solid "+DS.border+"40",padding:"14px 16px",marginBottom:10}}>
         {!showNew
@@ -1763,6 +1764,7 @@ function ProFeed(props){
           </div>
         </div>
       )}
+      {posts.length===0&&<Emp Icon={FileText} title="Aucune publication" sub="Vos publications apparaitront ici"/>}
       {posts.map(function(post){
         var pc=rC(post.type);
         return(
@@ -2159,20 +2161,22 @@ function HotelSvc(props){
   function removeAmenity(id){setAmenities(function(am){var next=am.filter(function(a){return a.id!==id;});_saveAmenities(next);return next;});}
   function toggleAvail(id){setRooms(function(rs){var next=rs.map(function(r){return r.id===id?Object.assign({},r,{available:!r.available}):r;});_saveRooms(next);return next;});}
   function toggleMenuAvail(id){setMenu(function(ms){var next=ms.map(function(m){return m.id===id?Object.assign({},m,{available:!m.available}):m;});_saveDishes(next);return next;});}
+  var tkH=useToast();var toastH=tkH.show;var ToastH=tkH.Toast;
   function saveRoom(item){
-    if(editItem){setRooms(function(rs){var next=rs.map(function(r){return r.id===item.id?item:r;});_saveRooms(next);return next;});}
-    else{setRooms(function(rs){var next=rs.concat([item]);_saveRooms(next);return next;});}
+    if(editItem){setRooms(function(rs){var next=rs.map(function(r){return r.id===item.id?item:r;});_saveRooms(next);return next;});toastH("Chambre mise a jour","success");}
+    else{setRooms(function(rs){var next=rs.concat([item]);_saveRooms(next);return next;});toastH("Chambre ajoutee","success");}
     setEditItem(null);setShowAdd(false);
   }
   function saveDish(item){
-    if(editItem){setMenu(function(ms){var next=ms.map(function(m){return m.id===item.id?item:m;});_saveDishes(next);return next;});}
-    else{setMenu(function(ms){var next=ms.concat([item]);_saveDishes(next);return next;});}
+    if(editItem){setMenu(function(ms){var next=ms.map(function(m){return m.id===item.id?item:m;});_saveDishes(next);return next;});toastH("Plat mis a jour","success");}
+    else{setMenu(function(ms){var next=ms.concat([item]);_saveDishes(next);return next;});toastH("Plat ajoute","success");}
     setEditItem(null);setShowAdd(false);
   }
-  function deleteRoom(id){setRooms(function(rs){var next=rs.filter(function(r){return r.id!==id;});_saveRooms(next);return next;});}
-  function deleteDish(id){setMenu(function(ms){var next=ms.filter(function(m){return m.id!==id;});_saveDishes(next);return next;});}
+  function deleteRoom(id){setRooms(function(rs){var next=rs.filter(function(r){return r.id!==id;});_saveRooms(next);return next;});toastH("Chambre supprimee","info");}
+  function deleteDish(id){setMenu(function(ms){var next=ms.filter(function(m){return m.id!==id;});_saveDishes(next);return next;});toastH("Plat supprime","info");}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
+      <ToastH/>
       {(showAdd||editItem)&&<ServiceConfigModal mode={tab==="rooms"?"room":"dish"} color={tab==="rooms"?DS.hotel:DS.restaurant} initial={editItem} onClose={function(){setShowAdd(false);setEditItem(null);}} onSave={tab==="rooms"?saveRoom:saveDish}/>}
       <div style={{background:DS.surface,borderBottom:"1px solid "+DS.border,padding:"12px 14px 10px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
@@ -2312,19 +2316,21 @@ function RestOff(props){
   var s4c=useState("");var newOfferPrice=s4c[0];var setNewOfferPrice=s4c[1];
   var s5=useState("menu");var tab=s5[0];var setTab=s5[1];
   function _saveOffers(next){try{localStorage.setItem("hp_restoff_offers",JSON.stringify(next));}catch(e){}}
-  function addOffer(){if(!newOfferName.trim())return;var o={id:"o"+Date.now(),name:newOfferName.trim(),price:newOfferPrice?parseFloat(newOfferPrice)||null:null,available:true};var next=offers.concat([o]);setOffers(next);_saveOffers(next);setNewOfferName("");setNewOfferPrice("");setShowAddOffer(false);}
-  function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next);}
+  var tkO=useToast();var toastO=tkO.show;var ToastO=tkO.Toast;
+  function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next);toastO("Offre supprimee","info");}
+  function addOffer(){if(!newOfferName.trim())return;var o={id:"o"+Date.now(),name:newOfferName.trim(),price:newOfferPrice?parseFloat(newOfferPrice):null,available:true};var next=offers.concat([o]);setOffers(next);_saveOffers(next);setNewOfferName("");setNewOfferPrice("");setShowAddOffer(false);toastO("Offre ajoutee","success");}
   function _saveItems(next){try{localStorage.setItem("hp_restoff_items",JSON.stringify(next));}catch(e){}}
   function saveItem(item){
-    if(editItem){setItems(function(is){var next=is.map(function(i){return i.id===item.id?item:i;});_saveItems(next);return next;});}
-    else{setItems(function(is){var next=is.concat([item]);_saveItems(next);return next;});}
+    if(editItem){setItems(function(is){var next=is.map(function(i){return i.id===item.id?item:i;});_saveItems(next);return next;});toastO("Plat mis a jour","success");}
+    else{setItems(function(is){var next=is.concat([item]);_saveItems(next);return next;});toastO("Plat ajoute","success");}
     setEditItem(null);setShowAdd(false);
   }
-  function deleteItem(id){setItems(function(is){var next=is.filter(function(i){return i.id!==id;});_saveItems(next);return next;});}
+  function deleteItem(id){setItems(function(is){var next=is.filter(function(i){return i.id!==id;});_saveItems(next);return next;});toastO("Plat supprime","info");}
   function toggleAvail(id){setItems(function(is){var next=is.map(function(i){return i.id===id?Object.assign({},i,{available:!i.available}):i;});_saveItems(next);return next;});}
   var categories=items.reduce(function(acc,item){if(item.category&&acc.indexOf(item.category)<0)acc.push(item.category);return acc;},[]);
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
+      <ToastO/>
       {(showAdd||editItem)&&<ServiceConfigModal mode="dish" color={color} initial={editItem} onClose={function(){setShowAdd(false);setEditItem(null);}} onSave={saveItem}/>}
       <div style={{background:DS.surface,borderBottom:"1px solid "+DS.border,padding:"12px 14px 10px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
@@ -2416,15 +2422,17 @@ function ProResa(props){
   var resas=s1[0];var setResas=s1[1];
   var s2=useState("all");var filter=s2[0];var setFilter=s2[1];
   var s3=useState(null);var scanTarget=s3[0];var setScanTarget=s3[1];
+  var tkR=useToast();var toastR=tkR.show;var ToastR=tkR.Toast;
   var filtered=filter==="all"?resas:resas.filter(function(r){return r.status===filter;});
   var sColors={confirmed:DS.success,pending:DS.warning,completed:DS.primary,refused:DS.error,consumed:DS.textDim};
   var sLabels={confirmed:"Confirmee",pending:"En attente",completed:"Terminee",refused:"Refusee",consumed:"Consommee"};
   function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem("hp_resas_all",JSON.stringify(updated));}catch(e){}}
-  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});}
-  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});}
-  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);}
+  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Reservation confirmee","success");}
+  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Reservation refusee","info");}
+  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivee confirmee - Client marque present","success");}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
+      <ToastR/>
       {scanTarget&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:1300,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
           <div style={{width:"100%",maxWidth:360,background:DS.surface,borderRadius:20,overflow:"hidden",border:"1px solid "+DS.border}}>
@@ -2461,8 +2469,8 @@ function ProResa(props){
         {[["all","Toutes"],["pending","En attente"],["confirmed","Confirmees"],["completed","Terminees"],["consumed","Consommees"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=filter===v;return <button key={v} onClick={function(){setFilter(v);}} style={{padding:"6px 12px",borderRadius:20,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{l}</button>;})}
       </div>
       <div style={{padding:"0 14px"}}>
-        {filtered.map(function(r){return(
-          <div key={r.id} style={{background:DS.card,borderRadius:14,padding:"14px",marginBottom:12,border:"1px solid "+(r.qrScanned?DS.textDim+"44":DS.border),opacity:r.status==="consumed"?0.7:1}}>
+        {filtered.map(function(r,_ri){return(
+          <div key={r.id} style={{background:DS.card,borderRadius:14,padding:"14px",marginBottom:12,border:"1px solid "+(r.qrScanned?DS.textDim+"44":DS.border),opacity:r.status==="consumed"?0.7:1,animation:"hp-item-in 0.32s ease both",animationDelay:(_ri*55)+"ms"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:14,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",gap:6}}>
