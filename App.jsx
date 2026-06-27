@@ -3001,7 +3001,7 @@ export default function App() {
   // === BANDEAU DEV (visible uniquement si DEV_BYPASS_AUTH = true) ===
   var devBanner=DEV_BYPASS_AUTH?(
     <div style={{background:"#1a1a00",borderBottom:"1px solid #F59E0B55",padding:"6px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0}}>
-      <span style={{fontSize:10,color:"#F59E0B",fontWeight:800}}>⚠ MODE TEST</span>
+      <span style={{fontSize:10,color:"#F59E0B",fontWeight:800}}>⚠ MODE TEST v14</span>
       <div style={{display:"flex",gap:4}}>
         {[["client","Client"],["hotel","Hôtel"],["restaurant","Resto"]].map(function(_i){
           var t=_i[0];var l=_i[1];var isAct=devType===t;
