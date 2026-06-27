@@ -2304,6 +2304,8 @@ function HotelSvc(props){
   var amenities=sa[0];var setAmenities=sa[1];
   var sb=useState(false);var addSvc=sb[0];var setAddSvc=sb[1];
   var sc=useState("");var newSvcName=sc[0];var setNewSvcName=sc[1];
+  var sd=useState(null);var confirmDeleteRoom=sd[0];var setConfirmDeleteRoom=sd[1];
+  var se=useState(null);var confirmDeleteDish=se[0];var setConfirmDeleteDish=se[1];
   function _saveRooms(rs){try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}}
   function _saveDishes(ms){try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ms));}catch(e){}}
   function _saveAmenities(am){try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}}
@@ -2379,7 +2381,14 @@ function HotelSvc(props){
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:8,borderTop:"1px solid "+DS.border+"20"}}>
                 <div style={{display:"flex",gap:6}}>
                   <button onClick={function(){setEditItem(r);setShowAdd(false);}} style={{padding:"5px 12px",background:DS.primarySoft,border:"none",borderRadius:8,color:DS.primary,fontSize:11,fontWeight:700,cursor:"pointer"}}>Modifier</button>
-                  <button onClick={function(){deleteRoom(r.id);}} style={{padding:"5px 12px",background:DS.errorSoft,border:"none",borderRadius:8,color:DS.error,fontSize:11,fontWeight:700,cursor:"pointer"}}>Supprimer</button>
+                  {confirmDeleteRoom===r.id?(
+                    <span style={{display:"flex",gap:4,alignItems:"center"}}>
+                      <button onClick={function(){setConfirmDeleteRoom(null);}} style={{padding:"5px 10px",background:DS.border,border:"none",borderRadius:8,color:DS.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+                      <button onClick={function(){deleteRoom(r.id);setConfirmDeleteRoom(null);}} style={{padding:"5px 10px",background:DS.error,border:"none",borderRadius:8,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>Confirmer</button>
+                    </span>
+                  ):(
+                    <button onClick={function(){setConfirmDeleteRoom(r.id);}} style={{padding:"5px 12px",background:DS.errorSoft,border:"none",borderRadius:8,color:DS.error,fontSize:11,fontWeight:700,cursor:"pointer"}}>Supprimer</button>
+                  )}
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:7}}>
                   <span style={{fontSize:11,color:r.available?DS.success:DS.error,fontWeight:700}}>{r.available?"Disponible":"Indisponible"}</span>
@@ -2410,7 +2419,14 @@ function HotelSvc(props){
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:8,borderTop:"1px solid "+DS.border+"20"}}>
                     <div style={{display:"flex",gap:6}}>
                       <button onClick={function(){setEditItem(m);setShowAdd(false);}} style={{padding:"5px 12px",background:DS.primarySoft,border:"none",borderRadius:8,color:DS.primary,fontSize:11,fontWeight:700,cursor:"pointer"}}>Modifier</button>
-                      <button onClick={function(){deleteDish(m.id);}} style={{padding:"5px 12px",background:DS.errorSoft,border:"none",borderRadius:8,color:DS.error,fontSize:11,fontWeight:700,cursor:"pointer"}}>Supprimer</button>
+                      {confirmDeleteDish===m.id?(
+                        <span style={{display:"flex",gap:4,alignItems:"center"}}>
+                          <button onClick={function(){setConfirmDeleteDish(null);}} style={{padding:"5px 10px",background:DS.border,border:"none",borderRadius:8,color:DS.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+                          <button onClick={function(){deleteDish(m.id);setConfirmDeleteDish(null);}} style={{padding:"5px 10px",background:DS.error,border:"none",borderRadius:8,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>Confirmer</button>
+                        </span>
+                      ):(
+                        <button onClick={function(){setConfirmDeleteDish(m.id);}} style={{padding:"5px 12px",background:DS.errorSoft,border:"none",borderRadius:8,color:DS.error,fontSize:11,fontWeight:700,cursor:"pointer"}}>Supprimer</button>
+                      )}
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:7}}>
                       <span style={{fontSize:11,color:m.available?DS.success:DS.error,fontWeight:700}}>{m.available?"Dispo":"Indispo"}</span>
