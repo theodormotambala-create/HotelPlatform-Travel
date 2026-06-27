@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
-// ⚠️ MODE DEV — mettre à false pour réactiver l'authentification
-const DEV_BYPASS_AUTH = true;
+// ⚠️ MODE DEV — mettre à true pour court-circuiter l'authentification en développement
+const DEV_BYPASS_AUTH = false;
 const DEV_ACCOUNT_TYPE = "client"; // "client" | "hotel" | "restaurant"
 import {
   Home, Search, MessageCircle, User, Bell, Settings, Star, Heart,
