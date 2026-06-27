@@ -498,7 +498,7 @@ function BotNav(props){
     setTapped(id);setTimeout(function(){setTapped(null);},200);
     if(id==="feed"&&active===id&&onHomeRefresh)onHomeRefresh();else set(id);
   }
-  return(<div style={{position:"sticky",bottom:0,background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}}>{tabs.map(function(tab){var Icon=tab.icon;var id=tab.id;var isAct=active===id;var isTapped=tapped===id;return(<button key={id} onClick={function(){tap(id);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"9px 0 7px",background:"none",border:"none",cursor:"pointer",gap:3,transform:isTapped?"scale(.88)":"scale(1)",transition:"transform .14s cubic-bezier(0.22,1,0.36,1)"}}><Icon size={22} color={isAct?accent:DS.textMuted} strokeWidth={isAct?2.5:1.5}/><div style={{fontSize:9,fontWeight:isAct?800:400,color:isAct?accent:DS.textMuted,transition:"color .18s"}}>{tab.label}</div><div style={{width:isAct?18:0,height:2.5,borderRadius:2,background:accent,transition:"width .25s cubic-bezier(0.22,1,0.36,1)"}}/></button>);})}</div>);
+  return(<div style={{position:"fixed",bottom:0,left:0,right:0,maxWidth:420,margin:"0 auto",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}}>{tabs.map(function(tab){var Icon=tab.icon;var id=tab.id;var isAct=active===id;var isTapped=tapped===id;return(<button key={id} onClick={function(){tap(id);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"9px 0 7px",background:"none",border:"none",cursor:"pointer",gap:3,transform:isTapped?"scale(.88)":"scale(1)",transition:"transform .14s cubic-bezier(0.22,1,0.36,1)"}}><Icon size={22} color={isAct?accent:DS.textMuted} strokeWidth={isAct?2.5:1.5}/><div style={{fontSize:9,fontWeight:isAct?800:400,color:isAct?accent:DS.textMuted,transition:"color .18s"}}>{tab.label}</div><div style={{width:isAct?18:0,height:2.5,borderRadius:2,background:accent,transition:"width .25s cubic-bezier(0.22,1,0.36,1)"}}/></button>);})}</div>);
 }
 
 function Ov(props){
@@ -3033,14 +3033,14 @@ export default function App() {
       {id:"profile",     icon:User,          label:"Profil"},
     ];
     return(
-      <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,maxWidth:420,margin:"0 auto",overflow:"hidden",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",display:"flex",flexDirection:"column"}}>
+      <div style={{maxWidth:420,margin:"0 auto",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",minHeight:"100vh",paddingBottom:"calc(60px + env(safe-area-inset-bottom))"}}>
         <TopBar
           left={<div style={{fontSize:16,fontWeight:900,color:DS.text,letterSpacing:-0.5}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>}
           right={headerRight}
         />
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
-        <div key={cTab} style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
+        <div key={cTab} style={{animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
           {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV"/>}
@@ -3071,7 +3071,7 @@ export default function App() {
        {id:"profile",      icon:User,          label:"Profil"}];
 
   return(
-    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,maxWidth:420,margin:"0 auto",overflow:"hidden",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",display:"flex",flexDirection:"column"}}>
+    <div style={{maxWidth:420,margin:"0 auto",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",minHeight:"100vh",paddingBottom:"calc(60px + env(safe-area-inset-bottom))"}}>
       <TopBar
         left={
           <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
@@ -3083,7 +3083,7 @@ export default function App() {
       />
       {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
-      <div key={pTab} style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
+      <div key={pTab} style={{animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
         {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}

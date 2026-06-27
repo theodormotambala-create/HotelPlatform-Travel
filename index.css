@@ -6,8 +6,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html, body, #root {
-  height: 100%;
+html, body {
   width: 100%;
   background: #09090F;
   overscroll-behavior: none;
