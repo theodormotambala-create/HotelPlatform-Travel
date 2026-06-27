@@ -695,6 +695,26 @@ function AuthScreen(props){
           }
         </div>
         {mode==="login"&&<div style={{textAlign:"center",marginTop:8}}><button onClick={function(){setMode("forgot");}} style={{background:"none",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Mot de passe oublie ?</button></div>}
+        <div style={{marginTop:20,borderTop:"1px solid "+DS.border,paddingTop:16,textAlign:"center"}}>
+          <div style={{fontSize:11,color:DS.textDim,marginBottom:10,fontWeight:600,letterSpacing:0.5}}>TESTER L APPLICATION</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={function(){onAuth("client","active","demo.client@hotelplatform.com","demo-client-001");}} style={{flex:1,padding:"10px 6px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:18,marginBottom:2}}>👤</div>
+              <div style={{fontSize:10,fontWeight:700,color:DS.text}}>Client</div>
+              <div style={{fontSize:9,color:DS.textMuted}}>Mode demo</div>
+            </button>
+            <button onClick={function(){onAuth("hotel","active","demo.hotel@hotelplatform.com","demo-hotel-001");}} style={{flex:1,padding:"10px 6px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:18,marginBottom:2}}>🏨</div>
+              <div style={{fontSize:10,fontWeight:700,color:DS.text}}>Hotel</div>
+              <div style={{fontSize:9,color:DS.textMuted}}>Mode demo</div>
+            </button>
+            <button onClick={function(){onAuth("restaurant","active","demo.resto@hotelplatform.com","demo-resto-001");}} style={{flex:1,padding:"10px 6px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",textAlign:"center"}}>
+              <div style={{fontSize:18,marginBottom:2}}>🍽️</div>
+              <div style={{fontSize:10,fontWeight:700,color:DS.text}}>Restaurant</div>
+              <div style={{fontSize:9,color:DS.textMuted}}>Mode demo</div>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
