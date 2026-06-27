@@ -2717,7 +2717,7 @@ function ProProf(props){
         <div style={{fontSize:12,color:DS.textMuted,marginBottom:10}}>{data.location}</div>
         {!isVerified&&!verifStatus&&(
           <button onClick={function(){if(premiumActive){setShowVerif(true);}else{if(onPremium)onPremium();}}} style={{width:"100%",padding:"10px 14px",background:premiumActive?"transparent":DS.card,border:"1px solid "+(premiumActive?color+"44":DS.border),borderRadius:12,color:premiumActive?color:DS.textDim,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}>
-            {premiumActive?<ShieldCheck size={14}/>:<Lock size={14}/>} <span style={{color:DS.success}}>Gagner un badge officiel pour ta credibilite</span>
+            {premiumActive?<ShieldCheck size={14}/>:<Lock size={14}/>} <span style={{color:DS.success}}>Le badge officiel inspire la confiance et attire davantage de clients</span>
           </button>
         )}
         {verifStatus==="pending"&&(
