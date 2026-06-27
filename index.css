@@ -23,8 +23,9 @@ body {
   max-width: 480px;
   margin: 0 auto;
   position: relative;
-  overflow: hidden;
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Splash de demarrage (avant que React prenne la main) */

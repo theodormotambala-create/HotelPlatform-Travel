@@ -3033,7 +3033,7 @@ export default function App() {
       {id:"profile",     icon:User,          label:"Profil"},
     ];
     return(
-      <div style={{height:"100%",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",display:"flex",flexDirection:"column",maxWidth:420,margin:"0 auto",position:"relative"}}>
+      <div style={{height:"100dvh",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",display:"flex",flexDirection:"column",maxWidth:420,margin:"0 auto",position:"relative"}}>
         <TopBar
           left={<div style={{fontSize:16,fontWeight:900,color:DS.text,letterSpacing:-0.5}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>}
           right={headerRight}
@@ -3071,7 +3071,7 @@ export default function App() {
        {id:"profile",      icon:User,          label:"Profil"}];
 
   return(
-    <div style={{height:"100%",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",display:"flex",flexDirection:"column",maxWidth:420,margin:"0 auto",position:"relative"}}>
+    <div style={{height:"100dvh",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",display:"flex",flexDirection:"column",maxWidth:420,margin:"0 auto",position:"relative"}}>
       <TopBar
         left={
           <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
