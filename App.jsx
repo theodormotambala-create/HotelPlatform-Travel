@@ -1091,7 +1091,11 @@ function ClientFeed(props){
   var _init=useRef(null);
   if(!_init.current){var _lk={};var _fv=[];try{_lk=JSON.parse(localStorage.getItem("hp_likes")||"{}");_fv=JSON.parse(localStorage.getItem("hp_favs")||"[]");}catch(e){}_init.current={likes:_lk,favs:_fv};}
   var _initLikes=_init.current.likes;var _initFavs=_init.current.favs;
-  var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes+(_initLikes[p.id]?1:0),comments:[],showCmt:false});}));
+  var s1=useState(function(){
+    var base=DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes+(_initLikes[p.id]?1:0),comments:[],showCmt:false});});
+    try{var _pp=JSON.parse(localStorage.getItem("hp_pro_posts")||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:false,comments:p.comments||[],showCmt:false});});return _new.concat(base);}}catch(_e){}
+    return base;
+  });
   var posts=s1[0];var setPosts=s1[1];
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState({});var cmtText=s2[0];var setCmtText=s2[1];
@@ -1348,6 +1352,23 @@ function ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro){
 }
 function EstabM(props){
   var e=props.e;var rawOnClose=props.onClose;var onBook=props.onBook;var onChat=props.onChat;var viewerIsPro=props.viewerIsPro||false;
+  try{
+    var _h0=DataLayer.getHotels()[0];var _r0=DataLayer.getRestaurants()[0];
+    if(_h0&&e&&e.id===_h0.id){
+      var _rmsRaw=localStorage.getItem("hp_hotelsvc_rooms");var _amsRaw=localStorage.getItem("hp_hotelsvc_amenities");var _dshRaw=localStorage.getItem("hp_hotelsvc_dishes");
+      var _patch={};
+      if(_rmsRaw)_patch.rooms=JSON.parse(_rmsRaw);
+      if(_amsRaw)_patch.services=JSON.parse(_amsRaw).filter(function(a){return a.active!==false;});
+      if(_dshRaw){var _fl=JSON.parse(_dshRaw);var _mc={};_fl.forEach(function(d){var c=d.category||"Plats";if(!_mc[c])_mc[c]=[];_mc[c].push(d);});_patch.menu=Object.keys(_mc).map(function(c){return{cat:c,items:_mc[c]};});}
+      if(Object.keys(_patch).length)e=Object.assign({},e,_patch);
+    }else if(_r0&&e&&e.id===_r0.id){
+      var _itRaw=localStorage.getItem("hp_restoff_items");var _ofRaw=localStorage.getItem("hp_restoff_offers");
+      var _patch2={};
+      if(_itRaw){var _fl2=JSON.parse(_itRaw);var _mc2={};_fl2.forEach(function(d){var c=d.category||"Plats";if(!_mc2[c])_mc2[c]=[];_mc2[c].push(d);});_patch2.menu=Object.keys(_mc2).map(function(c){return{cat:c,items:_mc2[c]};});}
+      if(_ofRaw)_patch2.offers=JSON.parse(_ofRaw);
+      if(Object.keys(_patch2).length)e=Object.assign({},e,_patch2);
+    }
+  }catch(_ex){}
   var scl=useState(false);var closingE=scl[0];var setClosingE=scl[1];
   function onClose(){if(closingE)return;setClosingE(true);setTimeout(function(){if(rawOnClose)rawOnClose();},260);}
   var s1=useState("about");var tab=s1[0];var setTab=s1[1];
@@ -1848,6 +1869,7 @@ function ProFeed(props){
     var newId="post-"+Date.now();
     var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:newPost,img:mediaType==="image"?mediaPreview:null,video:mediaType==="video"?mediaPreview:null,likes:0,comments:[],showCmt:false,verified:data.verified};
     setPosts(function(ps){return [newObj].concat(ps);});
+    try{var _pp=JSON.parse(localStorage.getItem("hp_pro_posts")||"[]");localStorage.setItem("hp_pro_posts",JSON.stringify([newObj].concat(_pp).slice(0,30)));}catch(_e){}
     // Fix #5 : sauvegarde dans Supabase si disponible
     try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,data:newObj}]).catch(function(){});}catch(e){}
     setNewPost("");setShowNew(false);setMediaPreview(null);setMediaType(null);
