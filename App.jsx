@@ -2669,15 +2669,6 @@ function ProProf(props){
   var _vfKey="hp_verif_status_"+(proType||"hotel");
   var s3=useState(function(){try{return localStorage.getItem(_vfKey)||null;}catch(e){return null;}});var verifStatus=s3[0];var _setVerifStatusRaw=s3[1];
   function setVerifStatus(v){_setVerifStatusRaw(v);try{if(v)localStorage.setItem(_vfKey,v);else localStorage.removeItem(_vfKey);}catch(e){}}
-  useEffect(function(){
-    if(verifStatus==="pending"){
-      var timer=setTimeout(function(){
-        setVerifStatus("approved");
-        toastP("Votre badge de verification a ete valide !","success");
-      },6000);
-      return function(){clearTimeout(timer);};
-    }
-  },[verifStatus]);
   var _descKey="hp_pro_desc_"+(proType||"hotel");
   var sd=useState(function(){try{var v=localStorage.getItem(_descKey);return v||data.description;}catch(e){return data.description;}});var description=sd[0];var setDescription=sd[1];
   var se=useState(false);var editingAbout=se[0];var setEditingAbout=se[1];
@@ -2688,7 +2679,16 @@ function ProProf(props){
   function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){if(onPhotoChange)onPhotoChange(ev.target.result);};r.readAsDataURL(f);}
   function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}setEditingAbout(false);toastP("A propos mis a jour","success");}
   var premiumActive=isPremium||data.isPremium;
-  var isVerified=data.verified||(verifStatus==="approved");
+  // Periode de grace : badge reste visible 7 jours apres expiration de l abonnement
+  var _graceActive=false;
+  var _graceEnd=null;
+  if(!premiumActive&&premiumData&&premiumData.expiresAt){
+    var _expDate=new Date(premiumData.expiresAt);
+    _graceEnd=new Date(_expDate.getTime()+7*24*60*60*1000);
+    _graceActive=new Date()<_graceEnd;
+  }
+  // Badge visible seulement si approuve par le Panel ET (premium actif OU periode de grace)
+  var isVerified=verifStatus==="approved"&&(premiumActive||_graceActive);
   return(
     <div style={{paddingBottom:20}}>
       <ImgViewer src={_proViewer} onClose={function(){_setProViewer(null);}}/>
@@ -2717,19 +2717,26 @@ function ProProf(props){
         <div style={{fontSize:12,color:DS.textMuted,marginBottom:10}}>{data.location}</div>
         {!isVerified&&!verifStatus&&(
           <button onClick={function(){if(premiumActive){setShowVerif(true);}else{if(onPremium)onPremium();}}} style={{width:"100%",padding:"10px 14px",background:premiumActive?"transparent":DS.card,border:"1px solid "+(premiumActive?color+"44":DS.border),borderRadius:12,color:premiumActive?color:DS.textDim,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}>
-            {premiumActive?<ShieldCheck size={14}/>:<Lock size={14}/>} <span style={{color:DS.success}}>Gagner un badge officiel pour ta credibilite</span>
+            {premiumActive?<ShieldCheck size={14}/>:<Lock size={14}/>} <span style={{color:DS.success}}>Le badge officiel inspire la confiance et attire davantage de clients</span>
           </button>
         )}
         {verifStatus==="pending"&&(
           <div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:12,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
             <AlertTriangle size={14} color={DS.warning}/>
-            <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:DS.warning}}>Verification en cours</div><div style={{fontSize:11,color:DS.textMuted}}>Reponse sous 48-72h</div></div>
+            <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:DS.warning}}>Verification en cours</div><div style={{fontSize:11,color:DS.textMuted}}>Examen du dossier sous 48-72h par notre equipe</div></div>
           </div>
         )}
-        {isVerified&&!verifStatus&&(
+        {verifStatus==="approved"&&isVerified&&(
           <div style={{background:DS.successSoft,border:"1px solid "+DS.success+"33",borderRadius:12,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
             <ShieldCheck size={14} color={DS.success}/>
-            <div style={{fontSize:12,fontWeight:700,color:DS.success}}>Etablissement verifie</div>
+            <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:DS.success}}>Etablissement verifie</div><div style={{fontSize:11,color:DS.textMuted}}>{_graceActive&&!premiumActive?"Badge actif — "+Math.ceil((_graceEnd-new Date())/(1000*60*60*24))+" jours restants (renouvelez votre abonnement)":"Badge officiel actif"}</div></div>
+          </div>
+        )}
+        {verifStatus==="approved"&&!isVerified&&!premiumActive&&(
+          <div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"33",borderRadius:12,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+            <Lock size={14} color={DS.error}/>
+            <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:DS.error}}>Badge suspendu</div><div style={{fontSize:11,color:DS.textMuted}}>Renouvelez votre abonnement Premium pour reafficher votre badge</div></div>
+            <button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 12px",background:DS.gold,border:"none",borderRadius:8,color:"#000",fontSize:11,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>Renouveler</button>
           </div>
         )}
         <div style={{display:"flex",gap:7,marginBottom:12}}>
