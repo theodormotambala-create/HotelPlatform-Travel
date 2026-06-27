@@ -774,8 +774,8 @@ function NotifP(props){
   var accent=props.accent;var onBack=props.onBack;var onNavigate=props.onNavigate;var isPro=props.isPro||false;
   var extNotifs=props.notifs||null;var onMarkRead=props.onMarkRead||null;
   var _defaultNotifs=isPro
-    ?[{id:"np1",Icon:Calendar,color:DS.primary,title:"Nouvelle reservation",body:"Moussa Konate a effectue une reservation.",time:"5 min",read:false,tab:"reservations"},{id:"np2",Icon:MessageCircle,color:DS.success,title:"Nouveau message client",body:"Aicha Mbaye vous a envoye un message.",time:"30 min",read:false,tab:"chat"},{id:"np3",Icon:Users,color:DS.hotel,title:"Nouvel abonne",body:"Un nouvel utilisateur suit votre etablissement.",time:"2h",read:true,tab:"feed"}]
-    :[{id:"nc1",Icon:Calendar,color:DS.primary,title:"Reservation confirmee",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},{id:"nc2",Icon:MessageCircle,color:DS.success,title:"Nouveau message",body:"Le Jardin Gourmand vous a envoye un message.",time:"1h",read:false,tab:"chat"},{id:"nc3",Icon:Star,color:DS.gold,title:"Premium",body:"Votre abonnement Premium expire dans 7 jours.",time:"1j",read:true,tab:"profile"}];
+    ?[{id:"np1",icon:"Calendar",color:DS.primary,title:"Nouvelle reservation",body:"Moussa Konate a effectue une reservation.",time:"5 min",read:false,tab:"reservations"},{id:"np2",icon:"MessageCircle",color:DS.success,title:"Nouveau message client",body:"Aicha Mbaye vous a envoye un message.",time:"30 min",read:false,tab:"chat"},{id:"np3",icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un nouvel utilisateur suit votre etablissement.",time:"2h",read:true,tab:"feed"}]
+    :[{id:"nc1",icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},{id:"nc2",icon:"MessageCircle",color:DS.success,title:"Nouveau message",body:"Le Jardin Gourmand vous a envoye un message.",time:"1h",read:false,tab:"chat"},{id:"nc3",icon:"Star",color:DS.gold,title:"Premium",body:"Votre abonnement Premium expire dans 7 jours.",time:"1j",read:true,tab:"profile"}];
   var ns=useState(_defaultNotifs);
   var _localNotifs=ns[0];var setLocalNotifs=ns[1];
   var notifs=extNotifs!==null?extNotifs:_localNotifs;
@@ -786,7 +786,7 @@ function NotifP(props){
   var title=isPro?"Notifications Pro":"Notifications";
   var snSk=useState(true);var notifSkLoading=snSk[0];var setNotifSkLoading=snSk[1];
   useEffect(function(){var t=setTimeout(function(){setNotifSkLoading(false);},300);return function(){clearTimeout(t);};},[]);
-  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>{title}</div>} right={null}/>{notifSkLoading?<NotifSkeleton/>:<>{notifs.length===0&&<Emp Icon={Bell} title="Aucune notification" sub="Vos notifications apparaitront ici"/>}{notifs.map(function(n,_ni){var Icon=n.Icon;return(<div key={n.id} onClick={function(){handleMarkRead(n.id);if(onNavigate)onNavigate(n.tab);}} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",background:n.read?"transparent":n.color+"08",animation:"hp-item-in 0.3s ease both",animationDelay:(_ni*50)+"ms"}}><div style={{width:40,height:40,borderRadius:"50%",background:n.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={n.color}/></div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?600:800,color:DS.text,marginBottom:2}}>{n.title}</div><div style={{fontSize:12,color:DS.textMuted}}>{n.body}</div><div style={{fontSize:10,color:DS.textDim,marginTop:4}}>{n.time}</div></div>{!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:accent,marginTop:6,flexShrink:0}}/>}</div>);})}</>}</div>);
+  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>{title}</div>} right={null}/>{notifSkLoading?<NotifSkeleton/>:<>{notifs.length===0&&<Emp Icon={Bell} title="Aucune notification" sub="Vos notifications apparaitront ici"/>}{notifs.map(function(n,_ni){var Icon=ICON_MAP[n.icon]||ICON_MAP[n.Icon&&n.Icon.displayName]||Bell;return(<div key={n.id} onClick={function(){handleMarkRead(n.id);if(onNavigate)onNavigate(n.tab);}} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",background:n.read?"transparent":n.color+"08",animation:"hp-item-in 0.3s ease both",animationDelay:(_ni*50)+"ms"}}><div style={{width:40,height:40,borderRadius:"50%",background:n.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={n.color}/></div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?600:800,color:DS.text,marginBottom:2}}>{n.title}</div><div style={{fontSize:12,color:DS.textMuted}}>{n.body}</div><div style={{fontSize:10,color:DS.textDim,marginTop:4}}>{n.time}</div></div>{!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:accent,marginTop:6,flexShrink:0}}/>}</div>);})}</>}</div>);
 }
 
 function SettingsS(props){
@@ -1048,8 +1048,8 @@ function CommentsSheet(props){
       <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",borderTop:"1px solid "+DS.border+"40",flexShrink:0,background:DS.surface}}>
         <Av sz={30} letter={selfLetter}/>
         <div style={{flex:1,position:"relative"}}>
-          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter"){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),Icon:MessageCircle,color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre à "+replyTo.author+"...":"Ajouter un commentaire..."} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
-          <button onClick={function(){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),Icon:MessageCircle,color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
+          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter"){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre à "+replyTo.author+"...":"Ajouter un commentaire..."} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          <button onClick={function(){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
         </div>
       </div>
     </div>
@@ -1106,7 +1106,7 @@ function ClientFeed(props){
       try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem("hp_likes",JSON.stringify(lk));}catch(e){}
       return next;
     });
-    if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),Icon:Heart,color:DS.error,title:"Nouveau like",body:selfName+" a aimé la publication de "+post.author+".",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
+    if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:selfName+" a aimé la publication de "+post.author+".",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
@@ -1809,7 +1809,7 @@ function ProFeed(props){
     setPosts(function(ps){
       var next=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});
       try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem("hp_pro_likes",JSON.stringify(lk));}catch(e){}
-      if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),Icon:Heart,color:DS.error,title:"Nouveau like",body:"Quelqu'un a aimé votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
+      if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:"Quelqu'un a aimé votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
 
       return next;
     });
@@ -2766,15 +2766,17 @@ function ProProf(props){
   );
 }
 // == NOTIFICATION DATA (NC = client, NP = pro) — defaults avant persistance ==
+// ICON_MAP : cle string → composant React (serialisable en JSON)
+var ICON_MAP={Calendar:Calendar,MessageCircle:MessageCircle,Star:Star,Users:Users,Heart:Heart,Bell:Bell};
 var NC_DATA = [
-  {id:"nc1",Icon:Calendar,color:DS.primary,title:"Reservation confirmee",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},
-  {id:"nc2",Icon:MessageCircle,color:DS.success,title:"Nouveau message",body:"Le Jardin Gourmand vous a envoye un message.",time:"1h",read:false,tab:"chat"},
-  {id:"nc3",Icon:Star,color:DS.gold,title:"Premium",body:"Votre abonnement Premium expire dans 7 jours.",time:"1j",read:true,tab:"profile"}
+  {id:"nc1",icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},
+  {id:"nc2",icon:"MessageCircle",color:DS.success,title:"Nouveau message",body:"Le Jardin Gourmand vous a envoye un message.",time:"1h",read:false,tab:"chat"},
+  {id:"nc3",icon:"Star",color:DS.gold,title:"Premium",body:"Votre abonnement Premium expire dans 7 jours.",time:"1j",read:true,tab:"profile"}
 ];
 var NP_DATA = [
-  {id:"np1",Icon:Calendar,color:DS.primary,title:"Nouvelle reservation",body:"Moussa Konate a effectue une reservation.",time:"5 min",read:false,tab:"reservations"},
-  {id:"np2",Icon:MessageCircle,color:DS.success,title:"Nouveau message client",body:"Aicha Mbaye vous a envoye un message.",time:"30 min",read:false,tab:"chat"},
-  {id:"np3",Icon:Users,color:DS.hotel,title:"Nouvel abonne",body:"Un nouvel utilisateur suit votre etablissement.",time:"2h",read:true,tab:"feed"}
+  {id:"np1",icon:"Calendar",color:DS.primary,title:"Nouvelle reservation",body:"Moussa Konate a effectue une reservation.",time:"5 min",read:false,tab:"reservations"},
+  {id:"np2",icon:"MessageCircle",color:DS.success,title:"Nouveau message client",body:"Aicha Mbaye vous a envoye un message.",time:"30 min",read:false,tab:"chat"},
+  {id:"np3",icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un nouvel utilisateur suit votre etablissement.",time:"2h",read:true,tab:"feed"}
 ];
 
 export default function App() {
@@ -2873,7 +2875,7 @@ export default function App() {
   var followingIds=s12[0];  var setFollowingIds=s12[1];
   var s13fav=useState(function(){try{return JSON.parse(localStorage.getItem("hp_fav_estabs")||"[]");}catch(e){return[];}});
   var favEstabIds=s13fav[0]; var setFavEstabIds=s13fav[1];
-  var sNotif=useState(function(){try{var v=localStorage.getItem("hp_notifs");return v?JSON.parse(v):null;}catch(e){return null;}});
+  var sNotif=useState(function(){try{var v=localStorage.getItem("hp_notifs");if(!v)return null;var p=JSON.parse(v);if(Array.isArray(p)&&p.length>0&&!p[0].icon){localStorage.removeItem("hp_notifs");return null;}return p;}catch(e){return null;}});
   var _notifStored=sNotif[0]; var setNotifStored=sNotif[1];
   var sNotifPrefs=useState(function(){try{var v=localStorage.getItem("hp_notif_prefs");return v?JSON.parse(v):{reservation:true,message:true,promo:true,follow:true};}catch(e){return{reservation:true,message:true,promo:true,follow:true};}});
   var notifPrefs=sNotifPrefs[0]; var setNotifPrefs=sNotifPrefs[1];
@@ -2927,7 +2929,7 @@ export default function App() {
   function toggleFollowGlobal(id){
     var was=followingIds.indexOf(id)>=0;
     setFollowingIds(function(f){var next=was?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_following",JSON.stringify(next));}catch(e){}return next;});
-    if(!was&&!isPro){addNotif({id:"notif_follow_"+Date.now(),Icon:Users,color:DS.hotel,title:"Nouvel abonne",body:"Un utilisateur suit maintenant votre etablissement.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
+    if(!was&&!isPro){addNotif({id:"notif_follow_"+Date.now(),icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un utilisateur suit maintenant votre etablissement.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
     tk.show(was?"Vous ne suivez plus cet etablissement":"Vous suivez cet etablissement","success");
   }
   function toggleFavEstab(id){
@@ -3046,7 +3048,7 @@ export default function App() {
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false}/>}
-        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),Icon:Calendar,color:DS.primary,title:"Reservation confirmee",body:"Votre reservation chez "+(resa.estab||"l etablissement")+" est enregistree.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});setBook(null);}}/>}
+        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Votre reservation chez "+(resa.estab||"l etablissement")+" est enregistree.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});setBook(null);}}/>}
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
         {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setCTab(t);}}/>;}}</Ov>}
@@ -3091,7 +3093,7 @@ export default function App() {
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true}/>}
-      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),Icon:Calendar,color:DS.primary,title:"Reservation confirmee",body:"Votre reservation chez "+(resa.estab||"l etablissement")+" est enregistree.",time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});setBook(null);}}/>}
+      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Votre reservation chez "+(resa.estab||"l etablissement")+" est enregistree.",time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});setBook(null);}}/>}
       {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
       {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setPTab(t);}}/>;}}</Ov>}
