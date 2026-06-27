@@ -2306,6 +2306,7 @@ function HotelSvc(props){
   var sc=useState("");var newSvcName=sc[0];var setNewSvcName=sc[1];
   var sd=useState(null);var confirmDeleteRoom=sd[0];var setConfirmDeleteRoom=sd[1];
   var se=useState(null);var confirmDeleteDish=se[0];var setConfirmDeleteDish=se[1];
+  var sf=useState(null);var confirmDeleteSvc=sf[0];var setConfirmDeleteSvc=sf[1];
   function _saveRooms(rs){try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}}
   function _saveDishes(ms){try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ms));}catch(e){}}
   function _saveAmenities(am){try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}}
@@ -2459,7 +2460,14 @@ function HotelSvc(props){
               <div onClick={function(){toggleAmenity(am.id);}} style={{width:40,height:22,borderRadius:11,background:am.active?DS.success:DS.border,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}>
                 <div style={{position:"absolute",top:2,left:am.active?20:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
               </div>
-              <button onClick={function(){removeAmenity(am.id);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,color:DS.error,opacity:.7}}><X size={12} color={DS.error}/></button>
+              {confirmDeleteSvc===am.id?(
+                <span style={{display:"flex",gap:4,alignItems:"center"}}>
+                  <button onClick={function(){setConfirmDeleteSvc(null);}} style={{padding:"3px 8px",background:DS.border,border:"none",borderRadius:7,color:DS.text,fontSize:10,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+                  <button onClick={function(){removeAmenity(am.id);setConfirmDeleteSvc(null);}} style={{padding:"3px 8px",background:DS.error,border:"none",borderRadius:7,color:"#fff",fontSize:10,fontWeight:700,cursor:"pointer"}}>Confirmer</button>
+                </span>
+              ):(
+                <button onClick={function(){setConfirmDeleteSvc(am.id);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,color:DS.error,opacity:.7}}><X size={12} color={DS.error}/></button>
+              )}
             </div>
           );})}
         </div>
