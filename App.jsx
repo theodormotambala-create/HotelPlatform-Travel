@@ -964,7 +964,8 @@ function ShareSheet(props){
 }
 function CommentsSheet(props){
   var post=props.post;var cmtText=props.cmtText;var setCmtText=props.setCmtText;var addCmt=props.addCmt;var delCmt=props.delCmt;var onClose=props.onClose;var selfLetter=props.selfLetter||"V";
-  var selfName=props.selfName||"Vous";
+  var selfName=props.selfName||"Vous";var onAddNotif=props.onAddNotif||null;
+  var sReply=useState(null);var replyTo=sReply[0];var setReplyTo=sReply[1];
   var menuC=useState(null);var menuCm=menuC[0];var setMenuCm=menuC[1];
   var lpTimer=useRef(null);
   function lpStart(cm,e){if(cm.author!==selfName)return;lpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuCm(cm);},480);}
@@ -1025,21 +1026,30 @@ function CommentsSheet(props){
           <div key={cm.id||i} style={{display:"flex",gap:10,marginBottom:14,animation:isNew?"hp-item-in 0.25s ease both":"none"}}>
             <Av sz={32} letter={cm.author[0]}/>
             <div style={{flex:1}}>
+              {cm.replyTo&&<div style={{fontSize:11,color:DS.textMuted,marginBottom:3,paddingLeft:2,borderLeft:"2px solid "+DS.primary,paddingLeft:6,opacity:0.8}}>↩ {cm.replyTo}</div>}
               <div onTouchStart={function(e){lpStart(cm,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(cm);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(mine)setMenuCm(cm);}} style={{background:DS.card,borderRadius:"0 14px 14px 14px",padding:"8px 12px",cursor:mine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>
                 <div style={{fontSize:12,fontWeight:700,color:DS.text,marginBottom:3}}>{cm.author}</div>
                 <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.5}}>{cm.text}</div>
               </div>
-              <div style={{fontSize:9,color:DS.textDim,marginTop:3,paddingLeft:4}}>{cm.time}{mine?" · maintenir pour supprimer":""}</div>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginTop:3,paddingLeft:4}}>
+                <span style={{fontSize:9,color:DS.textDim}}>{cm.time}{mine?" · maintenir pour supprimer":""}</span>
+                <button onClick={function(){setReplyTo(cm);}} style={{fontSize:10,fontWeight:700,color:DS.primary,background:"none",border:"none",cursor:"pointer",padding:0}}>Répondre</button>
+              </div>
             </div>
           </div>
         );})}
       </div>
+      {/* Indicateur de réponse */}
+      {replyTo&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 14px",background:DS.primary+"12",borderTop:"1px solid "+DS.primary+"30",flexShrink:0}}>
+        <div style={{flex:1,fontSize:11,color:DS.primary,fontWeight:700}}>↩ En réponse à {replyTo.author}</div>
+        <button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer",padding:0}}><X size={13} color={DS.primary}/></button>
+      </div>}
       {/* Input */}
       <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",borderTop:"1px solid "+DS.border+"40",flexShrink:0,background:DS.surface}}>
         <Av sz={30} letter={selfLetter}/>
         <div style={{flex:1,position:"relative"}}>
-          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter")addCmt(post.id);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Ajouter un commentaire..." style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
-          <button onClick={function(){addCmt(post.id);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
+          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter"){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),Icon:MessageCircle,color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre à "+replyTo.author+"...":"Ajouter un commentaire..."} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          <button onClick={function(){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),Icon:MessageCircle,color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
         </div>
       </div>
     </div>
@@ -1060,7 +1070,7 @@ function FeedText(props){
   );
 }
 function ClientFeed(props){
-  var onProfile=props.onProfile;
+  var onProfile=props.onProfile;var onAddNotif=props.onAddNotif||null;
   var selfEmail=props.selfEmail||"";
   var selfName=selfEmail?selfEmail.split("@")[0]:"Vous";
   var selfLetter=(selfName[0]||"V").toUpperCase();
@@ -1098,16 +1108,16 @@ function ClientFeed(props){
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
   function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partage avec succes","success");}
-  function addCmt(id){
+  function addCmt(id,replyTo){
     var text=(cmtText[id]||"").trim();if(!text)return;
-    var cm={id:Date.now(),author:selfName,text:text,time:"maintenant"};
+    var cm={id:Date.now(),author:selfName,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    toast("Commentaire publie","neutral");
+    toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
-    toast("Commentaire supprime","neutral");
+    toast("Commentaire supprimé","neutral");
   }
   var sLoad=useState(true);var loading=sLoad[0];var setLoading=sLoad[1];
   useEffect(function(){var t=setTimeout(function(){setLoading(false);},350);return function(){clearTimeout(t);};},[]);
@@ -1176,7 +1186,7 @@ function ClientFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -1744,7 +1754,7 @@ function BookM(props){
   );
 }
 function ProFeed(props){
-  var proType=props.proType;var isPremium=props.isPremium||false;var onPremium=props.onPremium;var onProfile=props.onProfile;
+  var proType=props.proType;var isPremium=props.isPremium||false;var onPremium=props.onPremium;var onProfile=props.onProfile;var onAddNotif=props.onAddNotif||null;
   // Fix #3 : data declare en premier pour eviter crash dans addCmt
   var color=rC(proType);
   var _allData=proType==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
@@ -1761,12 +1771,12 @@ function ProFeed(props){
   var s3=useState(false);var showNew=s3[0];var setShowNew=s3[1];
   var scm2=useState({});var cmtText=scm2[0];var setCmtText=scm2[1];
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
-  function addCmt(id){
+  function addCmt(id,replyTo){
     var text=(cmtText[id]||"").trim();if(!text)return;
-    var cm={id:Date.now(),author:data.name,text:text,time:"maintenant"};
+    var cm={id:Date.now(),author:data.name,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    toast("Commentaire publie","neutral");
+    toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
@@ -1938,7 +1948,7 @@ function ProFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -3023,7 +3033,7 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email}/></div>}
+          {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV"/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
@@ -3066,7 +3076,7 @@ export default function App() {
       {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email}/></div>}
+        {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
