@@ -1,11 +1,15 @@
 import { useState, useEffect, useRef } from "react";
+
+// ⚠️ MODE DEV — mettre à true pour court-circuiter l'authentification en développement
+const DEV_BYPASS_AUTH = false;
+const DEV_ACCOUNT_TYPE = "client"; // "client" | "hotel" | "restaurant"
 import {
   Home, Search, MessageCircle, User, Bell, Settings, Star, Heart,
   Share2, Link2, MapPin, ArrowLeft, X, Plus, Trash2, Edit2, Eye, Calendar,
   CreditCard, Users, AlertTriangle, LogOut, Lock, Mail, Send,
   MoreVertical, CheckCircle, XCircle, ChevronRight, FileText, Flag, Activity,
   Building2, Utensils, Shield, ShieldCheck, Phone, Package, Waves,
-  EyeOff, Car, Dumbbell, Tag, Wifi, Bookmark, Clock, UserPlus, UserCheck
+  EyeOff, Car, Dumbbell, Tag, Wifi, Bookmark, Clock, UserPlus, UserCheck, Camera
 } from "lucide-react";
 
 const DS = {
@@ -29,7 +33,7 @@ function fmtK(n){
   return String(n);
 }
 
-const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}button{transition:opacity .18s cubic-bezier(0.22,1,0.36,1),transform .16s cubic-bezier(0.22,1,0.36,1),background .2s ease}button:active{transform:scale(.96);opacity:.85}.hp-scroll{-webkit-overflow-scrolling:touch}";
+const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}@keyframes hp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes hp-item-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}@keyframes hp-heart-pop{0%{transform:scale(1)}20%{transform:scale(1.45)}40%{transform:scale(1.1)}60%{transform:scale(1.28)}80%{transform:scale(.97)}100%{transform:scale(1)}}@keyframes hp-bounce-in{0%{opacity:0;transform:scale(.87) translateY(10px)}55%{opacity:1;transform:scale(1.03)}75%{transform:scale(.99)}100%{opacity:1;transform:scale(1)}}@keyframes hp-toast-in{from{opacity:0;transform:translateX(-50%) translateY(18px) scale(.93)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}@keyframes hp-slide-down{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-sheet-out{from{transform:translateY(0);opacity:1}to{transform:translateY(100%);opacity:0}}@keyframes hp-msg-in{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes hp-success-ring{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.12);opacity:1}80%{transform:scale(.96)}100%{transform:scale(1);opacity:1}}button{transition:opacity .16s cubic-bezier(0.22,1,0.36,1),transform .14s cubic-bezier(0.22,1,0.36,1),background .18s ease,color .18s ease}button:active{transform:scale(.94);opacity:.82}.hp-scroll{-webkit-overflow-scrolling:touch}.hp-card{transition:box-shadow .18s ease,transform .16s ease}.hp-card:active{transform:scale(.984)}.hp-img{opacity:0;transition:opacity .38s ease}.hp-img-loaded{opacity:1}.hp-input-focus{outline:none!important;box-shadow:0 0 0 2.5px #6366F133!important;border-color:#6366F1!important;transition:box-shadow .18s ease,border-color .18s ease}.hp-sk{background:linear-gradient(90deg,#17171F 25%,#252533 50%,#17171F 75%);background-size:600px 100%;animation:hp-shimmer 1.5s infinite linear;border-radius:8px}input,textarea{transition:box-shadow .18s ease,border-color .18s ease}";
 function useAnimations(){useEffect(function(){if(document.getElementById("hp-a"))return;var s=document.createElement("style");s.id="hp-a";s.textContent=ANIM_CSS;document.head.appendChild(s);},[]);}
 
 const HOTELS=[
@@ -55,6 +59,11 @@ const FEED=[
   {id:"res2",author:"Chez Mamie Fatou",type:"restaurant",time:"8h",img:"https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=70",text:"Aujourd hui : Thieboudienne special avec poissons du jour.",likes:89,comments:5,shares:4,followers:1540,verified:false},
 ];
 const AD={active:true,label:"PUBLICITE",text:"Decouvrez nos etablissements partenaires"};
+const ADS_POOL=[
+  {active:true,label:"PUBLICITE",text:"Decouvrez nos etablissements partenaires"},
+  {active:true,label:"PROMO",text:"Offre speciale : -20% sur votre premiere reservation Premium"},
+  {active:true,label:"NOUVEAUTE",text:"Nouveaux restaurants africains disponibles sur la plateforme"},
+];
 
 // =====================================================================
 // COUCHE DE DONNEES CENTRALISEE (DataLayer)
@@ -139,26 +148,38 @@ var DataLayer = {
           DataLayer._seedPosts(supabase);
         }
       });
-    }catch(e){ /* hors-ligne ou non configure : on garde la demo */ }
+    }catch(e){ /* hors-ligne ou non configure : on garde la demo */
+      // Fix #9 : retry apres 8 secondes si echec au demarrage
+      setTimeout(function(){ try{ DataLayer.syncFromSupabase(supabase); }catch(e2){} }, 8000);
+    }
   },
   // Alimente la base avec les etablissements de demo (premier deploiement)
   _seedEstablishments: function(supabase){
-    try{
-      var rows = HOTELS.concat(RESTAURANTS).map(function(e){
-        return { id:e.id, type:e.type, name:e.name, location:e.location,
-                 verified:!!e.verified, is_premium:!!e.isPremium, data:e };
-      });
-      supabase.from("establishments").insert(rows).then(function(){}); 
-    }catch(e){}
+    // Fix #8 : attendre une session active avant de seeder
+    supabase.auth.getSession().then(function(){
+      try{
+        var rows = HOTELS.concat(RESTAURANTS).map(function(e){
+          return { id:e.id, type:e.type, name:e.name, location:e.location,
+                   verified:!!e.verified, is_premium:!!e.isPremium, data:e };
+        });
+        // Fix #7 : re-synchroniser apres insertion pour confirmer
+        supabase.from("establishments").insert(rows).then(function(r){
+          if(!r.error) DataLayer.syncFromSupabase(supabase);
+        });
+      }catch(e){}
+    }).catch(function(){});
   },
-  // Alimente la base avec les posts de demo
   _seedPosts: function(supabase){
-    try{
-      var rows = FEED.map(function(p){
-        return { id:p.id, author:p.author, type:p.type, data:p };
-      });
-      supabase.from("posts").insert(rows).then(function(){});
-    }catch(e){}
+    supabase.auth.getSession().then(function(){
+      try{
+        var rows = FEED.map(function(p){
+          return { id:p.id, author:p.author, type:p.type, data:p };
+        });
+        supabase.from("posts").insert(rows).then(function(r){
+          if(!r.error) DataLayer.syncFromSupabase(supabase);
+        });
+      }catch(e){}
+    }).catch(function(){});
   },
 
   // =================================================================
@@ -229,36 +250,51 @@ var DataLayer = {
 //   }
 // =====================================================================
 var AuthService = {
-  // Construit l'objet utilisateur de session a partir du type/statut/email
-  buildSession: function(accType, status, email){
+  _sb: function(){ return (typeof window!=="undefined"&&window.__supabase)||null; },
+  buildSession: function(accType, status, email, userId){
     return {
       type: accType,
       accountStatus: status || "active",
       email: email || "",
+      userId: userId || null,
       suspendReason: null,
       banReason: null,
       refuseReason: null
     };
   },
-  // Connexion par email (mode demo : accepte tout couple email/mot de passe non vide)
-  login: function(accType, email){
-    // FUTUR: appel reseau d'authentification ici
+  login: async function(accType, email, password){
+    var sb = AuthService._sb();
+    if(sb){
+      var r = await sb.auth.signInWithPassword({ email: email, password: password });
+      if(r.error) throw r.error;
+      return AuthService.buildSession(accType, "active", r.data.user.email, r.data.user.id);
+    }
     return AuthService.buildSession(accType, "active", email || "demo@platform.com");
   },
-  // Inscription (les comptes etablissement passent en attente de validation)
-  register: function(accType, email){
-    // FUTUR: creation de compte cote backend ici
+  register: async function(accType, email, password){
+    var sb = AuthService._sb();
+    if(sb){
+      var r = await sb.auth.signUp({ email: email, password: password, options: { data: { account_type: accType } } });
+      if(r.error) throw r.error;
+      var status = accType !== "client" ? "pending" : "active";
+      var s = AuthService.buildSession(accType, status, (r.data.user&&r.data.user.email)||email, r.data.user&&r.data.user.id);
+      s.needsEmailConfirm = !r.data.session;
+      return s;
+    }
     var status = accType !== "client" ? "pending" : "active";
     return AuthService.buildSession(accType, status, email || "demo@platform.com");
   },
-  // Connexion via fournisseur externe (Google, etc.)
-  loginWithProvider: function(accType, provider, email){
-    // FUTUR: OAuth (supabase.auth.signInWithOAuth) ici
-    return AuthService.buildSession(accType, "active", email || (provider + "@gmail.com"));
+  loginWithProvider: async function(accType, provider){
+    var sb = AuthService._sb();
+    if(sb){
+      await sb.auth.signInWithOAuth({ provider: provider, options: { redirectTo: window.location.origin } });
+      return null;
+    }
+    return AuthService.buildSession(accType, "active", provider + "@gmail.com");
   },
-  // Deconnexion
-  logout: function(){
-    // FUTUR: supabase.auth.signOut() ici
+  logout: async function(){
+    var sb = AuthService._sb();
+    if(sb) await sb.auth.signOut();
     return null;
   }
 };
@@ -281,22 +317,20 @@ var AuthService = {
 //   }
 // =====================================================================
 var BookingService = {
-  // Genere un identifiant de reservation unique
+  _all: (function(){try{return JSON.parse(localStorage.getItem("hp_resas_all")||"[]");}catch(e){return [];}}()),
   generateId: function(){
     return "R" + Date.now().toString().slice(-8);
   },
-  // Cree une reservation a partir des donnees du parcours (objet deja construit)
-  // Retourne l'objet final (avec garde-fous). FUTUR: persistance backend ici.
   createBooking: function(resa){
     if(!resa) return null;
-    // garantir un id et un horodatage
     if(!resa.id){ resa.id = BookingService.generateId(); }
     if(!resa.createdAt){ resa.createdAt = new Date().toISOString(); }
-    // Persistance Supabase optionnelle, en arriere-plan (n'affecte pas l'UI)
+    BookingService._all.push(resa);
+    try{localStorage.setItem("hp_resas_all",JSON.stringify(BookingService._all));}catch(e){}
     try{ if(DataLayer._client){ DataLayer.saveReservation(resa).then(function(){}); } }catch(e){}
     return resa;
   },
-  // Ajoute une reservation a l'historique (logique d'etat pure, reutilisable)
+  getAll: function(){ return BookingService._all.slice(); },
   appendToHistory: function(history, resa){
     return (history || []).concat([resa]);
   }
@@ -362,13 +396,26 @@ function useToast(){
   function show(msg,type){if(!type)type="success";if(timer.current)clearTimeout(timer.current);setToast({msg:msg,type:type});timer.current=setTimeout(function(){setToast(null);},2400);}
   function Toast(){
     if(!toast)return null;
-    var bg={success:DS.success,error:DS.error,info:DS.info,warning:DS.warning}[toast.type]||DS.card;
-    return(<div onClick={function(){setToast(null);}} style={{position:"fixed",bottom:88,left:"50%",transform:"translateX(-50%)",zIndex:9999,background:bg,color:"#fff",padding:"10px 22px",borderRadius:30,fontSize:13,fontWeight:700,whiteSpace:"nowrap",cursor:"pointer"}}>{toast.msg}</div>);
+    var bg={success:DS.success,error:DS.error,info:DS.info,warning:DS.warning,neutral:DS.textDim}[toast.type]||DS.card;
+    var icon={success:"✓",error:"✕",info:"ℹ",warning:"⚠"}[toast.type]||"";
+    return(<div onClick={function(){setToast(null);}} style={{position:"fixed",bottom:96,left:"50%",transform:"translateX(-50%)",zIndex:9999,background:bg,color:"#fff",padding:"11px 22px",borderRadius:30,fontSize:13,fontWeight:700,whiteSpace:"nowrap",cursor:"pointer",display:"flex",alignItems:"center",gap:8,boxShadow:"0 8px 32px rgba(0,0,0,.45)",animation:"hp-toast-in .28s cubic-bezier(0.22,1,0.36,1)"}}>{icon&&<span style={{fontSize:14}}>{icon}</span>}{toast.msg}</div>);
   }
   return {show:show,Toast:Toast};
 }
 
-function VBadge(props){var sz=props.sz||22;return(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><defs><linearGradient id="vbg" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#FFD700"/><stop offset="100%" stopColor="#D97706"/></linearGradient></defs><path d="M12 2L14.09 8.26L20.73 8.27L15.45 12.14L17.54 18.4L12 14.52L6.46 18.4L8.55 12.14L3.27 8.27L9.91 8.26Z" fill="url(#vbg)" stroke="#D97706" strokeWidth="0.5"/><path d="M9 12L11 14L15 10" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>);}
+function VBadge(props){
+  var sz=props.sz||22;var showLabel=props.showLabel||false;
+  var star=(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" style={{display:"block",filter:"drop-shadow(0 0 3px #FFD700aa)"}}><defs><linearGradient id="vbg" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox"><stop offset="0%" stopColor="#FFF176"/><stop offset="40%" stopColor="#FFD700"/><stop offset="100%" stopColor="#B45309"/></linearGradient><radialGradient id="vshine" cx="35%" cy="30%" r="55%"><stop offset="0%" stopColor="#FFFDE7" stopOpacity="0.85"/><stop offset="100%" stopColor="#FFD700" stopOpacity="0"/></radialGradient></defs><path d="M12 1.5L14.39 8.26L21.5 8.27L15.82 12.49L18.21 19.25L12 15.02L5.79 19.25L8.18 12.49L2.5 8.27L9.61 8.26Z" fill="url(#vbg)" stroke="#92400E" strokeWidth="0.4"/><path d="M12 1.5L14.39 8.26L21.5 8.27L15.82 12.49L18.21 19.25L12 15.02L5.79 19.25L8.18 12.49L2.5 8.27L9.61 8.26Z" fill="url(#vshine)"/><path d="M8.5 12L11 14.5L15.5 9.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>);
+  if(!showLabel)return(<div style={{width:sz,height:sz,borderRadius:"50%",background:"#111",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 6px 2px #FFD70066,0 2px 6px rgba(0,0,0,.6)",flexShrink:0}}>{star}</div>);
+  var circSz=sz;var lblFontSz=Math.max(9,Math.round(sz*0.45));
+  return(
+    <div style={{display:"inline-flex",flexDirection:"column",alignItems:"center",gap:0,flexShrink:0}}>
+      <div style={{width:circSz,height:circSz,borderRadius:"50%",background:"#111",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 0 8px 3px #FFD70066,0 2px 8px rgba(0,0,0,.7)"}}>{star}</div>
+      <div style={{background:"#14532d",borderRadius:"0 0 6px 6px",padding:"1px 5px",marginTop:-3,boxShadow:"0 2px 4px rgba(0,0,0,.4)"}}><span style={{fontSize:lblFontSz,fontWeight:800,color:"#4ade80",letterSpacing:"0.01em",whiteSpace:"nowrap"}}>Vérifié</span></div>
+    </div>
+  );
+}
+function CBadge(props){var sz=props.sz||22;return(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#2563EB"/><path d="M7.5 12L10.5 15L16.5 9" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>);}
 function BackBtn(props){
   var onClick=props.onClick;var light=props.light||false;
   var iconColor=light?"#fff":DS.text;
@@ -380,15 +427,56 @@ function BackBtn(props){
 }
 
 function Av(props){
-  var sz=props.sz||40;var letter=props.letter||"?";var img=props.img||null;var verified=props.verified||false;
-  return(<div style={{position:"relative",width:sz,height:sz,flexShrink:0}}>{img?<img src={img} alt="" style={{width:sz,height:sz,borderRadius:"50%",objectFit:"cover"}}/>:<div style={{width:sz,height:sz,borderRadius:"50%",background:DS.primary+"30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.round(sz*.4),fontWeight:800,color:DS.primary}}>{letter}</div>}{verified&&<div style={{position:"absolute",bottom:-2,right:-2,background:DS.bg,borderRadius:"50%",padding:1}}><VBadge sz={Math.round(sz*.36)}/></div>}</div>);
+  var sz=props.sz||40;var letter=props.letter||"?";var img=props.img||null;var verified=props.verified||false;var isClient=props.isClient||false;
+  var badge=verified?(<div style={{position:"absolute",bottom:-2,right:-2,background:DS.bg,borderRadius:"50%",padding:1}}>{isClient?<CBadge sz={Math.round(sz*.38)}/>:<VBadge sz={Math.round(sz*.36)}/>}</div>):null;
+  return(<div style={{position:"relative",width:sz,height:sz,flexShrink:0}}>{img?<img src={img} alt="" style={{width:sz,height:sz,borderRadius:"50%",objectFit:"cover"}}/>:<div style={{width:sz,height:sz,borderRadius:"50%",background:DS.primary+"30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.round(sz*.4),fontWeight:800,color:DS.primary}}>{letter}</div>}{badge}</div>);
+}
+function ImgViewer(props){
+  var src=props.src;var onClose=props.onClose;
+  if(!src)return null;
+  return(<div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",animation:"hp-fade 0.18s ease"}}><img src={src} alt="" style={{maxWidth:"92vw",maxHeight:"88vh",objectFit:"contain",borderRadius:12,boxShadow:"0 24px 64px rgba(0,0,0,.7)"}}/><button onClick={onClose} style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,.12)",border:"none",borderRadius:"50%",width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><X size={18} color="#fff"/></button></div>);
+}
+function CamBadge(props){
+  var uploadRef=props.uploadRef;var sz=props.sz||24;
+  return(<div onClick={function(e){e.stopPropagation();if(uploadRef&&uploadRef.current)uploadRef.current.click();}} style={{width:sz,height:sz,borderRadius:"50%",background:DS.card,border:"2px solid "+DS.bg,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 2px 6px rgba(0,0,0,.5)"}}><Camera size={Math.round(sz*.5)} color={DS.textMuted}/></div>);
+}
+function DualAv(props){
+  var sz=props.sz||72;var letter=props.letter||"?";var innerImg=props.innerImg||null;var outerImg=props.outerImg||null;var verified=props.verified||false;var isClient=props.isClient||false;var onClickInner=props.onClickInner||null;var onClickOuter=props.onClickOuter||null;var uploadRef=props.uploadRef||null;
+  var ring=8;var outerSz=sz+ring*2;var badgeSz=Math.round(sz*.34);
+  return(
+    <div style={{position:"relative",width:outerSz,height:outerSz,flexShrink:0}}>
+      <div onClick={onClickOuter} style={{position:"absolute",inset:0,borderRadius:"50%",overflow:"hidden",cursor:onClickOuter?"pointer":"default",background:DS.card,border:"2px solid "+DS.border}}>
+        {outerImg&&<img src={outerImg} alt="" style={{width:"100%",height:"100%",objectFit:"cover",opacity:.75}}/>}
+      </div>
+      <div style={{position:"absolute",top:ring,left:ring,width:sz,height:sz,borderRadius:"50%",border:"2.5px solid "+DS.bg,overflow:"hidden",boxSizing:"border-box"}}>
+        <div onClick={onClickInner} style={{width:"100%",height:"100%",cursor:"pointer"}}>
+          {innerImg?<img src={innerImg} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div style={{width:"100%",height:"100%",background:DS.primary+"30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.round(sz*.38),fontWeight:800,color:DS.primary}}>{letter}</div>}
+        </div>
+      </div>
+      {uploadRef&&<div style={{position:"absolute",bottom:ring,right:ring,zIndex:5}}><CamBadge uploadRef={uploadRef} sz={badgeSz}/></div>}
+      {verified&&!uploadRef&&<div style={{position:"absolute",bottom:ring-2,right:ring-2,background:DS.bg,borderRadius:"50%",padding:1,zIndex:4}}>{isClient?<CBadge sz={badgeSz}/>:<VBadge sz={badgeSz}/>}</div>}
+    </div>
+  );
 }
 
 function Stars(props){var r=props.r||0;var sz=props.sz||14;return(<span style={{display:"inline-flex",gap:2}}>{[1,2,3,4,5].map(function(i){return <Star key={i} size={sz} fill={i<=r?"#F59E0B":"none"} color={i<=r?"#F59E0B":DS.border} strokeWidth={1.5}/>;})}</span>);}
 
 function Emp(props){var Icon=props.Icon||Package;var title=props.title||"";var sub=props.sub||"";return(<div style={{padding:"48px 20px",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:10}}><Icon size={40} color={DS.textDim} strokeWidth={1}/><div style={{fontSize:15,fontWeight:700,color:DS.textMuted}}>{title}</div>{sub&&<div style={{fontSize:12,color:DS.textDim,maxWidth:240}}>{sub}</div>}</div>);}
+function Sk(props){var w=props.w||"100%";var h=props.h||14;var r=props.r||8;return(<div className="hp-sk" style={{width:w,height:h,borderRadius:r,flexShrink:0}}/>);}
+function FeedSkeleton(){return(<div style={{animation:"hp-fade .2s ease"}}>{[0,1,2].map(function(i){return(<div key={i} style={{background:DS.surface,marginBottom:10,padding:"18px 16px",borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28"}}><div style={{display:"flex",gap:12,marginBottom:14}}><div className="hp-sk" style={{width:52,height:52,borderRadius:"50%",flexShrink:0}}/><div style={{flex:1,display:"flex",flexDirection:"column",gap:8}}><Sk h={13} w="55%"/><Sk h={10} w="35%"/><Sk h={9} w="20%"/></div></div><Sk h={13} w="90%" r={6}/><div style={{marginTop:6}}><Sk h={13} w="70%" r={6}/></div><div className="hp-sk" style={{width:"100%",height:220,borderRadius:0,margin:"14px 0 0"}}/><div style={{display:"flex",gap:8,marginTop:14}}><Sk h={10} w="25%"/><Sk h={10} w="25%"/><Sk h={10} w="20%"/></div></div>);})}</div>);}
 
-function AdBanner(){var AD=DataLayer.getAd();if(!AD.active)return null;return(<div style={{margin:"6px 14px",padding:"7px 14px",background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,display:"flex",alignItems:"center",gap:8}}><Tag size={11} color={DS.primary}/><span style={{fontSize:9,fontWeight:800,color:DS.primary,letterSpacing:1}}>{AD.label} </span><span style={{fontSize:11,color:DS.textMuted}}>{AD.text}</span></div>);}
+function DiscSkeleton(){return(<div style={{animation:"hp-fade .2s ease"}}>{[0,1,2].map(function(i){return(<div key={i} style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border}}><div className="hp-sk" style={{width:"100%",height:160,borderRadius:0,flexShrink:0}}/><div style={{padding:"12px 14px"}}><Sk h={15} w="65%"/><div style={{marginTop:6}}><Sk h={11} w="45%"/></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><Sk h={34} w="48%" r={10}/><Sk h={34} w="48%" r={10}/></div></div>);})}</div>);}
+function ProfSkeleton(){return(<div style={{animation:"hp-fade .2s ease",paddingBottom:20}}><div style={{background:DS.card,borderBottom:"1px solid "+DS.border,padding:"16px 16px 12px",textAlign:"center"}}><div className="hp-sk" style={{width:72,height:72,borderRadius:"50%",margin:"0 auto 12px"}}/><Sk h={18} w="45%" r={8}/><div style={{margin:"6px auto 0",width:"60%"}}><Sk h={12} w="100%"/></div></div><div style={{display:"flex",margin:"12px 16px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[0,1,2].map(function(i){return <div key={i} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><Sk h={18} w="60%" r={4}/><div style={{marginTop:4,display:"flex",justifyContent:"center"}}><Sk h={10} w="50%"/></div></div>;})}</div><div style={{padding:"0 16px"}}>{[0,1,2].map(function(i){return <div key={i} style={{background:DS.card,borderRadius:14,marginBottom:12,border:"1px solid "+DS.border,padding:"14px"}}><Sk h={14} w="60%"/><div style={{marginTop:6}}><Sk h={11} w="40%"/></div></div>;})}</div></div>);}
+function NotifSkeleton(){return(<div style={{animation:"hp-fade .2s ease"}}>{[0,1,2,3].map(function(i){return(<div key={i} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20"}}><div className="hp-sk" style={{width:40,height:40,borderRadius:"50%",flexShrink:0}}/><div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}><Sk h={13} w="55%"/><Sk h={11} w="80%"/><Sk h={9} w="20%"/></div></div>);})}</div>);}
+function ChatListSkeleton(){return(<div style={{animation:"hp-fade .2s ease"}}>{[0,1,2,3].map(function(i){return(<div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20"}}><div className="hp-sk" style={{width:46,height:46,borderRadius:"50%",flexShrink:0}}/><div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}><div style={{display:"flex",justifyContent:"space-between"}}><Sk h={13} w="45%"/><Sk h={10} w="15%"/></div><Sk h={11} w="70%"/></div></div>);})}</div>);}
+function ResaSkeleton(){return(<div style={{padding:"0 14px",animation:"hp-fade .2s ease"}}>{[0,1,2].map(function(i){return(<div key={i} style={{background:DS.card,borderRadius:14,padding:"14px",marginBottom:12,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{flex:1,display:"flex",flexDirection:"column",gap:7}}><Sk h={14} w="60%"/><Sk h={11} w="40%"/><Sk h={10} w="55%"/></div><div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}><Sk h={16} w={70} r={6}/><Sk h={10} w={50} r={6}/></div></div><div style={{display:"flex",gap:6}}><Sk h={30} w={80} r={8}/><Sk h={30} w={80} r={8}/></div></div>);})}</div>);}
+
+function AdBanner(){
+  var si=useState(0);var adIdx=si[0];var setAdIdx=si[1];
+  useEffect(function(){var t=setInterval(function(){setAdIdx(function(i){return(i+1)%ADS_POOL.length;});},8000);return function(){clearInterval(t);};},[]);
+  var AD=ADS_POOL[adIdx];if(!AD.active)return null;
+  return(<div key={adIdx} style={{margin:"6px 14px",padding:"7px 14px",background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,display:"flex",alignItems:"center",gap:8,animation:"hp-fade 0.4s ease"}}><Tag size={11} color={DS.primary}/><span style={{fontSize:9,fontWeight:800,color:DS.primary,letterSpacing:1}}>{AD.label} </span><span style={{fontSize:11,color:DS.textMuted}}>{AD.text}</span></div>);
+}
 
 function OffB(props){return(<button onClick={props.onPress} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid "+DS.border+"20",background:"none",border:"none",cursor:"pointer",textAlign:"left"}}><span style={{fontSize:14,color:DS.text}}>{props.label}</span><ChevronRight size={16} color={DS.textMuted}/></button>);}
 
@@ -405,7 +493,12 @@ function TopBar(props){return(<div style={{display:"flex",alignItems:"center",ju
 
 function BotNav(props){
   var tabs=props.tabs;var active=props.active;var set=props.set;var accent=props.accent;var onHomeRefresh=props.onHomeRefresh;
-  return(<div style={{position:"sticky",bottom:0,background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",zIndex:100}}>{tabs.map(function(tab){var Icon=tab.icon;var id=tab.id;var isAct=active===id;return(<button key={id} onClick={function(){if(id==="feed"&&isAct&&onHomeRefresh)onHomeRefresh();else set(id);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 0 6px",background:"none",border:"none",cursor:"pointer",gap:2}}><Icon size={22} color={isAct?accent:DS.textMuted} strokeWidth={isAct?2.5:1.5}/><div style={{fontSize:9,fontWeight:isAct?700:400,color:isAct?accent:DS.textMuted}}>{tab.label}</div><div style={{width:isAct?16:0,height:2,borderRadius:1,background:accent,transition:"width 0.2s ease",overflow:"hidden"}}/></button>);})}</div>);
+  var sTap=useState(null);var tapped=sTap[0];var setTapped=sTap[1];
+  function tap(id){
+    setTapped(id);setTimeout(function(){setTapped(null);},200);
+    if(id==="feed"&&active===id&&onHomeRefresh)onHomeRefresh();else set(id);
+  }
+  return(<div style={{position:"sticky",bottom:0,background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}}>{tabs.map(function(tab){var Icon=tab.icon;var id=tab.id;var isAct=active===id;var isTapped=tapped===id;return(<button key={id} onClick={function(){tap(id);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"9px 0 7px",background:"none",border:"none",cursor:"pointer",gap:3,transform:isTapped?"scale(.88)":"scale(1)",transition:"transform .14s cubic-bezier(0.22,1,0.36,1)"}}><Icon size={22} color={isAct?accent:DS.textMuted} strokeWidth={isAct?2.5:1.5}/><div style={{fontSize:9,fontWeight:isAct?800:400,color:isAct?accent:DS.textMuted,transition:"color .18s"}}>{tab.label}</div><div style={{width:isAct?18:0,height:2.5,borderRadius:2,background:accent,transition:"width .25s cubic-bezier(0.22,1,0.36,1)"}}/></button>);})}</div>);
 }
 
 function Ov(props){
@@ -416,13 +509,36 @@ function Ov(props){
     setClosing(true);
     setTimeout(function(){if(onClose)onClose();},260);
   }
-  return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:850,maxWidth:420,margin:"0 auto",overflowY:"auto",animation:(closing?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}>{typeof props.children==="function"?props.children(handleClose):props.children}</div>);
+  return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:850,maxWidth:420,margin:"0 auto",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:(closing?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}>{typeof props.children==="function"?props.children(handleClose):props.children}</div>);
 }
 
+function AccountTypeScreen(props){
+  var onSelect=props.onSelect;
+  return(
+    <div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,animation:"hp-fade-up 0.28s ease"}}>
+      <div style={{textAlign:"center",marginBottom:32}}>
+        <div style={{fontSize:32,fontWeight:900,color:DS.text,letterSpacing:-1}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>
+        <div style={{fontSize:13,color:DS.textMuted,marginTop:8}}>Choisissez votre type de compte</div>
+      </div>
+      <div style={{width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:14}}>
+        {[["client","Client","Voyageur · Reservations · Avis",User,DS.client],["hotel","Hotel","Gerez votre etablissement hotelier",Building2,DS.hotel],["restaurant","Restaurant","Gerez votre restaurant",Utensils,DS.restaurant]].map(function(item){
+          var t=item[0];var l=item[1];var desc=item[2];var Ic=item[3];var col=item[4];
+          return(
+            <button key={t} onClick={function(){onSelect(t);}} style={{width:"100%",padding:"18px 20px",borderRadius:16,border:"1px solid "+col+"44",background:DS.card,cursor:"pointer",display:"flex",alignItems:"center",gap:16,textAlign:"left"}}>
+              <div style={{width:48,height:48,borderRadius:14,background:col+"18",border:"1px solid "+col+"33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ic size={24} color={col}/></div>
+              <div><div style={{fontSize:15,fontWeight:800,color:DS.text,marginBottom:3}}>{l}</div><div style={{fontSize:12,color:DS.textMuted}}>{desc}</div></div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 function AuthScreen(props){
-  var onAuth=props.onAuth;
+  var onAuth=props.onAuth;var onBack=props.onBack;
+  var _initType=props.initialAccType||"client";
   var s1=useState("login");var mode=s1[0];var setMode=s1[1];
-  var s2=useState("client");var accType=s2[0];var setAccType=s2[1];
+  var s2=useState(_initType);var accType=s2[0];var setAccType=s2[1];
   var s3=useState("");var email=s3[0];var setEmail=s3[1];
   var s4=useState("");var pass=s4[0];var setPass=s4[1];
   var s5=useState(false);var showP=s5[0];var setShowP=s5[1];
@@ -430,16 +546,58 @@ function AuthScreen(props){
   var s7=useState("");var faCode=s7[0];var setFACode=s7[1];
   var s8=useState(false);var cgu=s8[0];var setCgu=s8[1];
   var s9=useState("email");var faMethod=s9[0];var setFAMethod=s9[1];
-  var MOCK_2FA_CODE="847291";
+  var s10=useState(false);var loading=s10[0];var setLoading=s10[1];
+  var s11=useState("");var authErr=s11[0];var setAuthErr=s11[1];
+  var s12=useState("");var confirmPass=s12[0];var setConfirmPass=s12[1];
+  var s13=useState(false);var emailPending=s13[0];var setEmailPending=s13[1];
+  var s14=useState("");var formErr=s14[0];var setFormErr=s14[1];
   function submit(){
-    if(mode!=="forgot"&&!pass.trim())return;
-    if(mode==="register"&&!cgu)return;
-    setTwoFA(true);
+    setFormErr("");
+    if(mode!=="forgot"&&!email.trim()){setFormErr("Veuillez saisir votre email.");return;}
+    var emailRe=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if(!emailRe.test(email.trim())){setFormErr("Adresse email invalide.");return;}
+    if(mode!=="forgot"&&pass.length<6){setFormErr("Le mot de passe doit contenir au moins 6 caracteres.");return;}
+    if(mode!=="forgot"&&pass.length>72){setFormErr("Le mot de passe est trop long (maximum 72 caracteres).");return;}
+    if(mode==="register"&&pass!==confirmPass){setFormErr("Les mots de passe ne correspondent pas.");return;}
+    if(mode==="register"&&!cgu){setFormErr("Veuillez accepter les conditions d utilisation.");return;}
+    setTwoFA(true);setAuthErr("");
   }
-  function verify2FA(){
-    if(faCode===MOCK_2FA_CODE||faCode.length===6){
-      var session=mode==="register"?AuthService.register(accType,email):AuthService.login(accType,email);
-      onAuth(accType,session.accountStatus,session.email);
+  async function verify2FA(){
+    if(faCode.length===6){
+      setLoading(true);setAuthErr("");
+      try{
+        var session=mode==="register"
+          ?await AuthService.register(accType,email,pass)
+          :await AuthService.login(accType,email,pass);
+        if(session){
+          if(session.needsEmailConfirm){
+            setEmailPending(true);setTwoFA(false);
+          } else {
+            onAuth(accType,session.accountStatus,session.email,session.userId);
+          }
+        }
+      }catch(e){
+        var msg = e.message||"";
+        if(msg.includes("fetch")||msg.includes("network")||msg.includes("ERR_")||msg.includes("Failed to fetch")){
+          setAuthErr("Connexion impossible. Verifiez votre connexion internet.");
+        } else if(msg.includes("Invalid login")||msg.includes("invalid_credentials")){
+          setAuthErr("Email ou mot de passe incorrect.");
+        } else if(msg.includes("already registered")||msg.includes("User already registered")){
+          setAuthErr("Cet email est deja utilise. Essayez de vous connecter.");
+        } else if(msg.includes("longer than 72")||msg.includes("72 characters")){
+          setAuthErr("Mot de passe trop long. Maximum 72 caracteres.");
+        } else if(msg.includes("Password should be")||msg.includes("password")){
+          setAuthErr("Le mot de passe doit contenir entre 6 et 72 caracteres.");
+        } else if(msg.includes("Email not confirmed")){
+          setAuthErr("Confirmez votre email avant de vous connecter.");
+        } else if(msg.includes("rate limit")||msg.includes("too many")){
+          setAuthErr("Trop de tentatives. Attendez quelques minutes avant de reessayer.");
+        } else {
+          setAuthErr(msg||"Erreur de connexion. Veuillez reessayer.");
+        }
+      }finally{
+        setLoading(false);
+      }
     }
   }
   if(twoFA){
@@ -449,29 +607,46 @@ function AuthScreen(props){
           <div style={{textAlign:"center",marginBottom:24}}>
             <div style={{width:64,height:64,borderRadius:"50%",background:DS.primarySoft,border:"2px solid "+DS.primary,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><Shield size={28} color={DS.primary}/></div>
             <div style={{fontSize:20,fontWeight:900,color:DS.text}}>Verification 2FA</div>
-            <div style={{fontSize:13,color:DS.textMuted,marginTop:6}}>Code envoye par {faMethod==="sms"?"SMS":"email"}</div>
+            <div style={{fontSize:13,color:DS.textMuted,marginTop:6}}>Code envoye a <span style={{color:DS.primary,fontWeight:700}}>{email||"votre email"}</span></div>
           </div>
           <div style={{display:"flex",gap:8,marginBottom:16}}>
             {[["email","Email"],["sms","SMS"]].map(function(_i){var m=_i[0];var l=_i[1];var isAct=faMethod===m;return <button key={m} onClick={function(){setFAMethod(m);}} style={{flex:1,padding:"8px",borderRadius:10,border:"1px solid "+(isAct?DS.primary:DS.border),background:isAct?DS.primarySoft:"transparent",color:isAct?DS.primary:DS.textMuted,fontSize:12,fontWeight:700,cursor:"pointer"}}>{l}</button>;})}
           </div>
-          <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"10px 14px",marginBottom:8,fontSize:12,color:DS.textMuted,textAlign:"center"}}>
-            Code de demonstration : <span style={{fontWeight:800,color:DS.primary,letterSpacing:2}}>{MOCK_2FA_CODE}</span>
-          </div>
           <input value={faCode} onChange={function(e){setFACode(e.target.value);}} maxLength={6} placeholder="Entrez le code a 6 chiffres" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px",fontSize:20,fontWeight:800,color:DS.text,outline:"none",textAlign:"center",letterSpacing:6,boxSizing:"border-box",marginBottom:12}}/>
-          <button onClick={verify2FA} disabled={faCode.length<6} style={{width:"100%",padding:"13px",background:faCode.length>=6?DS.primary:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:faCode.length>=6?"pointer":"not-allowed",marginBottom:10,opacity:faCode.length>=6?1:.7}}>Valider</button>
+          {authErr&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error,textAlign:"center"}}>{authErr}</div>}
+          <button onClick={verify2FA} disabled={faCode.length<6||loading} style={{width:"100%",padding:"13px",background:faCode.length>=6&&!loading?DS.primary:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:faCode.length>=6&&!loading?"pointer":"not-allowed",marginBottom:10,opacity:faCode.length>=6&&!loading?1:.7}}>{loading?"Connexion en cours...":"Valider"}</button>
           <button onClick={function(){setTwoFA(false);setFACode("");}} style={{width:"100%",padding:"10px",background:"transparent",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Retour</button>
+        </div>
+      </div>
+    );
+  }
+  if(emailPending){
+    return(
+      <div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,animation:"hp-fade-up 0.28s ease"}}>
+        <div style={{width:"100%",maxWidth:360,textAlign:"center"}}>
+          <div style={{width:72,height:72,borderRadius:"50%",background:DS.primarySoft,border:"2px solid "+DS.primary,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px"}}><Mail size={32} color={DS.primary}/></div>
+          <div style={{fontSize:22,fontWeight:900,color:DS.text,marginBottom:10}}>Confirmez votre email</div>
+          <div style={{fontSize:14,color:DS.textMuted,lineHeight:1.7,marginBottom:24}}>Un lien de confirmation a ete envoye a <span style={{color:DS.primary,fontWeight:700}}>{email}</span>.<br/>Cliquez sur le lien pour activer votre compte.</div>
+          <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 16px",marginBottom:20,fontSize:12,color:DS.textMuted,textAlign:"left"}}>
+            <div style={{fontWeight:700,color:DS.text,marginBottom:4}}>Vous ne trouvez pas l email ?</div>
+            <div>Verifiez vos spams ou dossier promotions. Le lien expire dans 24h.</div>
+          </div>
+          <button onClick={function(){setEmailPending(false);setMode("login");setTwoFA(false);setFACode("");setPass("");setConfirmPass("");}} style={{width:"100%",padding:"13px",background:DS.primary,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Se connecter</button>
         </div>
       </div>
     );
   }
   return(
     <div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,animation:"hp-fade-up 0.28s ease"}}>
+      {onBack&&<button onClick={mode==="forgot"?function(){setMode("login");}:onBack} style={{position:"absolute",top:18,left:18,background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"7px 12px",display:"flex",alignItems:"center",gap:6,cursor:"pointer",color:DS.textMuted,fontSize:12,fontWeight:700}}>
+        <ArrowLeft size={14} color={DS.textMuted}/>{mode==="forgot"?"Retour":"Changer de compte"}
+      </button>}
       <div style={{textAlign:"center",marginBottom:20}}>
         <div style={{fontSize:32,fontWeight:900,color:DS.text,letterSpacing:-1}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>
         <div style={{fontSize:12,color:DS.textMuted,marginTop:6}}>{mode==="login"?"Connectez-vous":mode==="register"?"Creez votre compte":"Reinitialiser le mot de passe"}</div>
       </div>
       <div style={{width:"100%",maxWidth:360}}>
-        {mode!=="forgot"&&(
+        {mode==="register"&&(
           <div style={{marginBottom:16}}>
             <div style={{fontSize:10,color:DS.textDim,fontWeight:800,letterSpacing:1.5,marginBottom:8,textAlign:"center"}}>TYPE DE COMPTE</div>
             <div style={{display:"flex",gap:8}}>
@@ -484,15 +659,22 @@ function AuthScreen(props){
         )}
         <div style={{position:"relative",marginBottom:10}}>
           <Mail size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/> 
-          <input type="email" value={email} onChange={function(ev){setEmail(ev.target.value);}} placeholder="Email ou telephone" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          <input type="email" value={email} onChange={function(ev){setEmail(ev.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Email ou telephone" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
         </div>
         {mode!=="forgot"&&(
-          <div style={{position:"relative",marginBottom:12}}>
+          <div style={{position:"relative",marginBottom:10}}>
             <Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/>
-            <input type={showP?"text":"password"} value={pass} onChange={function(ev){setPass(ev.target.value);}} placeholder="Mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+            <input type={showP?"text":"password"} value={pass} onChange={function(ev){setPass(ev.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
             <button onClick={function(){setShowP(!showP);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",display:"flex"}}><EyeOff size={14} color={DS.textMuted}/></button>
           </div>
         )}
+        {mode==="register"&&(
+          <div style={{position:"relative",marginBottom:12}}>
+            <Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/>
+            <input type={showP?"text":"password"} value={confirmPass} onChange={function(ev){setConfirmPass(ev.target.value);}} placeholder="Confirmer le mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+(confirmPass&&confirmPass!==pass?DS.error:DS.border),borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+        )}
+        {formErr&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error,textAlign:"center"}}>{formErr}</div>}
         {mode==="register"&&accType!=="client"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:11,color:DS.warning}}>Les comptes Hotel et Restaurant sont soumis a validation avant activation.</div>}
         {mode==="register"&&(
           <div onClick={function(){setCgu(!cgu);}} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",cursor:"pointer",marginBottom:10}}>
@@ -508,7 +690,7 @@ function AuthScreen(props){
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
           <div style={{flex:1,height:1,background:DS.border}}/><span style={{fontSize:11,color:DS.textDim}}>OU</span><div style={{flex:1,height:1,background:DS.border}}/>
         </div>
-        <button onClick={function(){var s=AuthService.loginWithProvider(accType,"google","google@gmail.com");onAuth(accType,s.accountStatus,s.email);}} style={{width:"100%",padding:"12px",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,color:DS.text,fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+        <button onClick={async function(){var s=await AuthService.loginWithProvider(accType,"google");if(s)onAuth(accType,s.accountStatus,s.email,s.userId);}} style={{width:"100%",padding:"12px",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,color:DS.text,fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
           <div style={{width:18,height:18,borderRadius:"50%",background:"#EA4335",display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{fontSize:10,color:"#fff",fontWeight:900}}>G</span></div>
           Continuer avec Google
         </button>
@@ -533,17 +715,94 @@ function AccountStatusScreen(props){
   return(<div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}><div style={{width:"100%",maxWidth:360,textAlign:"center"}}>{icon}<div style={{fontSize:20,fontWeight:800,color:DS.text,marginBottom:8}}>{title}</div><div style={{fontSize:14,color:DS.textMuted,lineHeight:1.6,marginBottom:24}}>{msg}</div><a href="mailto:support@hotelplatform.com" style={{display:"block",padding:"12px",background:DS.primarySoft,border:"1px solid "+DS.primary+"33",borderRadius:12,color:DS.primary,fontSize:13,fontWeight:700,textDecoration:"none",textAlign:"center",marginBottom:12}}>Contacter le support</a><button onClick={onLogout} style={{padding:"12px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer",width:"100%"}}>Se deconnecter</button></div></div>);
 }
 
+function ChangeEmailModal(props){
+  var onClose=props.onClose;var accent=props.accent||DS.primary;
+  var se=useState("");var email=se[0];var setEmail=se[1];
+  var sl=useState(false);var loading=sl[0];var setLoading=sl[1];
+  var serr=useState("");var err=serr[0];var setErr=serr[1];
+  var sok=useState(false);var ok=sok[0];var setOk=sok[1];
+  async function submit(){
+    if(!email.trim()||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())){setErr("Adresse email invalide.");return;}
+    setLoading(true);setErr("");
+    try{
+      var sb=(typeof window!=="undefined"&&window.__supabase)||null;
+      if(sb){var r=await sb.auth.updateUser({email:email.trim()});if(r.error){setErr(r.error.message||"Erreur lors de la mise a jour.");setLoading(false);return;}}
+      setOk(true);
+    }catch(e){setErr("Erreur de connexion.");}
+    setLoading(false);
+  }
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:20,animation:"hp-slide-up 0.28s ease"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Changer d email</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div>{ok?(<div style={{textAlign:"center",padding:"20px 0"}}><CheckCircle size={40} color={DS.success} style={{margin:"0 auto 12px",display:"block"}}/><div style={{fontSize:14,color:DS.text,fontWeight:700,marginBottom:6}}>Email mis a jour</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:16}}>Un lien de confirmation a ete envoye a {email}.</div><button onClick={onClose} style={{width:"100%",padding:"11px",background:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div>):(<div><div style={{marginBottom:10,position:"relative"}}><Mail size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type="email" value={email} onChange={function(ev){setEmail(ev.target.value);}} placeholder="Nouvel email" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/></div>{err&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error}}>{err}</div>}<div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button><button onClick={submit} disabled={loading||!email.trim()} style={{flex:2,padding:"11px",background:loading||!email.trim()?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:loading||!email.trim()?"not-allowed":"pointer",opacity:loading||!email.trim()?.6:1}}>{loading?"Mise a jour...":"Confirmer"}</button></div></div>)}</div></div>);
+}
+
+function ChangePwdModal(props){
+  var onClose=props.onClose;var accent=props.accent||DS.primary;
+  var sc=useState("");var curPwd=sc[0];var setCurPwd=sc[1];
+  var sp=useState("");var pwd=sp[0];var setPwd=sp[1];
+  var sp2=useState("");var pwd2=sp2[0];var setPwd2=sp2[1];
+  var sl=useState(false);var loading=sl[0];var setLoading=sl[1];
+  var serr=useState("");var err=serr[0];var setErr=serr[1];
+  var sok=useState(false);var ok=sok[0];var setOk=sok[1];
+  var sv=useState(false);var show=sv[0];var setShow=sv[1];
+  var svc=useState(false);var showCur=svc[0];var setShowCur=svc[1];
+  var canSubmit=curPwd.length>=1&&pwd.length>=6&&pwd===pwd2;
+  async function submit(){
+    if(!curPwd){setErr("Veuillez saisir votre mot de passe actuel.");return;}
+    if(pwd.length<6){setErr("Le nouveau mot de passe doit contenir au moins 6 caracteres.");return;}
+    if(pwd!==pwd2){setErr("Les nouveaux mots de passe ne correspondent pas.");return;}
+    setLoading(true);setErr("");
+    try{
+      var sb=(typeof window!=="undefined"&&window.__supabase)||null;
+      if(sb){
+        var sess=await sb.auth.getSession();
+        var email=sess&&sess.data&&sess.data.session?sess.data.session.user.email:"";
+        if(email){
+          var verif=await sb.auth.signInWithPassword({email:email,password:curPwd});
+          if(verif.error){setErr("Mot de passe actuel incorrect.");setLoading(false);return;}
+        }
+        var r=await sb.auth.updateUser({password:pwd});
+        if(r.error){setErr(r.error.message||"Erreur lors de la mise a jour.");setLoading(false);return;}
+      }
+      setOk(true);
+      if(onSuccess)onSuccess();
+    }catch(e){setErr("Erreur de connexion.");}
+    setLoading(false);
+  }
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:20,animation:"hp-slide-up 0.28s ease"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Changer de mot de passe</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div>{ok?(<div style={{textAlign:"center",padding:"20px 0"}}><CheckCircle size={40} color={DS.success} style={{margin:"0 auto 12px",display:"block"}}/><div style={{fontSize:14,color:DS.text,fontWeight:700,marginBottom:6}}>Mot de passe mis a jour</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:16}}>Votre mot de passe a ete modifie avec succes.</div><button onClick={onClose} style={{width:"100%",padding:"11px",background:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div>):(<div><div style={{marginBottom:6,fontSize:11,color:DS.textMuted,paddingLeft:2}}>Mot de passe actuel</div><div style={{marginBottom:14,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={showCur?"text":"password"} value={curPwd} onChange={function(ev){setCurPwd(ev.target.value);}} placeholder="Saisissez votre mot de passe actuel" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/><button onClick={function(){setShowCur(!showCur);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer"}}>{showCur?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button></div><div style={{height:1,background:DS.border,marginBottom:14}}/><div style={{marginBottom:6,fontSize:11,color:DS.textMuted,paddingLeft:2}}>Nouveau mot de passe</div><div style={{marginBottom:10,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={show?"text":"password"} value={pwd} onChange={function(ev){setPwd(ev.target.value);}} placeholder="Au moins 6 caracteres" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/><button onClick={function(){setShow(!show);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer"}}>{show?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button></div><div style={{marginBottom:14,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={show?"text":"password"} value={pwd2} onChange={function(ev){setPwd2(ev.target.value);}} placeholder="Confirmer le nouveau mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+(pwd2&&pwd2!==pwd?DS.error:DS.border),borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/></div>{err&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error}}>{err}</div>}<div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button><button onClick={submit} disabled={loading||!canSubmit} style={{flex:2,padding:"11px",background:loading||!canSubmit?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:loading||!canSubmit?"not-allowed":"pointer",opacity:loading||!canSubmit?.6:1}}>{loading?"Verification...":"Confirmer"}</button></div></div>)}</div></div>);
+}
+
 function NotifP(props){
-  var accent=props.accent;var onBack=props.onBack;var onNavigate=props.onNavigate;
-  var ns=useState([{id:1,Icon:Calendar,color:DS.primary,title:"Reservation confirmee",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},{id:2,Icon:MessageCircle,color:DS.success,title:"Nouveau message",body:"Le Jardin Gourmand vous a envoye un message.",time:"1h",read:false,tab:"chat"},{id:3,Icon:Star,color:DS.gold,title:"Premium",body:"Votre abonnement Premium expire dans 7 jours.",time:"1j",read:true,tab:"profile"}]);
-  var notifs=ns[0];var setNotifs=ns[1];
-  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>Notifications</div>} right={null}/>{notifs.map(function(n){var Icon=n.Icon;return(<div key={n.id} onClick={function(){setNotifs(function(prev){return prev.map(function(x){return x.id===n.id?Object.assign({},x,{read:true}):x;});});if(onNavigate)onNavigate(n.tab);}} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",background:n.read?"transparent":n.color+"08"}}><div style={{width:40,height:40,borderRadius:"50%",background:n.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={n.color}/></div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?600:800,color:DS.text,marginBottom:2}}>{n.title}</div><div style={{fontSize:12,color:DS.textMuted}}>{n.body}</div><div style={{fontSize:10,color:DS.textDim,marginTop:4}}>{n.time}</div></div>{!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:accent,marginTop:6,flexShrink:0}}/>}</div>);})}</div>);
+  var accent=props.accent;var onBack=props.onBack;var onNavigate=props.onNavigate;var isPro=props.isPro||false;
+  var extNotifs=props.notifs||null;var onMarkRead=props.onMarkRead||null;
+  var _defaultNotifs=isPro
+    ?[{id:"np1",icon:"Calendar",color:DS.primary,title:"Nouvelle reservation",body:"Moussa Konate a effectue une reservation.",time:"5 min",read:false,tab:"reservations"},{id:"np2",icon:"MessageCircle",color:DS.success,title:"Nouveau message client",body:"Aicha Mbaye vous a envoye un message.",time:"30 min",read:false,tab:"chat"},{id:"np3",icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un nouvel utilisateur suit votre etablissement.",time:"2h",read:true,tab:"feed"}]
+    :[{id:"nc1",icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},{id:"nc2",icon:"MessageCircle",color:DS.success,title:"Nouveau message",body:"Le Jardin Gourmand vous a envoye un message.",time:"1h",read:false,tab:"chat"},{id:"nc3",icon:"Star",color:DS.gold,title:"Premium",body:"Votre abonnement Premium expire dans 7 jours.",time:"1j",read:true,tab:"profile"}];
+  var ns=useState(_defaultNotifs);
+  var _localNotifs=ns[0];var setLocalNotifs=ns[1];
+  var notifs=extNotifs!==null?extNotifs:_localNotifs;
+  function handleMarkRead(id){
+    if(onMarkRead){onMarkRead(id);}
+    else{setLocalNotifs(function(prev){return prev.map(function(x){return x.id===id?Object.assign({},x,{read:true}):x;});});}
+  }
+  var title=isPro?"Notifications Pro":"Notifications";
+  var snSk=useState(true);var notifSkLoading=snSk[0];var setNotifSkLoading=snSk[1];
+  useEffect(function(){var t=setTimeout(function(){setNotifSkLoading(false);},300);return function(){clearTimeout(t);};},[]);
+  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>{title}</div>} right={null}/>{notifSkLoading?<NotifSkeleton/>:<>{notifs.length===0&&<Emp Icon={Bell} title="Aucune notification" sub="Vos notifications apparaitront ici"/>}{notifs.map(function(n,_ni){var Icon=ICON_MAP[n.icon]||ICON_MAP[n.Icon&&n.Icon.displayName]||Bell;return(<div key={n.id} onClick={function(){handleMarkRead(n.id);if(onNavigate)onNavigate(n.tab);}} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",background:n.read?"transparent":n.color+"08",animation:"hp-item-in 0.3s ease both",animationDelay:(_ni*50)+"ms"}}><div style={{width:40,height:40,borderRadius:"50%",background:n.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={n.color}/></div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?600:800,color:DS.text,marginBottom:2}}>{n.title}</div><div style={{fontSize:12,color:DS.textMuted}}>{n.body}</div><div style={{fontSize:10,color:DS.textDim,marginTop:4}}>{n.time}</div></div>{!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:accent,marginTop:6,flexShrink:0}}/>}</div>);})}</>}</div>);
 }
 
 function SettingsS(props){
   var onBack=props.onBack;var accType=props.accType;var onLogout=props.onLogout;var onPremium=props.onPremium;var onPrivacy=props.onPrivacy;
+  var isPremium=props.isPremium||false;var premiumData=props.premiumData||null;
+  var onChangeEmail=props.onChangeEmail||null;var onChangePwd=props.onChangePwd||null;
+  var notifPrefs=props.notifPrefs||{reservation:true,message:true,promo:true,follow:true};
+  var onUpdateNotifPrefs=props.onUpdateNotifPrefs||function(){};
   var color=rC(accType);
-  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>Parametres</div>} right={null}/><div style={{padding:"8px 0 40px"}}><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>ABONNEMENT</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20"}}><div><div style={{fontSize:12,fontWeight:700,color:DS.gold}}>Passer Premium</div><div style={{fontSize:10,color:DS.textMuted}}>{accType==="client"?"Sans pub - Confidentialite - Badge eligible":"Video - Badge - Avis clients"}</div></div><button onClick={onPremium} style={{padding:"6px 14px",background:DS.gold,border:"none",borderRadius:20,color:"#000",fontSize:11,fontWeight:800,cursor:"pointer"}}>Voir</button></div></div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>COMPTE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{[["Modifier mon profil",Edit2],["Changer d email",Mail],["Changer de mot de passe",Lock]].map(function(_i){var label=_i[0];var Ic=_i[1];return(<div key={label} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>{label}</span><ChevronRight size={14} color={DS.textDim}/></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>CONFIDENTIALITE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onPrivacy} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>Parametres de confidentialite</span><ChevronRight size={14} color={DS.textDim}/></div></div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onLogout} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:DS.error+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><LogOut size={15} color={DS.error}/></div><span style={{flex:1,fontSize:13,color:DS.error}}>Se deconnecter</span></div></div></div></div>);
+  var premiumExpStr=isPremium&&premiumData?new Date(premiumData.expiresAt).toLocaleDateString("fr-FR"):null;
+  function accountActions(label){
+    if(label==="Changer d email"&&onChangeEmail)return onChangeEmail();
+    if(label==="Changer de mot de passe"&&onChangePwd)return onChangePwd();
+  }
+  var NOTIF_TOGGLES=[["reservation","Reservations","Confirmations et mises a jour"],["message","Messages","Nouveaux messages recus"],["promo","Promotions","Offres et evenements"],["follow","Abonnes","Nouveaux abonnes"]];
+  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>Parametres</div>} right={null}/><div style={{padding:"8px 0 40px"}}><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>ABONNEMENT</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{isPremium?(<div style={{padding:"12px 16px"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontSize:12,fontWeight:800,color:DS.gold}}>Premium actif</div><div style={{fontSize:10,color:DS.textMuted}}>Expire le {premiumExpStr}</div></div><div style={{display:"flex",gap:6}}><VBadge sz={20}/><button onClick={onPremium} style={{padding:"5px 10px",background:DS.gold+"22",border:"1px solid "+DS.gold+"44",borderRadius:16,color:DS.gold,fontSize:10,fontWeight:800,cursor:"pointer"}}>Gerer</button></div></div></div>):(<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px"}}><div><div style={{fontSize:12,fontWeight:700,color:DS.gold}}>Passer Premium</div><div style={{fontSize:10,color:DS.textMuted}}>{accType==="client"?"Sans pub - Confidentialite - Badge eligible":"Video - Badge - Avis clients"}</div></div><button onClick={onPremium} style={{padding:"6px 14px",background:DS.gold,border:"none",borderRadius:20,color:"#000",fontSize:11,fontWeight:800,cursor:"pointer"}}>Voir</button></div>)}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>COMPTE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{[["Changer d email",Mail],["Changer de mot de passe",Lock]].map(function(_i){var label=_i[0];var Ic=_i[1];return(<div key={label} onClick={function(){accountActions(label);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>{label}</span><ChevronRight size={14} color={DS.textDim}/></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>NOTIFICATIONS</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{NOTIF_TOGGLES.map(function(_i,idx){var key=_i[0];var title=_i[1];var desc=_i[2];var val=notifPrefs[key]!==false;return(<div key={key} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:idx<NOTIF_TOGGLES.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{flex:1}}><div style={{fontSize:13,color:DS.text,fontWeight:600}}>{title}</div><div style={{fontSize:10,color:DS.textMuted}}>{desc}</div></div><div onClick={function(){var patch={};patch[key]=!val;onUpdateNotifPrefs(patch);}} style={{width:40,height:22,borderRadius:11,background:val?color:DS.border,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}><div style={{position:"absolute",top:2,left:val?20:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/></div></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>CONFIDENTIALITE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onPrivacy} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>Parametres de confidentialite</span><ChevronRight size={14} color={DS.textDim}/></div></div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onLogout} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:DS.error+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><LogOut size={15} color={DS.error}/></div><span style={{flex:1,fontSize:13,color:DS.error}}>Se deconnecter</span></div></div></div></div>);
 }
 
 function PremiumModal(props){
@@ -551,6 +810,10 @@ function PremiumModal(props){
   var s1=useState("std");var plan=s1[0];var setPlan=s1[1];
   var s2=useState(1);var step=s2[0];var setStep=s2[1];
   var s3=useState(1);var duration=s3[0];var setDuration=s3[1];
+  var sC=useState(false);var closing=sC[0];var setClosing=sC[1];
+  var cT=useRef(null);
+  function handleClose(){if(closing)return;setClosing(true);cT.current=setTimeout(function(){onClose();},260);}
+  useEffect(function(){return function(){if(cT.current)clearTimeout(cT.current);};},[]);
   var isClient=accType==="client";
   var PLANS=isClient
     ?[{id:"std",name:"Premium Essentiel",price:9.99,color:DS.client,features:["Sans publicite","Confidentialite avancee","Verrouillage de profil","Support prioritaire"]},
@@ -564,13 +827,17 @@ function PremiumModal(props){
   var rawTotal=sel.price*selDur.months;
   var finalTotal=rawTotal*(1-selDur.discount);
   var savings=rawTotal-finalTotal;
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"92vh",overflowY:"auto",animation:"hp-slide-up 0.32s ease"}}><div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>HotelPlatform Premium</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div><div style={{padding:"0 20px",display:"flex",gap:4,marginTop:14}}>{[1,2,3].map(function(s){return <div key={s} style={{flex:1,height:3,borderRadius:2,background:s<=step?DS.gold:DS.border}}/>;})}</div><div style={{padding:20}}>{step===1&&<div>{PLANS.map(function(p){var isS=plan===p.id;return(<button key={p.id} onClick={function(){setPlan(p.id);}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?p.color+"88":DS.border),background:isS?p.color+"14":DS.card,cursor:"pointer",textAlign:"left"}}><div><div style={{fontSize:13,fontWeight:800,color:isS?p.color:DS.text}}>{p.name}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{p.features.slice(0,2).join(" - ")}</div></div><div style={{fontSize:16,fontWeight:900,color:p.color}}>{p.price} EUR<span style={{fontSize:9,color:DS.textMuted,fontWeight:600}}>/mois</span></div></button>);})}  <button onClick={function(){setStep(2);}} style={{width:"100%",padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginTop:8}}>Continuer</button></div>}{step===2&&<div><div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:4}}>Choisissez votre duree</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>{sel.name} - plus la duree est longue, plus la reduction est importante</div>{DURATIONS.map(function(d){var isS=duration===d.months;var dTotal=sel.price*d.months*(1-d.discount);return(<button key={d.months} onClick={function(){setDuration(d.months);}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?DS.gold+"88":DS.border),background:isS?DS.gold+"14":DS.card,cursor:"pointer",textAlign:"left"}}><div><div style={{fontSize:13,fontWeight:800,color:isS?DS.gold:DS.text}}>{d.label}</div>{d.discount>0&&<div style={{fontSize:10,color:DS.success,marginTop:2,fontWeight:700}}>Economisez {Math.round(d.discount*100)}%</div>}</div><div style={{textAlign:"right"}}><div style={{fontSize:15,fontWeight:900,color:isS?DS.gold:DS.text}}>{dTotal.toFixed(2)} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>{(dTotal/d.months).toFixed(2)} EUR/mois</div></div></button>);})}<div style={{display:"flex",gap:8,marginTop:8}}><button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button><button onClick={function(){setStep(3);}} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer"}}>Continuer</button></div></div>}{step===3&&<div style={{textAlign:"center",paddingBottom:10}}><div style={{width:72,height:72,borderRadius:"50%",background:DS.goldSoft,border:"2px solid "+DS.gold,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><VBadge sz={40}/></div><div style={{fontSize:18,fontWeight:900,color:DS.gold,marginBottom:6}}>{sel.name}</div><div style={{fontSize:13,color:DS.textMuted,marginBottom:16}}>{selDur.label} - {finalTotal.toFixed(2)} EUR{savings>0&&<span style={{color:DS.success}}> (economie de {savings.toFixed(2)} EUR)</span>}</div><div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:20,textAlign:"left"}}>{sel.features.map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<sel.features.length-1?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}</div><div style={{display:"flex",gap:8}}><button onClick={function(){setStep(2);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button><button onClick={function(){if(onSubscribe)onSubscribe(plan,duration);}} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:13,fontWeight:900,cursor:"pointer"}}>Confirmer l abonnement</button></div></div>}</div></div></div>);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"92vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.32s ease"}}><div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>HotelPlatform Premium</div><button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div><div style={{padding:"0 20px",display:"flex",gap:4,marginTop:14}}>{[1,2,3].map(function(s){return <div key={s} style={{flex:1,height:3,borderRadius:2,background:s<=step?DS.gold:DS.border}}/>;})}</div><div style={{padding:20}}>{step===1&&<div>{PLANS.map(function(p){var isS=plan===p.id;return(<button key={p.id} onClick={function(){setPlan(p.id);}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?p.color+"88":DS.border),background:isS?p.color+"14":DS.card,cursor:"pointer",textAlign:"left"}}><div><div style={{fontSize:13,fontWeight:800,color:isS?p.color:DS.text}}>{p.name}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{p.features.slice(0,2).join(" - ")}</div></div><div style={{fontSize:16,fontWeight:900,color:p.color}}>{p.price} EUR<span style={{fontSize:9,color:DS.textMuted,fontWeight:600}}>/mois</span></div></button>);})}  <button onClick={function(){setStep(2);}} style={{width:"100%",padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginTop:8}}>Continuer</button></div>}{step===2&&<div><div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:4}}>Choisissez votre duree</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>{sel.name} - plus la duree est longue, plus la reduction est importante</div>{DURATIONS.map(function(d){var isS=duration===d.months;var dTotal=sel.price*d.months*(1-d.discount);return(<button key={d.months} onClick={function(){setDuration(d.months);}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?DS.gold+"88":DS.border),background:isS?DS.gold+"14":DS.card,cursor:"pointer",textAlign:"left"}}><div><div style={{fontSize:13,fontWeight:800,color:isS?DS.gold:DS.text}}>{d.label}</div>{d.discount>0&&<div style={{fontSize:10,color:DS.success,marginTop:2,fontWeight:700}}>Economisez {Math.round(d.discount*100)}%</div>}</div><div style={{textAlign:"right"}}><div style={{fontSize:15,fontWeight:900,color:isS?DS.gold:DS.text}}>{dTotal.toFixed(2)} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>{(dTotal/d.months).toFixed(2)} EUR/mois</div></div></button>);})}<div style={{display:"flex",gap:8,marginTop:8}}><button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button><button onClick={function(){setStep(3);}} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer"}}>Continuer</button></div></div>}{step===3&&<div style={{textAlign:"center",paddingBottom:10}}><div style={{width:72,height:72,borderRadius:"50%",background:DS.goldSoft,border:"2px solid "+DS.gold,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><VBadge sz={40}/></div><div style={{fontSize:18,fontWeight:900,color:DS.gold,marginBottom:6}}>{sel.name}</div><div style={{fontSize:13,color:DS.textMuted,marginBottom:16}}>{selDur.label} - {finalTotal.toFixed(2)} EUR{savings>0&&<span style={{color:DS.success}}> (economie de {savings.toFixed(2)} EUR)</span>}</div><div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:20,textAlign:"left"}}>{sel.features.map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<sel.features.length-1?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}</div><div style={{display:"flex",gap:8}}><button onClick={function(){setStep(2);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button><button onClick={function(){if(onSubscribe)onSubscribe(plan,duration);}} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:13,fontWeight:900,cursor:"pointer"}}>Confirmer l abonnement</button></div></div>}</div></div></div>);
 }
 
 function PrivacyModal(props){
   var onClose=props.onClose;var accType=props.accType;
   var color=rC(accType||"client");
   var isClientAcc=accType==="client";
+  var sC=useState(false);var closing=sC[0];var setClosing=sC[1];
+  var cT=useRef(null);
+  function handleClose(){if(closing)return;setClosing(true);cT.current=setTimeout(function(){onClose();},260);}
+  useEffect(function(){return function(){if(cT.current)clearTimeout(cT.current);};},[]);
   var settings=props.settings||{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};
   var onUpdate=props.onUpdate||function(){};
   var locked=settings.locked;var pseudo=settings.pseudo;var vis=settings.vis;var msgPermission=settings.msgPermission||"everyone";
@@ -578,12 +845,13 @@ function PrivacyModal(props){
   function setPseudo(v){onUpdate({pseudo:v});}
   function setVis(v){onUpdate({vis:v});}
   function setMsgPermission(v){onUpdate({msgPermission:v});}
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"88vh",overflowY:"auto",animation:"hp-slide-up 0.28s ease"}}><div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Confidentialite Premium</div><div style={{fontSize:11,color:DS.textMuted}}>Controlez qui voit votre profil</div></div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div><div style={{padding:20}}>{isClientAcc&&[["Verrouiller mon profil","Photo floutee, galerie masquee",locked,setLocked],["Mode pseudonyme","Afficher un pseudonyme",pseudo,setPseudo]].map(function(_i,i){var title=_i[0];var desc=_i[1];var val=_i[2];var setter=_i[3];return(<div key={i} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{title}</div><div style={{fontSize:11,color:DS.textMuted}}>{desc}</div></div><div onClick={function(){setter(!val);}} style={{width:44,height:24,borderRadius:12,background:val?color:DS.border,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}><div style={{position:"absolute",top:2,left:val?22:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/></div></div>);})} {isClientAcc&&<div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:8}}>Visibilite du profil</div>{[["public","Tout le monde"],["friends","Amis uniquement"],["private","Profil prive"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=vis===v;return(<button key={v} onClick={function(){setVis(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:5,borderRadius:10,border:"1px solid "+(isAct?color+"66":DS.border),background:isAct?color+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isAct?color:DS.border),background:isAct?color:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isAct?color:DS.textMuted,fontWeight:isAct?700:400}}>{l}</span></button>);})} </div>}{!isClientAcc&&<div style={{background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:DS.textMuted}}>Votre profil etablissement est toujours public et visible par tous les utilisateurs de la plateforme.</div>}<div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:2}}>Qui peut vous envoyer un message</div><div style={{fontSize:11,color:DS.textMuted,marginBottom:8}}>Controlez quels etablissements peuvent vous contacter</div>{[["everyone","Tout le monde"],["booked","Etablissements avec qui vous avez une reservation"],["none","Personne (messages bloques)"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=msgPermission===v;return(<button key={v} onClick={function(){setMsgPermission(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:5,borderRadius:10,border:"1px solid "+(isAct?color+"66":DS.border),background:isAct?color+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isAct?color:DS.border),background:isAct?color:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isAct?color:DS.textMuted,fontWeight:isAct?700:400}}>{l}</span></button>);})} </div><button onClick={onClose} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Enregistrer</button></div></div></div>);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.28s ease"}}><div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Confidentialite Premium</div><div style={{fontSize:11,color:DS.textMuted}}>Controlez qui voit votre profil</div></div><button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div><div style={{padding:20}}>{isClientAcc&&[["Verrouiller mon profil","Photo floutee, galerie masquee",locked,setLocked],["Mode pseudonyme","Afficher un pseudonyme",pseudo,setPseudo]].map(function(_i,i){var title=_i[0];var desc=_i[1];var val=_i[2];var setter=_i[3];return(<div key={i} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{title}</div><div style={{fontSize:11,color:DS.textMuted}}>{desc}</div></div><div onClick={function(){setter(!val);}} style={{width:44,height:24,borderRadius:12,background:val?color:DS.border,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}><div style={{position:"absolute",top:2,left:val?22:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/></div></div>);})} {isClientAcc&&<div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:8}}>Visibilite du profil</div>{[["public","Tout le monde"],["friends","Amis uniquement"],["private","Profil prive"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=vis===v;return(<button key={v} onClick={function(){setVis(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:5,borderRadius:10,border:"1px solid "+(isAct?color+"66":DS.border),background:isAct?color+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isAct?color:DS.border),background:isAct?color:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isAct?color:DS.textMuted,fontWeight:isAct?700:400}}>{l}</span></button>);})} </div>}{!isClientAcc&&<div style={{background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:DS.textMuted}}>Votre profil etablissement est toujours public et visible par tous les utilisateurs de la plateforme.</div>}<div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:2}}>Qui peut vous envoyer un message</div><div style={{fontSize:11,color:DS.textMuted,marginBottom:8}}>Controlez quels etablissements peuvent vous contacter</div>{[["everyone","Tout le monde"],["booked","Etablissements avec qui vous avez une reservation"],["none","Personne (messages bloques)"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=msgPermission===v;return(<button key={v} onClick={function(){setMsgPermission(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:5,borderRadius:10,border:"1px solid "+(isAct?color+"66":DS.border),background:isAct?color+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isAct?color:DS.border),background:isAct?color:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isAct?color:DS.textMuted,fontWeight:isAct?700:400}}>{l}</span></button>);})} </div><button onClick={handleClose} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div></div></div>);
 }
 
 function ChatUI(props){
-  var init=props.chats;var myColor=props.myColor;var nK=props.nK;var iK=props.iK;var vK=props.vK;var qR=props.qR;
-  var s1=useState(null);var active=s1[0];var setActive=s1[1];
+  var init=props.chats;var myColor=props.myColor;var nK=props.nK;var iK=props.iK;var vK=props.vK;var qR=props.qR;var isClientChat=props.isClientChat||false;
+  var initialConv=props.initialConv!==undefined&&props.initialConv!==null?props.initialConv:null;
+  var s1=useState(initialConv);var active=s1[0];var setActive=s1[1];
   var s2=useState("");var msg=s2[0];var setMsg=s2[1];
   var s3=useState(null);var replyTo=s3[0];var setReplyTo=s3[1];
   var smnu=useState(null);var menuMsg=smnu[0];var setMenuMsg=smnu[1];
@@ -592,13 +860,16 @@ function ChatUI(props){
   function mlpCancel(){if(mlpTimer.current){clearTimeout(mlpTimer.current);mlpTimer.current=null;}}
   var s4=useState(init.map(function(c){return Object.assign({},c,{msgs:(c.messages||[]).slice()});}));
   var thr=s4[0];var setThr=s4[1];
-  function send(){if(!msg.trim())return;var nm=MessageService.buildMessage(msg,replyTo);setThr(function(ts){return ts.map(function(c,i){return i===active?Object.assign({},c,{msgs:c.msgs.concat([nm])}):c;});});setMsg("");setReplyTo(null);}
+  var _autoReplies=["Je vous repondrai dans les plus brefs delais.","Bien recu, notre equipe traite votre demande.","Merci pour votre message !","Nous revenons vers vous tres rapidement.","Merci ! Avez-vous d autres questions ?"];
+  function send(){if(!msg.trim())return;var nm=MessageService.buildMessage(msg,replyTo);var curActive=active;setThr(function(ts){return ts.map(function(c,i){return i===curActive?Object.assign({},c,{msgs:c.msgs.concat([nm])}):c;});});setMsg("");setReplyTo(null);setTimeout(function(){var reply={id:Date.now()+1,f:"them",t:_autoReplies[Math.floor(Math.random()*_autoReplies.length)],time:MessageService.timeNow(),read:false};setThr(function(ts){return ts.map(function(c,i){return i===curActive?Object.assign({},c,{msgs:c.msgs.concat([reply])}):c;});});},1400+Math.random()*800);}
   function delMsg(id){setThr(function(ts){return ts.map(function(c,i){return i===active?Object.assign({},c,{msgs:c.msgs.map(function(m){return MessageService.markDeleted(m,id);})}):c;});});}
   function markRead(idx){setThr(function(ts){return ts.map(function(c,i){return i===idx?Object.assign({},c,{msgs:c.msgs.map(function(m){return MessageService.markRead(m);})}):c;});});}
   var conv=active!==null?thr[active]:null;
-  if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</div></div>{thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length;return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"..."}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);})}</div>);}
+  var sChatSk=useState(true);var chatSkLoading=sChatSk[0];var setChatSkLoading=sChatSk[1];
+  useEffect(function(){if(active!==null)return;var t=setTimeout(function(){setChatSkLoading(false);},280);return function(){clearTimeout(t);};},[active]);
+  if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</div></div>{chatSkLoading?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length;return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"..."}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
   var msgs=conv?conv.msgs:[];
-  return(<div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 120px)",background:DS.bg}}><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.success}}>En ligne</div></div></div><div style={{flex:1,overflowY:"auto",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprime]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoye"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Repondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} placeholder={replyTo?"Repondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()} style={{width:40,height:40,borderRadius:"50%",background:msg.trim()?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
+  return(<div style={{display:"flex",flexDirection:"column",height:"100%",background:DS.bg}}><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false} isClient={isClientChat}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.success}}>En ligne</div></div></div><div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",animation:"hp-msg-in 0.3s ease both",animationDelay:Math.min(i*20,200)+"ms"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprime]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoye"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Repondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Repondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()} style={{width:40,height:40,borderRadius:"50%",background:msg.trim()?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
 }
 
 function useLongPress(onTrigger){
@@ -693,73 +964,92 @@ function ShareSheet(props){
 }
 function CommentsSheet(props){
   var post=props.post;var cmtText=props.cmtText;var setCmtText=props.setCmtText;var addCmt=props.addCmt;var delCmt=props.delCmt;var onClose=props.onClose;var selfLetter=props.selfLetter||"V";
+  var selfName=props.selfName||"Vous";var onAddNotif=props.onAddNotif||null;
+  var sReply=useState(null);var replyTo=sReply[0];var setReplyTo=sReply[1];
   var menuC=useState(null);var menuCm=menuC[0];var setMenuCm=menuC[1];
-  var selfName=props.selfName||"Vous";
   var lpTimer=useRef(null);
   function lpStart(cm,e){if(cm.author!==selfName)return;lpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuCm(cm);},480);}
   function lpCancel(){if(lpTimer.current){clearTimeout(lpTimer.current);lpTimer.current=null;}}
+  // Closing animation
+  var sClosing=useState(false);var closing=sClosing[0];var setClosing=sClosing[1];
+  var closeTimer=useRef(null);
+  function handleClose(){if(closing)return;setClosing(true);closeTimer.current=setTimeout(function(){onClose();},260);}
+  useEffect(function(){return function(){if(closeTimer.current)clearTimeout(closeTimer.current);};}, []);
+  // Drag handle ONLY (no list drag = no unintended movement)
   var sd=useState(0);var dragY=sd[0];var setDragY=sd[1];
   var dragging=useState(false);var isDragging=dragging[0];var setIsDragging=dragging[1];
-  var st=useRef(null);var cur=useRef(0);var scrollerRef=useRef(null);var fromScroller=useRef(false);
-  function beginDrag(y,viaScroller){st.current=y;cur.current=0;fromScroller.current=!!viaScroller;setIsDragging(true);}
+  var st=useRef(null);var cur=useRef(0);
+  function beginDrag(y){st.current=y;cur.current=0;setIsDragging(true);}
   function moveDrag(y){if(st.current===null)return;var dy=y-st.current;cur.current=dy>0?dy:0;setDragY(cur.current);}
-  function endDrag(){if(cur.current>90){onClose();return;}st.current=null;cur.current=0;fromScroller.current=false;setDragY(0);setIsDragging(false);}
-  // Drag depuis la poignee / en-tete (toujours actif)
-  function onHeadTouchStart(e){beginDrag(e.touches[0].clientY,false);}
+  function endDrag(){if(cur.current>120){handleClose();return;}st.current=null;cur.current=0;setDragY(0);setIsDragging(false);}
+  function onHeadTouchStart(e){beginDrag(e.touches[0].clientY);}
   function onHeadTouchMove(e){if(st.current!==null){e.preventDefault();moveDrag(e.touches[0].clientY);}}
-  function onHeadTouchEnd(){endDrag();}
-  function onHeadMouseDown(e){beginDrag(e.clientY,false);}
-  // Drag depuis la liste : seulement si on est tout en haut et qu'on tire vers le bas
-  var listStartY=useRef(null);
-  function onListTouchStart(e){listStartY.current=e.touches[0].clientY;}
-  function onListTouchMove(e){
-    var sc=scrollerRef.current;if(!sc)return;
-    var y=e.touches[0].clientY;
-    if(st.current!==null){e.preventDefault();moveDrag(y);return;}
-    if(listStartY.current===null)return;
-    var dy=y-listStartY.current;
-    if(sc.scrollTop<=0&&dy>6){e.preventDefault();beginDrag(listStartY.current,true);moveDrag(y);}
-  }
-  function onListTouchEnd(){listStartY.current=null;if(st.current!==null)endDrag();}
+  function onHeadTouchEnd(){if(st.current!==null)endDrag();}
+  function onHeadMouseDown(e){beginDrag(e.clientY);}
   useEffect(function(){
     if(!isDragging)return;
     function mm(e){moveDrag(e.clientY);}
-    function mu(){endDrag();}
-    window.addEventListener("mousemove",mm);
-    window.addEventListener("mouseup",mu);
+    function mu(){if(st.current!==null)endDrag();}
+    window.addEventListener("mousemove",mm);window.addEventListener("mouseup",mu);
     return function(){window.removeEventListener("mousemove",mm);window.removeEventListener("mouseup",mu);};
   },[isDragging]);
-  return(<div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-    <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:480,height:"90vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:isDragging?"none":"hp-slide-up 0.3s ease",transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
-      <div onTouchStart={onHeadTouchStart} onTouchMove={onHeadTouchMove} onTouchEnd={onHeadTouchEnd} onMouseDown={onHeadMouseDown} style={{flexShrink:0,cursor:"grab",userSelect:"none",touchAction:"none"}}>
-        <div style={{padding:"10px 0 8px"}}>
-          <div style={{width:44,height:5,borderRadius:3,background:DS.textDim,margin:"0 auto"}}/>
-          <div style={{textAlign:"center",fontSize:10,color:DS.textDim,marginTop:5}}>Glisser vers le bas pour fermer</div>
-        </div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"4px 16px 12px",borderBottom:"1px solid "+DS.border+"40"}}>
-          <span style={{fontSize:16,fontWeight:800,color:DS.text}}>Commentaires{post.comments.length>0?" ("+post.comments.length+")":""}</span>
-        </div>
+  // Scroll management
+  var scrollerRef=useRef(null);
+  var prevCmtLen=useRef(post.comments.length);
+  var initCmtCount=useRef(post.comments.length);
+  // Reset scroll on first open
+  useEffect(function(){if(scrollerRef.current)scrollerRef.current.scrollTop=0;},[]);
+  // Scroll to bottom when new comment added
+  useEffect(function(){
+    if(post.comments.length>prevCmtLen.current&&scrollerRef.current){
+      scrollerRef.current.scrollTop=scrollerRef.current.scrollHeight;
+    }
+    prevCmtLen.current=post.comments.length;
+  },[post.comments.length]);
+  var backdropStyle={position:"fixed",top:52,left:0,right:0,bottom:0,background:closing?"rgba(0,0,0,0)":"rgba(0,0,0,.45)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center",transition:closing?"background .26s ease":"none",maxWidth:420,marginLeft:"auto",marginRight:"auto"};
+  var sheetAnim=closing?"hp-sheet-out 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-up 0.32s cubic-bezier(0.22,1,0.36,1)";
+  return(<div style={backdropStyle}>
+    <div style={{width:"100%",maxWidth:420,height:"50vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:sheetAnim,transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
+      {/* Poignee drag */}
+      <div onTouchStart={onHeadTouchStart} onTouchMove={onHeadTouchMove} onTouchEnd={onHeadTouchEnd} onMouseDown={onHeadMouseDown} style={{flexShrink:0,paddingTop:9,paddingBottom:4,cursor:"grab",userSelect:"none",touchAction:"none",textAlign:"center"}}>
+        <div style={{width:40,height:4,borderRadius:2,background:DS.textDim,display:"inline-block"}}/>
       </div>
-      <div ref={scrollerRef} onTouchStart={onListTouchStart} onTouchMove={onListTouchMove} onTouchEnd={onListTouchEnd} style={{flex:1,minHeight:0,overflowY:"auto",overflowX:"hidden",padding:"14px 16px",overscrollBehavior:"none"}}>
-        {post.comments.length===0&&<div style={{textAlign:"center",color:DS.textDim,fontSize:13,padding:"30px 0"}}>Aucun commentaire pour le moment. Soyez le premier !</div>}
-        {post.comments.map(function(cm,i){var mine=cm.author===selfName;return(
-          <div key={i} style={{display:"flex",gap:8,marginBottom:12}}>
-            <Av sz={30} letter={cm.author[0]}/>
+      {/* Header LinkedIn */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 16px 10px",borderBottom:"1px solid "+DS.border+"40",flexShrink:0}}>
+        <div style={{fontSize:15,fontWeight:800,color:DS.text}}>Commentaires{post.comments.length>0?" ("+post.comments.length+")":""}</div>
+        <button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border+"60",borderRadius:"50%",width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}><X size={13} color={DS.textMuted}/></button>
+      </div>
+      {/* Liste commentaires */}
+      <div ref={scrollerRef} style={{flex:1,minHeight:0,overflowY:"auto",overflowX:"hidden",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",overscrollBehavior:"contain"}}>
+        {post.comments.length===0&&<div style={{textAlign:"center",color:DS.textDim,fontSize:13,padding:"24px 0"}}>Aucun commentaire. Soyez le premier !</div>}
+        {post.comments.map(function(cm,i){var mine=cm.author===selfName;var isNew=i>=initCmtCount.current;return(
+          <div key={cm.id||i} style={{display:"flex",gap:10,marginBottom:14,animation:isNew?"hp-item-in 0.25s ease both":"none"}}>
+            <Av sz={32} letter={cm.author[0]}/>
             <div style={{flex:1}}>
-              <div onTouchStart={function(e){lpStart(cm,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(cm);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(mine)setMenuCm(cm);}} style={{background:DS.card,borderRadius:"0 12px 12px 12px",padding:"8px 12px",cursor:mine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>
-                <div style={{fontSize:12,fontWeight:700,color:DS.text,marginBottom:2}}>{cm.author}</div>
-                <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.45}}>{cm.text}</div>
+              {cm.replyTo&&<div style={{fontSize:11,color:DS.textMuted,marginBottom:3,paddingLeft:2,borderLeft:"2px solid "+DS.primary,paddingLeft:6,opacity:0.8}}>↩ {cm.replyTo}</div>}
+              <div onTouchStart={function(e){lpStart(cm,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(cm);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(mine)setMenuCm(cm);}} style={{background:DS.card,borderRadius:"0 14px 14px 14px",padding:"8px 12px",cursor:mine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>
+                <div style={{fontSize:12,fontWeight:700,color:DS.text,marginBottom:3}}>{cm.author}</div>
+                <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.5}}>{cm.text}</div>
               </div>
-              <div style={{fontSize:9,color:DS.textDim,marginTop:3,paddingLeft:6}}>{cm.time}{mine?" - maintenir pour supprimer":""}</div>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginTop:3,paddingLeft:4}}>
+                <span style={{fontSize:9,color:DS.textDim}}>{cm.time}{mine?" · maintenir pour supprimer":""}</span>
+                <button onClick={function(){setReplyTo(cm);}} style={{fontSize:10,fontWeight:700,color:DS.primary,background:"none",border:"none",cursor:"pointer",padding:0}}>Répondre</button>
+              </div>
             </div>
           </div>
         );})}
       </div>
-      <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 16px",borderTop:"1px solid "+DS.border+"40",flexShrink:0,background:DS.surface}}>
+      {/* Indicateur de réponse */}
+      {replyTo&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 14px",background:DS.primary+"12",borderTop:"1px solid "+DS.primary+"30",flexShrink:0}}>
+        <div style={{flex:1,fontSize:11,color:DS.primary,fontWeight:700}}>↩ En réponse à {replyTo.author}</div>
+        <button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer",padding:0}}><X size={13} color={DS.primary}/></button>
+      </div>}
+      {/* Input */}
+      <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",borderTop:"1px solid "+DS.border+"40",flexShrink:0,background:DS.surface}}>
         <Av sz={30} letter={selfLetter}/>
         <div style={{flex:1,position:"relative"}}>
-          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter")addCmt(post.id);}} placeholder="Ajouter un commentaire..." style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"11px 50px 11px 16px",fontSize:14,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
-          <button onClick={function(){addCmt(post.id);}} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={14} color="#fff"/></button>
+          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter"){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre à "+replyTo.author+"...":"Ajouter un commentaire..."} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          <button onClick={function(){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
         </div>
       </div>
     </div>
@@ -767,47 +1057,92 @@ function CommentsSheet(props){
   </div>);
 }
 
+function FeedText(props){
+  var text=props.text||"";
+  var sExp=useState(false);var exp=sExp[0];var setExp=sExp[1];
+  var LIMIT=180;
+  var isLong=text.length>LIMIT;
+  var shown=exp||!isLong?text:text.slice(0,LIMIT).trimEnd();
+  return(
+    <div style={{padding:"0 16px 12px",fontSize:15,color:DS.text,lineHeight:1.65}}>
+      {shown}{!exp&&isLong&&<span>… <span onClick={function(){setExp(true);}} style={{color:DS.textMuted,fontWeight:700,cursor:"pointer",fontSize:13}}>Voir plus</span></span>}
+    </div>
+  );
+}
 function ClientFeed(props){
-  var onProfile=props.onProfile;
-  var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:false,comments:[],showCmt:false});}));
+  var onProfile=props.onProfile;var onAddNotif=props.onAddNotif||null;
+  var selfEmail=props.selfEmail||"";
+  var selfName=selfEmail?selfEmail.split("@")[0]:"Vous";
+  var selfLetter=(selfName[0]||"V").toUpperCase();
+  var _init=useRef(null);
+  if(!_init.current){var _lk={};var _fv=[];try{_lk=JSON.parse(localStorage.getItem("hp_likes")||"{}");_fv=JSON.parse(localStorage.getItem("hp_favs")||"[]");}catch(e){}_init.current={likes:_lk,favs:_fv};}
+  var _initLikes=_init.current.likes;var _initFavs=_init.current.favs;
+  var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes+(_initLikes[p.id]?1:0),comments:[],showCmt:false});}));
   var posts=s1[0];var setPosts=s1[1];
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState({});var cmtText=s2[0];var setCmtText=s2[1];
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
-  var sf=useState([]);var favPosts=sf[0];var setFavPosts=sf[1];
+  var sf=useState(_initFavs);var favPosts=sf[0];var setFavPosts=sf[1];
   var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
   var followingPosts=props.followingIds||[];
-  function toggleFav(id){setFavPosts(function(f){return f.indexOf(id)>=0?f.filter(function(x){return x!==id;}):f.concat([id]);});setMenuOpen(null);toast(favPosts.indexOf(id)>=0?"Retire des favoris":"Ajoute aux favoris","success");}
+  function toggleFav(id){
+    var wasFav=favPosts.indexOf(id)>=0;
+    setFavPosts(function(f){
+      var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);
+      try{localStorage.setItem("hp_favs",JSON.stringify(next));}catch(e){}
+      return next;
+    });
+    setMenuOpen(null);
+    toast(wasFav?"Retire des favoris":"Ajoute aux favoris","success");
+  }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
-  function toggleLike(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});});}
+  function toggleLike(id){
+    var post=posts.find(function(p){return p.id===id;});
+    var wasLiked=post?post.liked:false;
+    setPosts(function(ps){
+      var next=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});
+      try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem("hp_likes",JSON.stringify(lk));}catch(e){}
+      return next;
+    });
+    if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:selfName+" a aimé la publication de "+post.author+".",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
+  }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
   function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partage avec succes","success");}
-  function addCmt(id){
+  function addCmt(id,replyTo){
     var text=(cmtText[id]||"").trim();if(!text)return;
-    var cm={id:Date.now(),author:"Vous",text:text,time:"maintenant"};
+    var cm={id:Date.now(),author:selfName,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    toast("Commentaire publie","success");
+    toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
-    toast("Commentaire supprime","success");
+    toast("Commentaire supprimé","neutral");
   }
+  var sLoad=useState(true);var loading=sLoad[0];var setLoading=sLoad[1];
+  useEffect(function(){var t=setTimeout(function(){setLoading(false);},350);return function(){clearTimeout(t);};},[]);
+  var sHeart=useState(null);var heartAnim=sHeart[0];var setHeartAnim=sHeart[1];
+  function triggerHeart(id){setHeartAnim(id);setTimeout(function(){setHeartAnim(null);},500);}
+  var _estabMap=useRef(null);
+  if(!_estabMap.current){var _em={};DataLayer.getHotels().concat(DataLayer.getRestaurants()).forEach(function(e){_em[e.id]=e;});_estabMap.current=_em;}
   return(
-    <div style={{background:DS.bg,paddingBottom:24}}>
+    <div style={{background:DS.bg,paddingBottom:24,WebkitOverflowScrolling:"touch"}}>
       <Toast/>
-      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){toast("Signalement envoye - Merci","success");}}/>}
-      {posts.map(function(post){
+      {loading&&<FeedSkeleton/>}
+      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
+      {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
+      {posts.length===0&&<Emp Icon={Home} title="Aucune publication" sub="Les publications des etablissements apparaitront ici"/>}
+      {posts.map(function(post,_pi){
         var color=rC(post.type);
         return(
-          <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28"}}>
-            <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 16px 14px"}}>
+          <div key={post.id} style={{background:DS.surface,marginBottom:8,borderTop:"1px solid "+DS.border+"22",borderBottom:"1px solid "+DS.border+"22",animation:"hp-item-in 0.38s cubic-bezier(0.22,1,0.36,1) both",animationDelay:(_pi*45)+"ms"}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px 10px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
                 <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{cursor:"pointer",flexShrink:0}}>
-                  <Av sz={52} letter={post.author[0]} verified={post.verified}/>
+                  <Av sz={52} letter={post.author[0]} img={_estabMap.current[post.id]?_estabMap.current[post.id].img:null} verified={post.verified}/>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{fontSize:15,fontWeight:800,color:DS.text,lineHeight:1.3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:"pointer",display:"inline-block",maxWidth:"100%"}}>{post.author}</div>
@@ -837,24 +1172,24 @@ function ClientFeed(props){
                 </div>
               </div>
             </div>
-            <div style={{padding:"0 16px 16px",fontSize:15,color:DS.text,lineHeight:1.7}}>{post.text}</div>
-            {post.img&&<img src={post.img} alt="" style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px 2px",fontSize:12,color:DS.textDim}}>
+            <FeedText text={post.text}/>
+            {post.img&&<div style={{position:"relative",overflow:"hidden",background:DS.card}}><img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.parentNode.style.display="none";}} style={{width:"100%",height:"min(500px,62vh)",objectFit:"cover",display:"block"}}/></div>}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 16px 2px",fontSize:12,color:DS.textDim}}>
               <span>{post.likes} reaction{post.likes!==1?"s":""}</span>
               <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
-            <div style={{display:"flex",borderTop:"1px solid "+DS.border+"30",marginTop:8}}>
-              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLike(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
+            <div style={{display:"flex",borderTop:"1px solid "+DS.border+"28",marginTop:6}}>
+              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLike(post.id);triggerHeart(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
                 var lb=_i[0];var Icon=_i[1];var col=_i[2];var fn=_i[3];
                 return(
-                  <button key={lb} onClick={fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"13px 0",background:"none",border:"none",cursor:"pointer",color:col,fontSize:13,fontWeight:lb==="Liker"&&post.liked?700:500}}>
-                    <Icon size={20} fill={lb==="Liker"&&post.liked?DS.error:"none"} color={col}/>{lb}
+                  <button key={lb} onClick={fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"11px 0",background:"none",border:"none",cursor:"pointer",color:col,fontSize:13,fontWeight:lb==="Liker"&&post.liked?700:500}}>
+                    <Icon size={19} fill={lb==="Liker"&&post.liked?DS.error:"none"} color={col} style={lb==="Liker"&&heartAnim===post.id?{animation:"hp-heart-pop .5s cubic-bezier(0.22,1,0.36,1)"}:{}}/>{lb}
                   </button>
                 );
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName="Vous" onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -867,18 +1202,37 @@ function ClientDisc(props){
   var onProfile=props.onProfile;var onBook=props.onBook;
   var s1=useState("hotels");var tab=s1[0];var setTab=s1[1];
   var s2=useState("");var search=s2[0];var setSearch=s2[1];
+  var sDSk=useState(true);var discSkLoading=sDSk[0];var setDiscSkLoading=sDSk[1];
+  useEffect(function(){var t=setTimeout(function(){setDiscSkLoading(false);},350);return function(){clearTimeout(t);};},[]);
   var items=tab==="hotels"?DataLayer.getHotels():DataLayer.getRestaurants();
   var filtered=items.filter(function(i){return i.name.toLowerCase().indexOf(search.toLowerCase())>=0||i.location.toLowerCase().indexOf(search.toLowerCase())>=0;});
   var color=tab==="hotels"?DS.hotel:DS.restaurant;
-  return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{padding:"0 14px",paddingBottom:16}}>{filtered.length===0?<Emp Icon={Search} title="Aucun resultat"/>:filtered.map(function(item){return(<div key={item.id} style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.verified&&<div style={{position:"absolute",top:8,left:8}}><VBadge sz={20}/></div>}{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){if(item.svcMode==="combined"){if(onProfile)onProfile(item.id,item.type);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>Reserver</button></div></div>);})}</div></div>);
+  return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{padding:"0 14px",paddingBottom:16}}>{discSkLoading?<DiscSkeleton/>:(filtered.length===0?<Emp Icon={Search} title="Aucun resultat"/>:filtered.map(function(item,_idx){return(<div key={item.id} className="hp-card" style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border,animation:"hp-item-in 0.32s ease both",animationDelay:(_idx*60)+"ms"}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{display:"flex",alignItems:"center",gap:5}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div>{item.verified&&<VBadge sz={18} showLabel={true}/>}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){if(item.svcMode==="combined"){if(onProfile)onProfile(item.id,item.type);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>{item.svcMode==="combined"?"Voir options":"Reserver"}</button></div></div>);}))}</div></div>);
 }
 
 function ClientProf(props){
-  var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;
+  var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var followingCount=props.followingCount||0;var profilePhoto=props.profilePhoto||null;var onPhotoChange=props.onPhotoChange||null;
+  var privacySettings=props.privacySettings||{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};
+  var selfEmail=props.selfEmail||"";
+  var _rawName=selfEmail?selfEmail.split("@")[0]:"Mon profil";
+  var displayName=privacySettings.pseudo?"Voyageur":_rawName;
+  var displayLetter=(displayName[0]||"M").toUpperCase();
+  var _visLabels={public:"Profil public","friends":"Amis uniquement","private":"Profil prive"};
+  var _visColors={public:DS.success,"friends":DS.warning,"private":DS.error};
+  var _allEstabs=DataLayer.getHotels().concat(DataLayer.getRestaurants());
+  var favEstabIds=props.favEstabIds||[];
+  var favEstabs=favEstabIds.map(function(id){return _allEstabs.find(function(x){return x.id===id;});}).filter(Boolean);
   var s1=useState("reservations");var tab=s1[0];var setTab=s1[1];
   var sq=useState(null);var activeQR=sq[0];var setActiveQR=sq[1];
+  var sPSk=useState(true);var profSkLoading=sPSk[0];var setProfSkLoading=sPSk[1];
+  useEffect(function(){var t=setTimeout(function(){setProfSkLoading(false);},350);return function(){clearTimeout(t);};},[]);
 
-  return(<div style={{paddingBottom:20}}><LoyaltyWidget points={620} level="silver"/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><Av sz={72} letter="M"/><div style={{fontSize:18,fontWeight:800,color:DS.text,marginTop:10}}>Moussa Konate</div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>Dakar, Senegal</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[["12","Suivis",null],["5","Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
+  var _locked=privacySettings.locked||false;
+  var _uploadRef=useRef(null);
+  var _sViewer=useState(null);var _viewer=_sViewer[0];var _setViewer=_sViewer[1];
+  function _handlePhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){if(onPhotoChange)onPhotoChange(ev.target.result);};r.readAsDataURL(f);}
+  if(profSkLoading)return <ProfSkeleton/>;
+  return(<div style={{paddingBottom:20}}><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/><LoyaltyWidget points={620} level="silver"/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><div style={{filter:_locked?"blur(3px)":"none",transition:"filter .3s",display:"inline-flex",justifyContent:"center"}}><DualAv sz={72} letter={displayLetter} innerImg={profilePhoto} onClickInner={function(){if(profilePhoto){_setViewer(profilePhoto);}else if(_uploadRef.current){_uploadRef.current.click();}}} uploadRef={_uploadRef} verified={isPremium} isClient={true}/></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:10,filter:_locked&&!privacySettings.pseudo?"blur(2px)":"none"}}><span style={{fontSize:18,fontWeight:800,color:DS.text}}>{displayName}</span>{isPremium&&<CBadge sz={20}/>}</div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{(privacySettings.pseudo||_locked)?"":selfEmail||""}</div><div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,padding:"3px 8px",borderRadius:20,border:"1px solid "+(_visColors[privacySettings.vis]||DS.success)+"44",background:(_visColors[privacySettings.vis]||DS.success)+"12"}}><Eye size={10} color={_visColors[privacySettings.vis]||DS.success}/><span style={{fontSize:9,fontWeight:700,color:_visColors[privacySettings.vis]||DS.success}}>{_visLabels[privacySettings.vis]||"Profil public"}</span>{_locked&&<><Lock size={8} color={DS.warning}/><span style={{fontSize:9,fontWeight:700,color:DS.warning}}>Verrouille</span></>}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
           (resaHistory&&resaHistory.length>0)?resaHistory.map(function(r,i){
             var showQR=activeQR===i;
             var st=r.status||"pending";
@@ -936,10 +1290,10 @@ function ClientProf(props){
                         </div>
                       );})}
                     </div>
-                    {st==="pending"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:8,padding:"6px 10px",marginBottom:10,fontSize:10,color:DS.warning,fontWeight:700}}>Code en attente d activation - sera valide des acceptation</div>}
-                    <div style={{display:"inline-flex",padding:12,background:"#fff",borderRadius:12,marginBottom:12,opacity:st==="consumed"?0.5:(st==="pending"?0.55:1)}}>
+                    {st==="pending"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:8,padding:"6px 10px",marginBottom:10,fontSize:10,color:DS.warning,fontWeight:700}}>En attente de confirmation - presentez ce code a l etablissement</div>}
+                    <div style={{display:"inline-flex",padding:12,background:"#fff",borderRadius:12,marginBottom:12,opacity:st==="consumed"?0.4:1}}>
                       <div style={{width:110,height:110,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                        {[1,1,1,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,0,1,1,1,1,1,0,1,0,1,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,1,1,0,1,0,1,1,1].map(function(px,pi){return <div key={pi} style={{background:px?"#000":"#fff"}}/>;  })}
+                        {genQRPixels(r.id||"HP-000000").map(function(px,pi){return <div key={pi} style={{background:px?"#000":"#fff"}}/>;  })}
                       </div>
                     </div>
                     <div style={{fontSize:10,color:DS.textDim,fontFamily:"monospace",letterSpacing:1,marginBottom:4}}>{r.id||"HP-000000"}</div>
@@ -956,7 +1310,7 @@ function ClientProf(props){
           })
           : <Emp Icon={Calendar} title="Aucune reservation" sub="Vos reservations apparaitront ici apres votre premiere reservation"/>
         )}
-        {tab==="favoris"&&<Emp Icon={Heart} title="Aucun favori"/>}</div></div>);
+        {tab==="favoris"&&(favEstabs.length>0?favEstabs.map(function(est){return(<div key={est.id} style={{background:DS.card,borderRadius:14,marginBottom:10,border:"1px solid "+DS.border,overflow:"hidden"}}><div style={{height:80,position:"relative"}}><img src={est.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{est.verified&&<div style={{position:"absolute",top:6,left:8}}><VBadge sz={16}/></div>}</div><div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:800,color:DS.text}}>{est.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{est.location}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><Stars r={est.rating} sz={10}/><span style={{fontSize:10,color:DS.textMuted}}>({est.reviewCount})</span></div></div><div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{est.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div></div>);}):<Emp Icon={Heart} title="Aucun favori" sub="Appuyez sur le coeur d un etablissement pour l ajouter"/>)}</div></div>);
 }
 
 function ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro){
@@ -984,6 +1338,9 @@ function EstabM(props){
   function onClose(){if(closingE)return;setClosingE(true);setTimeout(function(){if(rawOnClose)rawOnClose();},260);}
   var s1=useState("about");var tab=s1[0];var setTab=s1[1];
   var s2=useState(0);var rating=s2[0];var setRating=s2[1];
+  var s2t=useState("");var reviewText=s2t[0];var setReviewText=s2t[1];
+  var _rvKey="hp_reviews_"+(e&&e.id||"x");
+  var s2r=useState(function(){try{var v=localStorage.getItem(_rvKey);return v?JSON.parse(v):[];}catch(ex){return[];}});var localReviews=s2r[0];var setLocalReviews=s2r[1];
   var s9=useState([]);var selectedDishes=s9[0];var setSelectedDishes=s9[1];
   var allItems=(e&&e.menu||[]).reduce(function(acc,cat){return acc.concat(cat.items.map(function(it){return Object.assign({},it,{cat:cat.cat});}));},[]); 
   var selectedDishesTotal=allItems.filter(function(it){return selectedDishes.indexOf(it.cat+"-"+it.name)>=0;}).reduce(function(sum,it){return sum+(it.price||0);},0);
@@ -998,13 +1355,17 @@ function EstabM(props){
   var isFollowing=followingIds.indexOf(e.id)>=0;
   var followersCount=(e.followers||0)+(isFollowing?1:0);
   function toggleFollow(){if(props.onToggleFollow)props.onToggleFollow(e.id);}
+  var favEstabIds=props.favEstabIds||[];
+  var isFavEstab=favEstabIds.indexOf(e.id)>=0;
+  function toggleFavEstab(){if(props.onToggleFavEstab)props.onToggleFavEstab(e.id);}
   var color=rC(e.type);var isHotel=e.type==="hotel";
   var isCombinedEstab=isHotel&&e.svcMode==="combined";
   var comboMealsTotal=(e.meals||[]).filter(function(m){return comboMeals.indexOf(m.id)>=0;}).reduce(function(s,m){return s+m.price;},0);
   var comboTotal=(comboRoom?comboRoom.price:0)+comboMealsTotal;
-  return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:900,maxWidth:420,margin:"0 auto",overflowY:"auto",animation:(closingE?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}><Toast/><div style={{position:"relative",height:220,flexShrink:0}}><img src={e.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/><div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.2),rgba(0,0,0,.6))"}}/><div style={{position:"absolute",top:12,left:12}}><BackBtn onClick={onClose} light={true}/></div>{e.verified&&<div style={{position:"absolute",bottom:12,left:12,display:"flex",alignItems:"center",gap:5}}><VBadge sz={22}/><span style={{fontSize:11,color:"#fff",fontWeight:700}}>Verifie</span></div>}</div><div style={{padding:"16px 16px 8px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{fontSize:20,fontWeight:900,color:DS.text}}>{e.name}</div><div onClick={function(){window.open("https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location));}} style={{fontSize:12,color:DS.primary,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><MapPin size={11}/>{e.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:18,fontWeight:900,color:DS.gold}}>A partir de {e.priceFrom} EUR</div></div></div><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><Stars r={e.rating} sz={15}/><span style={{fontSize:13,fontWeight:800,color:DS.text}}>{e.rating}</span><span style={{fontSize:13,color:DS.textDim}}>-</span><span style={{fontSize:13,fontWeight:700,color:DS.text}}>{fmtK(followersCount)}</span><span style={{fontSize:12,color:DS.textMuted}}>abonnes</span></div><div style={{display:"flex",gap:8,marginBottom:16}}>{viewerIsPro
+  var _sEV=useState(null);var _eViewer=_sEV[0];var _setEViewer=_sEV[1];
+  return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:900,maxWidth:420,margin:"0 auto",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:(closingE?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}><ImgViewer src={_eViewer} onClose={function(){_setEViewer(null);}}/><Toast/><div style={{position:"relative",height:220,flexShrink:0}}><img src={e.img} alt="" onClick={function(){if(e.img)_setEViewer(e.img);}} style={{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}/><div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.2),rgba(0,0,0,.6))",pointerEvents:"none"}}/><div style={{position:"absolute",top:12,left:12}}><BackBtn onClick={onClose} light={true}/></div>{e.verified&&<div style={{position:"absolute",bottom:12,right:12}}><VBadge sz={22} showLabel={true}/></div>}<div style={{position:"absolute",bottom:-40,left:16,cursor:"pointer"}} onClick={function(){if(e.img)_setEViewer(e.img);}}><Av sz={68} letter={(e.name[0]||"H").toUpperCase()} img={e.img} verified={e.verified||false}/></div></div><div style={{padding:"52px 16px 8px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={{fontSize:20,fontWeight:900,color:DS.text}}>{e.name}</div>{e.verified&&<VBadge sz={22} showLabel={true}/>}</div><a href={"https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location)} target="_blank" rel="noopener noreferrer" style={{fontSize:12,color:DS.primary,cursor:"pointer",display:"flex",alignItems:"center",gap:4,textDecoration:"none"}}><MapPin size={11}/>{e.location}</a></div><div style={{textAlign:"right"}}><div style={{fontSize:18,fontWeight:900,color:DS.gold}}>A partir de {e.priceFrom} EUR</div></div></div><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><Stars r={e.rating} sz={15}/><span style={{fontSize:13,fontWeight:800,color:DS.text}}>{e.rating}</span><span style={{fontSize:13,color:DS.textDim}}>-</span><span style={{fontSize:13,fontWeight:700,color:DS.text}}>{fmtK(followersCount)}</span><span style={{fontSize:12,color:DS.textMuted}}>abonnes</span></div><div style={{display:"flex",gap:8,marginBottom:16}}>{viewerIsPro
                 ? <div style={{flex:2,padding:"9px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textDim,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:5,minHeight:36}}><Lock size={12}/>Reservation indisponible</div>
-                : <button onClick={function(){if(isCombinedEstab){setTab(resaType==="restaurant"?"menu":resaType==="combined"?"combo":"rooms");}else if(onBook){onBook(e);}}} style={{flex:2,padding:"9px 14px",background:color,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,minHeight:36}}><Calendar size={13}/>Reserver</button>}<button onClick={function(){if(onChat)onChat(e);if(onClose)onClose();}} style={{flex:viewerIsPro?2:1,padding:"9px 8px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textMuted,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}><MessageCircle size={13}/>Chat</button><button onClick={function(){window.open("https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location));}} style={{width:36,height:36,background:DS.card,border:"1px solid "+DS.border,borderRadius:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Voir sur la carte"><MapPin size={15} color={DS.primary}/></button><button onClick={toggleFollow} style={{flex:1,padding:"9px 8px",background:isFollowing?color+"18":DS.card,border:"1px solid "+(isFollowing?color:DS.border),borderRadius:20,color:isFollowing?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}>{isFollowing?<UserCheck size={14} color={color}/>:<UserPlus size={14} color={DS.textMuted}/>}{isFollowing?"Suivi":"Suivre"}</button><button style={{width:36,height:36,background:DS.card,border:"1px solid "+DS.border,borderRadius:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Heart size={15} color={DS.error}/></button></div>{isCombinedEstab&&!viewerIsPro&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:6}}>TYPE DE RESERVATION</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{[["hotel","Hotel uniquement"],["restaurant","Restaurant uniquement"],["combined","Reservation combinee (Hotel + Restaurant)"]].map(function(_i){var v=_i[0];var l=_i[1];var isSel=resaType===v;return(<button key={v} onClick={function(){setResaType(v);setTab(v==="restaurant"?"menu":v==="combined"?"combo":"rooms");}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:"pointer",textAlign:"left"}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isSel?color:DS.border),background:isSel?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel&&<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>}</div><span style={{fontSize:12,color:isSel?color:DS.text,fontWeight:isSel?700:400}}>{l}</span></button>);})}</div></div>}<div style={{display:"flex",gap:4,marginBottom:16}}>{ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro).map(function(_i){var t2=_i[0];var l=_i[1];var isAct=tab===t2;return <button key={t2} onClick={function(){setTab(t2);}} style={{flex:1,padding:"8px 4px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})} </div>{tab==="about"&&<div><div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6}}>{e.description}</div></div>}{tab==="amenities"&&<div>{(e.services||[]).filter(function(s){return typeof s==="string"||s.active!==false;}).map(function(s,i){var nm=typeof s==="string"?s:s.name;var Ic=getIcon(nm);var actSvcs=(e.services||[]).filter(function(x){return typeof x==="string"||x.active!==false;});return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:i<actSvcs.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{width:28,height:28,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><span style={{fontSize:12,color:DS.text}}>{nm}</span></div>);})}</div>}{tab==="rooms"&&isHotel&&(e.rooms||[]).map(function(r){return(<div key={r.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:10,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{r.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{r.capacity} personnes</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{r.price} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>par nuit</div></div></div>{viewerIsPro
+                : <button onClick={function(){if(isCombinedEstab){setTab(resaType==="restaurant"?"menu":resaType==="combined"?"combo":"rooms");}else if(onBook){onBook(e);}}} style={{flex:2,padding:"9px 14px",background:color,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,minHeight:36}}><Calendar size={13}/>Reserver</button>}<button onClick={function(){if(onChat)onChat(e);if(onClose)onClose();}} style={{flex:viewerIsPro?2:1,padding:"9px 8px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textMuted,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}><MessageCircle size={13}/>Chat</button><a href={"https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location)} target="_blank" rel="noopener noreferrer" style={{width:36,height:36,background:DS.card,border:"1px solid "+DS.border,borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",flexShrink:0}} title="Voir sur la carte"><MapPin size={15} color={DS.primary}/></a><button onClick={toggleFollow} style={{flex:1,padding:"9px 8px",background:isFollowing?color+"18":DS.card,border:"1px solid "+(isFollowing?color:DS.border),borderRadius:20,color:isFollowing?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}>{isFollowing?<UserCheck size={14} color={color}/>:<UserPlus size={14} color={DS.textMuted}/>}{isFollowing?"Suivi":"Suivre"}</button><button onClick={toggleFavEstab} style={{width:36,height:36,background:isFavEstab?DS.error+"18":DS.card,border:"1px solid "+(isFavEstab?DS.error+"55":DS.border),borderRadius:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"background .2s,border .2s"}}><Heart size={15} color={DS.error} fill={isFavEstab?DS.error:"none"}/></button></div>{isCombinedEstab&&!viewerIsPro&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:6}}>TYPE DE RESERVATION</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{[["hotel","Hotel uniquement"],["restaurant","Restaurant uniquement"],["combined","Reservation combinee (Hotel + Restaurant)"]].map(function(_i){var v=_i[0];var l=_i[1];var isSel=resaType===v;return(<button key={v} onClick={function(){setResaType(v);setTab(v==="restaurant"?"menu":v==="combined"?"combo":"rooms");}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:"pointer",textAlign:"left"}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isSel?color:DS.border),background:isSel?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel&&<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>}</div><span style={{fontSize:12,color:isSel?color:DS.text,fontWeight:isSel?700:400}}>{l}</span></button>);})}</div></div>}<div style={{display:"flex",gap:4,marginBottom:16}}>{ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro).map(function(_i){var t2=_i[0];var l=_i[1];var isAct=tab===t2;return <button key={t2} onClick={function(){setTab(t2);}} style={{flex:1,padding:"8px 4px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})} </div>{tab==="about"&&<div><div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6}}>{e.description}</div></div>}{tab==="amenities"&&<div>{(e.services||[]).filter(function(s){return typeof s==="string"||s.active!==false;}).map(function(s,i){var nm=typeof s==="string"?s:s.name;var Ic=getIcon(nm);var actSvcs=(e.services||[]).filter(function(x){return typeof x==="string"||x.active!==false;});return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:i<actSvcs.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{width:28,height:28,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><span style={{fontSize:12,color:DS.text}}>{nm}</span></div>);})}</div>}{tab==="rooms"&&isHotel&&(e.rooms||[]).map(function(r){return(<div key={r.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:10,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{r.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{r.capacity} personnes</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{r.price} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>par nuit</div></div></div>{viewerIsPro
                     ? <div style={{width:"100%",padding:"8px",background:"transparent",border:"1px solid "+DS.border,borderRadius:8,color:DS.textDim,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><Lock size={11}/>Reservation indisponible</div>
                     : <button onClick={function(){if(r.available&&onBook)onBook(Object.assign({},e,{selectedRoom:r}));}} style={{width:"100%",padding:"8px",background:r.available?color:"transparent",border:"1px solid "+(r.available?color:DS.textDim),borderRadius:8,color:r.available?"#fff":DS.textDim,fontSize:12,fontWeight:700,cursor:r.available?"pointer":"not-allowed"}}>{r.available?"Reserver":"Non disponible"}</button>}</div>);})}{tab==="combo"&&isCombinedEstab&&(
             <div>
@@ -1040,7 +1401,7 @@ function EstabM(props){
                     <div style={{fontSize:12,color:DS.textMuted}}>{comboRoom?"1 chambre":"Aucune chambre"} + {comboMeals.length} repas{comboTable?" + table":""}</div>
                     <div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{comboTotal.toFixed(0)} EUR / nuit</div>
                   </div>
-                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboTable:comboTable,comboTotal:comboTotal,isCombo:true}));else toast("Choisissez une chambre","error");}} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboTable:comboTable,comboTotal:comboTotal,isCombo:true}));else toast("Selectionnez d abord une chambre","error");}} style={{width:"100%",padding:"11px",background:comboRoom?color:DS.textDim,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:comboRoom?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:comboRoom?1:0.6,transition:"background .2s,opacity .2s"}}>
                     <Calendar size={14}/>Reserver le sejour combine
                   </button>
                 </div>
@@ -1084,12 +1445,13 @@ function EstabM(props){
                 </div>
               )}
             </div>
-          )}{tab==="reviews"&&<div>{e.isPremium
-              ? <div><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><div style={{marginTop:8,display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){toast("Avis publie","success");setRating(0);}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>
-              : <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}><Lock size={16} color={DS.textDim}/><span style={{fontSize:11,color:DS.textMuted}}>Cet etablissement n a pas d abonnement Premium actif et ne peut pas encore recevoir d avis</span></div>
-            }<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier"/></div>}</div></div>);
+          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}toast("Avis publie","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier a partager votre experience"/>}</div>}</div></div>);
 }
 
+function genQRPixels(id){
+  var s=0;for(var ci=0;ci<id.length;ci++){s=((s*31+id.charCodeAt(ci))&0x7FFFFFFF)>>>0;}
+  return Array.from({length:100},function(_,j){s=((s*1664525+1013904223)&0x7FFFFFFF)>>>0;return (s>>>15)&1;});
+}
 function BookM(props){
   var e=props.e;var onClose=props.onClose;
   if(!e)return null;
@@ -1103,13 +1465,17 @@ function BookM(props){
   function computeDateOut(din,nc){if(!din)return"";var d=new Date(din);d.setDate(d.getDate()+nc);return d.toISOString().slice(0,10);}
   var s5=useState("sans");var payMode=s5[0];var setPayMode=s5[1];
   var s6=useState("mobile");var payMethod=s6[0];var setPayMethod=s6[1];
-  var s7=useState(false);var confirmed=s7[0];var setConfirmed=s7[1];
+  var spay=useState(false);var paying=spay[0];var setPaying=spay[1];
+  var sC=useState(false);var closing=sC[0];var setClosing=sC[1];
+  var cT=useRef(null);
+  function handleClose(){if(closing)return;setClosing(true);cT.current=setTimeout(function(){onClose();},260);}
+  useEffect(function(){return function(){if(cT.current)clearTimeout(cT.current);};},[]);
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
-  var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
-  var sf=useState([]);var favPosts=sf[0];var setFavPosts=sf[1];
-  var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
-  function toggleFav(id){setFavPosts(function(f){return f.indexOf(id)>=0?f.filter(function(x){return x!==id;}):f.concat([id]);});setMenuOpen(null);toast(favPosts.indexOf(id)>=0?"Retire des favoris":"Ajoute aux favoris","success");}
-  function openReport(post){setMenuOpen(null);setReportTarget(post);}
+  var _ridRef=useRef(null);if(!_ridRef.current){_ridRef.current="HP-"+Math.floor(100000+Math.random()*900000);}
+  var resaId=_ridRef.current;
+  var _today=new Date().toISOString().slice(0,10);
+  var selfEmail=props.selfEmail||"";
+  var clientName=selfEmail.split("@")[0]||"Client";
   var isCombo=e.isCombo===true;
   var hasDishes=e.selectedDishes&&e.selectedDishes.length>0;
   var isHotelBooking=e.type==="hotel";
@@ -1118,25 +1484,25 @@ function BookM(props){
   var dateOut=isHotelBooking?(dateIn?computeDateOut(dateIn,nightsCount):""):dateIn;
   var basePrice=isCombo?e.comboTotal:(hasDishes?e.dishTotal:(e.selectedRoom?e.selectedRoom.price:e.priceFrom));
   var totalPrice=isCombo?basePrice*nights:(hasDishes?basePrice*tableCount:(isHotelBooking?basePrice*nights*roomCount:basePrice*tableCount));
-  var resaId="HP-"+Math.floor(100000+Math.random()*900000);
   var serviceLabel=isCombo?("Sejour combine - "+e.selectedRoom.name):(hasDishes?(e.selectedDishes.length+" plat"+(e.selectedDishes.length>1?"s":"")+" selectionne"+(e.selectedDishes.length>1?"s":"")):(e.selectedRoom?e.selectedRoom.name:(e.type==="hotel"?"Chambre Standard":"Reservation")));
   var guestsLabel=isRestaurantBooking?"NOMBRE DE CONVIVES":"NOMBRE DE VOYAGEURS";
   var dateLabel=isRestaurantBooking?"DATE DE RESERVATION":"DATE D ARRIVEE";
+  var qrPixels=genQRPixels(resaId);
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1100,display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"hp-fade 0.2s ease"}}>
-      <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"94vh",overflowY:"auto",animation:"hp-slide-up 0.3s ease"}}>
+      <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"94vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.3s ease"}}>
         <Toast/>
         <div style={{padding:"14px 20px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+DS.border}}>
           <div>
             <div style={{fontSize:15,fontWeight:800,color:DS.text}}>Reserver</div>
             <div style={{fontSize:11,color:DS.textMuted}}>{e.name}</div>
           </div>
-          <button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button>
+          <button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button>
         </div>
         <div style={{padding:"0 20px",display:"flex",gap:4,marginTop:14,marginBottom:4}}>
           {[1,2,3,4].map(function(s){return <div key={s} style={{flex:1,height:3,borderRadius:2,background:s<=step?color:DS.border}}/>;  })}
         </div>
-        <div style={{padding:"14px 20px 28px"}}>
+        <div key={step} style={{padding:"14px 20px 28px",animation:"hp-fade-up 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
 
           {/* ETAPE 1 : Dates + voyageurs/convives */}
           {step===1&&(
@@ -1146,7 +1512,7 @@ function BookM(props){
                 <div style={{display:"flex",gap:10,marginBottom:14}}>
                   <div style={{flex:1}}>
                     <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>{dateLabel}</div>
-                    <input type="date" value={dateIn} onChange={function(ev){setDateIn(ev.target.value);}} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 12px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+                    <input type="date" min={_today} value={dateIn} onChange={function(ev){setDateIn(ev.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 12px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
                   </div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>NOMBRE DE NUITS</div>
@@ -1160,7 +1526,7 @@ function BookM(props){
               ):(
                 <div style={{marginBottom:14}}>
                   <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>{dateLabel}</div>
-                  <input type="date" value={dateIn} onChange={function(ev){setDateIn(ev.target.value);}} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 12px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+                  <input type="date" min={_today} value={dateIn} onChange={function(ev){setDateIn(ev.target.value);}} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 12px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
                   <div style={{fontSize:10,color:DS.textDim,marginTop:5}}>Reservation pour une date unique, sans nuitee</div>
                 </div>
               )}
@@ -1263,12 +1629,20 @@ function BookM(props){
               <div style={{display:"flex",gap:8,marginTop:8}}>
                 <button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
                 <button onClick={function(){
-                  var initStatus=payMode==="avec"?"confirmed":"pending";
-                  var resa={id:resaId,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
-                  setStep(3);toast(payMode==="avec"?"Reservation confirmee !":"Demande envoyee a l etablissement !","success");
-                  if(props.onBooked)props.onBooked(BookingService.createBooking(resa));
-                }} style={{flex:2,padding:"11px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:900,cursor:"pointer"}}>
-                  {payMode==="avec"?"Payer "+totalPrice.toFixed(0)+" EUR":"Confirmer la reservation"}
+                  if(paying)return;
+                  setPaying(true);
+                  var delay=payMode==="avec"?1100:500;
+                  setTimeout(function(){
+                    var initStatus=payMode==="avec"?"confirmed":"pending";
+                    var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                    setPaying(false);
+                    setStep(3);
+                    toast(payMode==="avec"?"Reservation confirmee !":"Demande envoyee a l etablissement !","success");
+                    if(props.onBooked)props.onBooked(BookingService.createBooking(resa));
+                  },delay);
+                }} style={{flex:2,padding:"11px",background:paying?DS.textDim:color,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:900,cursor:paying?"not-allowed":"pointer",transition:"background .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  {paying?<span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite"}}/>:null}
+                  {paying?"Traitement en cours...":(payMode==="avec"?"Payer "+totalPrice.toFixed(0)+" EUR":"Confirmer la reservation")}
                 </button>
               </div>
             </div>
@@ -1278,7 +1652,7 @@ function BookM(props){
           {step===3&&(
             <div>
               <div style={{textAlign:"center",marginBottom:20}}>
-                <div style={{width:64,height:64,borderRadius:"50%",background:payMode==="avec"?DS.successSoft:DS.warningSoft,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px"}}>{payMode==="avec"?<CheckCircle size={32} color={DS.success}/>:<Clock size={32} color={DS.warning}/>}</div>
+                <div style={{width:64,height:64,borderRadius:"50%",background:payMode==="avec"?DS.successSoft:DS.warningSoft,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",animation:"hp-bounce-in 0.55s cubic-bezier(0.22,1,0.36,1)"}}>{payMode==="avec"?<CheckCircle size={32} color={DS.success}/>:<Clock size={32} color={DS.warning}/>}</div>
                 <div style={{fontSize:17,fontWeight:900,color:payMode==="avec"?DS.success:DS.warning}}>{payMode==="avec"?"Reservation confirmee !":"Demande envoyee !"}</div>
                 <div style={{fontSize:12,color:DS.textMuted,marginTop:4}}>{payMode==="avec"?"Votre ticket numerique est pret":"En attente de confirmation de l etablissement (24h)"}</div>
               </div>
@@ -1314,14 +1688,14 @@ function BookM(props){
                   <div style={{fontSize:10,color:DS.textMuted,marginBottom:10}}>CODE QR - A PRESENTER A L ETABLISSEMENT</div>
                   <div style={{display:"inline-flex",padding:12,background:"#fff",borderRadius:12,margin:"0 auto"}}>
                     <div style={{width:120,height:120,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                      {[1,1,1,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,0,1,1,1,1,1,0,1,0,1,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,1,1,0,1,0,1,1,1].map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff",borderRadius:1}}/>;  })}
+                      {qrPixels.map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff",borderRadius:1}}/>;  })}
                     </div>
                   </div>
                   <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace"}}>{resaId}</div>
                 </div>
               </div>
-              <div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:DS.warning,lineHeight:1.5}}>
-                {isRestaurantBooking?"Ce ticket reste valide jusqu a la date de reservation. L etablissement scannera votre QR code a votre arrivee.":"Ce ticket reste valide jusqu a la date d arrivee. L etablissement scannera votre QR code pour confirmer votre arrivee."}
+              <div style={{background:DS.successSoft,border:"1px solid "+DS.success+"33",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:DS.success,lineHeight:1.5,display:"flex",alignItems:"center",gap:8}}>
+                <CheckCircle size={13} color={DS.success}/>{isRestaurantBooking?"Ce ticket est valide jusqu a votre arrivee. L etablissement scannera votre QR code.":"Ce ticket est valide jusqu a votre arrivee. L etablissement scannera votre QR code pour confirmer."}
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={function(){setStep(4);}} style={{flex:1,padding:"11px",background:DS.primarySoft,border:"1px solid "+DS.primary+"33",borderRadius:12,color:DS.primary,fontSize:12,fontWeight:700,cursor:"pointer"}}>Voir le ticket</button>
@@ -1364,14 +1738,17 @@ function BookM(props){
                 <div style={{textAlign:"center",padding:"16px",borderTop:"1px solid "+DS.border+"30",background:DS.surface}}>
                   <div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}>
                     <div style={{width:100,height:100,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                      {[1,1,1,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,0,1,1,1,1,1,0,1,0,1,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,1,1,0,1,0,1,1,1].map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
+                      {qrPixels.map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
                     </div>
                   </div>
                   <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace",letterSpacing:1}}>{resaId}</div>
-                  <div style={{fontSize:10,color:DS.textDim,marginTop:4}}>Valide jusqu au {dateIn||"--"}</div>
+                  <div style={{fontSize:10,color:DS.textDim,marginTop:4}}>Valide jusqu au scannage de l etablissement</div>
                 </div>
               </div>
-              <button onClick={onClose} style={{width:"100%",padding:"12px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer"}}>Fermer</button>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={function(){setStep(3);}} style={{flex:1,padding:"12px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Retour</button>
+                <button onClick={onClose} style={{flex:2,padding:"12px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:900,cursor:"pointer"}}>Fermer</button>
+              </div>
             </div>
           )}
         </div>
@@ -1380,34 +1757,63 @@ function BookM(props){
   );
 }
 function ProFeed(props){
-  var proType=props.proType;var isPremium=props.isPremium||false;var onPremium=props.onPremium;var onProfile=props.onProfile;
-  var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:false,comments:[],showCmt:false});}));
+  var proType=props.proType;var isPremium=props.isPremium||false;var onPremium=props.onPremium;var onProfile=props.onProfile;var onAddNotif=props.onAddNotif||null;
+  // Fix #3 : data declare en premier pour eviter crash dans addCmt
+  var color=rC(proType);
+  var _allData=proType==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
+  var selfEmail=props.selfEmail||"";
+  var data=_allData.length>0?_allData[0]:{name:selfEmail.split("@")[0]||"Pro",verified:false,followers:0,rating:0,reviewCount:0};
+  // Fix #6 : localStorage pour likes et favs
+  var _initPro=useRef(null);
+  if(!_initPro.current){var _lkP={};var _fvP=[];try{_lkP=JSON.parse(localStorage.getItem("hp_pro_likes")||"{}");_fvP=JSON.parse(localStorage.getItem("hp_pro_favs")||"[]");}catch(e){}_initPro.current={likes:_lkP,favs:_fvP};}
+  var _initLikesPro=_initPro.current.likes;var _initFavsPro=_initPro.current.favs;
+  var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikesPro[p.id],likes:p.likes+(_initLikesPro[p.id]?1:0),comments:[],showCmt:false});}));
   var posts=s1[0];var setPosts=s1[1];
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState("");var newPost=s2[0];var setNewPost=s2[1];
   var s3=useState(false);var showNew=s3[0];var setShowNew=s3[1];
   var scm2=useState({});var cmtText=scm2[0];var setCmtText=scm2[1];
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
-  function addCmt(id){
+  function addCmt(id,replyTo){
     var text=(cmtText[id]||"").trim();if(!text)return;
-    var cm={id:Date.now(),author:data.name,text:text,time:"maintenant"};
+    var cm={id:Date.now(),author:data.name,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    toast("Commentaire publie","success");
+    toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
-    toast("Commentaire supprime","success");
+    toast("Commentaire supprime","neutral");
   }
-  var color=rC(proType);var data=proType==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
-  var sf=useState([]);var favPosts=sf[0];var setFavPosts=sf[1];
+  var sf=useState(_initFavsPro);var favPosts=sf[0];var setFavPosts=sf[1];
   var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
-  function toggleFav(id){setFavPosts(function(f){return f.indexOf(id)>=0?f.filter(function(x){return x!==id;}):f.concat([id]);});setMenuOpen(null);toast(favPosts.indexOf(id)>=0?"Retire des favoris":"Ajoute aux favoris","success");}
+  // Fix #2 : toast favoris dans le bon sens
+  function toggleFav(id){
+    var wasFav=favPosts.indexOf(id)>=0;
+    setFavPosts(function(f){var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_pro_favs",JSON.stringify(next));}catch(e){}return next;});
+    setMenuOpen(null);
+    toast(wasFav?"Retire des favoris":"Ajoute aux favoris","success");
+  }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   var followingPosts=props.followingIds||[];
   function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
   function toggleLike(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});});}
+  var sLoadPro=useState(true);var loadingPro=sLoadPro[0];var setLoadingPro=sLoadPro[1];
+  useEffect(function(){var t=setTimeout(function(){setLoadingPro(false);},350);return function(){clearTimeout(t);};},[]);
+  var sHeartPro=useState(null);var heartAnimPro=sHeartPro[0];var setHeartAnimPro=sHeartPro[1];
+  function triggerHeartPro(id){setHeartAnimPro(id);setTimeout(function(){setHeartAnimPro(null);},500);}
+  // Fix #6 : persistance likes Pro
+  function toggleLikePro(id){
+    var post=posts.find(function(p){return p.id===id;});var wasLiked=post?post.liked:false;
+    setPosts(function(ps){
+      var next=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});
+      try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem("hp_pro_likes",JSON.stringify(lk));}catch(e){}
+      if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:"Quelqu'un a aimé votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
+
+      return next;
+    });
+  }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
   function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partage avec succes","success");}
@@ -1425,15 +1831,21 @@ function ProFeed(props){
   function removeMedia(){setMediaPreview(null);setMediaType(null);}
   function publish(){
     if(!newPost.trim()&&!mediaPreview)return;
-    setPosts(function(ps){return [{id:Date.now(),author:data.name,type:proType,time:"maintenant",text:newPost,img:mediaType==="image"?mediaPreview:null,video:mediaType==="video"?mediaPreview:null,likes:0,comments:[],showCmt:false,verified:data.verified}].concat(ps);});
+    var newId="post-"+Date.now();
+    var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:newPost,img:mediaType==="image"?mediaPreview:null,video:mediaType==="video"?mediaPreview:null,likes:0,comments:[],showCmt:false,verified:data.verified};
+    setPosts(function(ps){return [newObj].concat(ps);});
+    // Fix #5 : sauvegarde dans Supabase si disponible
+    try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,data:newObj}]).catch(function(){});}catch(e){}
     setNewPost("");setShowNew(false);setMediaPreview(null);setMediaType(null);
+    toast("Publication publiee avec succes","success");
   }
   return(
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
-      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){toast("Signalement envoye - Merci","success");}}/>}
+      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
+      {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",background:DS.surface,borderBottom:"1px solid "+DS.border,marginBottom:10}}>
-        {[[fmtK(data.followers),"Abonnes",color],[data.rating+" *","Note",DS.gold],[fmtK(data.reviewCount),"Avis",DS.success]].map(function(_i,i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{padding:"14px 4px",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><div style={{fontSize:20,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
+        {[[fmtK(data.followers),"Abonnes",color],[data.rating+" ★","Note",DS.gold],[fmtK(data.reviewCount),"Avis",DS.success]].map(function(_i,i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{padding:"14px 4px",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><div style={{fontSize:20,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
       </div>
       <div style={{background:DS.surface,borderBottom:"1px solid "+DS.border+"40",padding:"14px 16px",marginBottom:10}}>
         {!showNew
@@ -1488,14 +1900,16 @@ function ProFeed(props){
           </div>
         </div>
       )}
-      {posts.map(function(post){
+      {loadingPro&&<FeedSkeleton/>}
+      {posts.length===0&&<Emp Icon={FileText} title="Aucune publication" sub="Vos publications apparaitront ici"/>}
+      {posts.map(function(post,_pfi){
         var pc=rC(post.type);
         return(
-          <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28"}}>
+          <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pfi*50)+"ms"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 16px 14px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
                 <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{cursor:onProfile?"pointer":"default",flexShrink:0}}>
-                  <Av sz={52} letter={post.author[0]} verified={post.verified}/>
+                  <Av sz={52} letter={post.author[0]} img={function(){var _pe=DataLayer.getEstablishmentById(post.id);return _pe?_pe.img:null;}()} verified={post.verified}/>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
                   <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{fontSize:15,fontWeight:800,color:DS.text,lineHeight:1.3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:onProfile?"pointer":"default",display:"inline-block",maxWidth:"100%"}}>{post.author}</div>
@@ -1524,23 +1938,23 @@ function ProFeed(props){
               </div>
             </div>
             <div style={{padding:"0 16px 16px",fontSize:15,color:DS.text,lineHeight:1.7}}>{post.text}</div>
-            {post.img&&<img src={post.img} alt="" style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}{post.video&&<video src={post.video} controls style={{width:"100%",maxHeight:620,display:"block",background:"#000"}}/>}
+            {post.img&&<img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.style.display="none";}} style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}{post.video&&<video src={post.video} controls style={{width:"100%",maxHeight:620,display:"block",background:"#000"}}/>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px 2px",fontSize:12,color:DS.textDim}}>
               <span>{post.likes} reaction{post.likes!==1?"s":""}</span>
               <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
             <div style={{display:"flex",borderTop:"1px solid "+DS.border+"30",marginTop:8}}>
-              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLike(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
+              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLikePro(post.id);triggerHeartPro(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
                 var lb=_i[0];var Icon=_i[1];var col=_i[2];var fn=_i[3];
                 return(
                   <button key={lb} onClick={fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"13px 0",background:"none",border:"none",cursor:"pointer",color:col,fontSize:13}}>
-                    <Icon size={20} fill={lb==="Liker"&&post.liked?DS.error:"none"} color={col}/>{lb}
+                    <Icon size={20} fill={lb==="Liker"&&post.liked?DS.error:"none"} color={col} style={lb==="Liker"&&heartAnimPro===post.id?{animation:"hp-heart-pop .5s cubic-bezier(0.22,1,0.36,1)"}:{}}/>{lb}
                   </button>
                 );
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -1564,10 +1978,14 @@ function ReportM(props){
     ["scam","Escroquerie ou arnaque"],
     ["other","Autre raison"],
   ];
-  function submit(){if(onSubmit)onSubmit(reason,details);setStep(3);}
+  function submit(){
+    var report={id:"rpt"+Date.now(),target:targetName,reason:reason,details:details,date:new Date().toISOString()};
+    try{var existing=JSON.parse(localStorage.getItem("hp_reports")||"[]");localStorage.setItem("hp_reports",JSON.stringify(existing.concat([report])));}catch(ex){}
+    if(onSubmit)onSubmit(reason,details);setStep(3);
+  }
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-      <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"88vh",overflowY:"auto",animation:"hp-slide-up 0.3s ease"}}>
+      <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-slide-up 0.3s ease"}}>
         <div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div>
             <div style={{fontSize:15,fontWeight:800,color:DS.text}}>Signaler {targetName}</div>
@@ -1650,7 +2068,7 @@ function ServiceConfigModal(props){
   }
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-      <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"92vh",overflowY:"auto",animation:"hp-slide-up 0.3s ease"}}>
+      <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"92vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-slide-up 0.3s ease"}}>
         <div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div>
             <div style={{fontSize:15,fontWeight:800,color:DS.text}}>{initial?"Modifier":"Ajouter"} {isRoom?"une chambre":"un plat"}</div>
@@ -1744,7 +2162,7 @@ function VerifRequestModal(props){
   function submit(){if(onSubmit)onSubmit();setStep(4);}
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:1400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-      <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"94vh",overflowY:"auto",animation:"hp-slide-up 0.3s ease"}}>
+      <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"94vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-slide-up 0.3s ease"}}>
         <div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div>
             <div style={{fontSize:15,fontWeight:800,color:DS.text}}>Badge de Verification</div>
@@ -1861,36 +2279,41 @@ function VerifRequestModal(props){
 function HotelSvc(props){
   var data=props.data||DataLayer.getHotels()[0];
   var color=DS.hotel;
-  var s1=useState(data.rooms||[]);var rooms=s1[0];var setRooms=s1[1];
+  var s1=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_rooms");return v?JSON.parse(v):(data.rooms||[]);}catch(e){return data.rooms||[];}});var rooms=s1[0];var setRooms=s1[1];
   var s2=useState(null);var editItem=s2[0];var setEditItem=s2[1];
   var s3=useState(false);var showAdd=s3[0];var setShowAdd=s3[1];
   var s4=useState(data.svcMode||"hotel");var svcMode=s4[0];var setSvcMode=s4[1];
   var hasResto=svcMode==="combined";
-  var s5=useState([]);var menu=s5[0];var setMenu=s5[1];
+  var s5=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_dishes");return v?JSON.parse(v):[];}catch(e){return[];}});var menu=s5[0];var setMenu=s5[1];
   var s6=useState(data.svcMode==="restaurant"?"menu":"rooms");var tab=s6[0];var setTab=s6[1];
-  var sa=useState((data.services||[]).map(function(s,i){return typeof s==="object"?Object.assign({},s):{id:"svc"+i,name:s,active:true};}));
+  var sa=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_amenities");return v?JSON.parse(v):(data.services||[]).map(function(s,i){return typeof s==="object"?Object.assign({},s):{id:"svc"+i,name:s,active:true};});}catch(e){return(data.services||[]).map(function(s,i){return typeof s==="object"?Object.assign({},s):{id:"svc"+i,name:s,active:true};});}});
   var amenities=sa[0];var setAmenities=sa[1];
   var sb=useState(false);var addSvc=sb[0];var setAddSvc=sb[1];
   var sc=useState("");var newSvcName=sc[0];var setNewSvcName=sc[1];
-  function toggleAmenity(id){setAmenities(function(am){return am.map(function(a){return a.id===id?Object.assign({},a,{active:!a.active}):a;});});}
-  function addAmenity(){if(!newSvcName.trim())return;var am=amenities.concat([{id:"svc"+Date.now(),name:newSvcName.trim(),active:true}]);setAmenities(am);setNewSvcName("");setAddSvc(false);}
-  function removeAmenity(id){setAmenities(function(am){return am.filter(function(a){return a.id!==id;});});}
-  function toggleAvail(id){setRooms(function(rs){return rs.map(function(r){return r.id===id?Object.assign({},r,{available:!r.available}):r;});});}
-  function toggleMenuAvail(id){setMenu(function(ms){return ms.map(function(m){return m.id===id?Object.assign({},m,{available:!m.available}):m;});});}
+  function _saveRooms(rs){try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}}
+  function _saveDishes(ms){try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ms));}catch(e){}}
+  function _saveAmenities(am){try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}}
+  function toggleAmenity(id){setAmenities(function(am){var next=am.map(function(a){return a.id===id?Object.assign({},a,{active:!a.active}):a;});_saveAmenities(next);return next;});}
+  function addAmenity(){if(!newSvcName.trim())return;var am=amenities.concat([{id:"svc"+Date.now(),name:newSvcName.trim(),active:true}]);setAmenities(am);_saveAmenities(am);setNewSvcName("");setAddSvc(false);}
+  function removeAmenity(id){setAmenities(function(am){var next=am.filter(function(a){return a.id!==id;});_saveAmenities(next);return next;});}
+  function toggleAvail(id){setRooms(function(rs){var next=rs.map(function(r){return r.id===id?Object.assign({},r,{available:!r.available}):r;});_saveRooms(next);return next;});}
+  function toggleMenuAvail(id){setMenu(function(ms){var next=ms.map(function(m){return m.id===id?Object.assign({},m,{available:!m.available}):m;});_saveDishes(next);return next;});}
+  var tkH=useToast();var toastH=tkH.show;var ToastH=tkH.Toast;
   function saveRoom(item){
-    if(editItem){setRooms(function(rs){return rs.map(function(r){return r.id===item.id?item:r;});});}
-    else{setRooms(function(rs){return rs.concat([item]);});}
+    if(editItem){setRooms(function(rs){var next=rs.map(function(r){return r.id===item.id?item:r;});_saveRooms(next);return next;});toastH("Chambre mise a jour","success");}
+    else{setRooms(function(rs){var next=rs.concat([item]);_saveRooms(next);return next;});toastH("Chambre ajoutee","success");}
     setEditItem(null);setShowAdd(false);
   }
   function saveDish(item){
-    if(editItem){setMenu(function(ms){return ms.map(function(m){return m.id===item.id?item:m;});});}
-    else{setMenu(function(ms){return ms.concat([item]);});}
+    if(editItem){setMenu(function(ms){var next=ms.map(function(m){return m.id===item.id?item:m;});_saveDishes(next);return next;});toastH("Plat mis a jour","success");}
+    else{setMenu(function(ms){var next=ms.concat([item]);_saveDishes(next);return next;});toastH("Plat ajoute","success");}
     setEditItem(null);setShowAdd(false);
   }
-  function deleteRoom(id){setRooms(function(rs){return rs.filter(function(r){return r.id!==id;});});}
-  function deleteDish(id){setMenu(function(ms){return ms.filter(function(m){return m.id!==id;});});}
+  function deleteRoom(id){setRooms(function(rs){var next=rs.filter(function(r){return r.id!==id;});_saveRooms(next);return next;});toastH("Chambre supprimee","info");}
+  function deleteDish(id){setMenu(function(ms){var next=ms.filter(function(m){return m.id!==id;});_saveDishes(next);return next;});toastH("Plat supprime","info");}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
+      <ToastH/>
       {(showAdd||editItem)&&<ServiceConfigModal mode={tab==="rooms"?"room":"dish"} color={tab==="rooms"?DS.hotel:DS.restaurant} initial={editItem} onClose={function(){setShowAdd(false);setEditItem(null);}} onSave={tab==="rooms"?saveRoom:saveDish}/>}
       <div style={{background:DS.surface,borderBottom:"1px solid "+DS.border,padding:"12px 14px 10px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
@@ -2017,23 +2440,34 @@ function HotelSvc(props){
 function RestOff(props){
   var data=props.data||DataLayer.getRestaurants()[0];
   var color=DS.restaurant;
-  var s1=useState((data.menu||[]).reduce(function(acc,cat){return acc.concat(cat.items.map(function(item){return Object.assign({},item,{id:"d"+Date.now()+Math.random(),category:cat.cat,available:true});}));},[]));
+  var _defaultItems=(data.menu||[]).reduce(function(acc,cat){return acc.concat(cat.items.map(function(item){return Object.assign({},item,{id:"d_"+cat.cat+"_"+item.name.replace(/\s/g,""),category:cat.cat,available:true});}));},  []);
+  var s1=useState(function(){try{var v=localStorage.getItem("hp_restoff_items");return v?JSON.parse(v):_defaultItems;}catch(e){return _defaultItems;}});
   var items=s1[0];var setItems=s1[1];
   var s2=useState(null);var editItem=s2[0];var setEditItem=s2[1];
   var s3=useState(false);var showAdd=s3[0];var setShowAdd=s3[1];
-  var s4=useState((data.offers||[]).map(function(o,i){return Object.assign({},{id:"o"+i,name:typeof o==="string"?o:o.name,price:typeof o==="object"&&o.price?o.price:null,available:true});}));
+  var _defaultOffers=(data.offers||[]).map(function(o,i){return Object.assign({},{id:"o"+i,name:typeof o==="string"?o:o.name,price:typeof o==="object"&&o.price?o.price:null,available:true});});
+  var s4=useState(function(){try{var v=localStorage.getItem("hp_restoff_offers");return v?JSON.parse(v):_defaultOffers;}catch(e){return _defaultOffers;}});
   var offers=s4[0];var setOffers=s4[1];
+  var s4a=useState(false);var showAddOffer=s4a[0];var setShowAddOffer=s4a[1];
+  var s4b=useState("");var newOfferName=s4b[0];var setNewOfferName=s4b[1];
+  var s4c=useState("");var newOfferPrice=s4c[0];var setNewOfferPrice=s4c[1];
   var s5=useState("menu");var tab=s5[0];var setTab=s5[1];
+  function _saveOffers(next){try{localStorage.setItem("hp_restoff_offers",JSON.stringify(next));}catch(e){}}
+  var tkO=useToast();var toastO=tkO.show;var ToastO=tkO.Toast;
+  function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next);toastO("Offre supprimee","info");}
+  function addOffer(){if(!newOfferName.trim())return;var o={id:"o"+Date.now(),name:newOfferName.trim(),price:newOfferPrice?parseFloat(newOfferPrice):null,available:true};var next=offers.concat([o]);setOffers(next);_saveOffers(next);setNewOfferName("");setNewOfferPrice("");setShowAddOffer(false);toastO("Offre ajoutee","success");}
+  function _saveItems(next){try{localStorage.setItem("hp_restoff_items",JSON.stringify(next));}catch(e){}}
   function saveItem(item){
-    if(editItem){setItems(function(is){return is.map(function(i){return i.id===item.id?item:i;});});}
-    else{setItems(function(is){return is.concat([item]);});}
+    if(editItem){setItems(function(is){var next=is.map(function(i){return i.id===item.id?item:i;});_saveItems(next);return next;});toastO("Plat mis a jour","success");}
+    else{setItems(function(is){var next=is.concat([item]);_saveItems(next);return next;});toastO("Plat ajoute","success");}
     setEditItem(null);setShowAdd(false);
   }
-  function deleteItem(id){setItems(function(is){return is.filter(function(i){return i.id!==id;});});}
-  function toggleAvail(id){setItems(function(is){return is.map(function(i){return i.id===id?Object.assign({},i,{available:!i.available}):i;});});}
+  function deleteItem(id){setItems(function(is){var next=is.filter(function(i){return i.id!==id;});_saveItems(next);return next;});toastO("Plat supprime","info");}
+  function toggleAvail(id){setItems(function(is){var next=is.map(function(i){return i.id===id?Object.assign({},i,{available:!i.available}):i;});_saveItems(next);return next;});}
   var categories=items.reduce(function(acc,item){if(item.category&&acc.indexOf(item.category)<0)acc.push(item.category);return acc;},[]);
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
+      <ToastO/>
       {(showAdd||editItem)&&<ServiceConfigModal mode="dish" color={color} initial={editItem} onClose={function(){setShowAdd(false);setEditItem(null);}} onSave={saveItem}/>}
       <div style={{background:DS.surface,borderBottom:"1px solid "+DS.border,padding:"12px 14px 10px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
@@ -2090,13 +2524,22 @@ function RestOff(props){
         )}
         {tab==="offres"&&(
           <div>
+            <button onClick={function(){setShowAddOffer(!showAddOffer);}} style={{width:"100%",padding:"10px 14px",background:color+"18",border:"1px dashed "+color,borderRadius:12,color:color,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}><Plus size={16}/>Ajouter une offre</button>
+            {showAddOffer&&<div style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:12,border:"1px solid "+DS.border}}>
+              <input value={newOfferName} onChange={function(e){setNewOfferName(e.target.value);}} placeholder="Nom de l offre (ex: Menu Decouverte)" style={{width:"100%",background:DS.bg,border:"1px solid "+DS.border,borderRadius:8,padding:"8px 12px",fontSize:12,color:DS.text,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+              <div style={{display:"flex",gap:8}}>
+                <input value={newOfferPrice} onChange={function(e){setNewOfferPrice(e.target.value);}} placeholder="Prix EUR (optionnel)" type="number" min="0" style={{flex:1,background:DS.bg,border:"1px solid "+DS.border,borderRadius:8,padding:"8px 12px",fontSize:12,color:DS.text,outline:"none"}}/>
+                <button onClick={addOffer} style={{padding:"8px 16px",background:color,border:"none",borderRadius:8,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>Ajouter</button>
+              </div>
+            </div>}
             {offers.map(function(o){return(
               <div key={o.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:10,border:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:36,height:36,borderRadius:10,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Tag size={16} color={color}/></div>
                 <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{o.name}</div>{o.price&&<div style={{fontSize:12,color:DS.gold,fontWeight:700}}>{o.price} EUR</div>}</div>
+                <button onClick={function(){deleteOffer(o.id);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,color:DS.error}}><X size={14} color={DS.error}/></button>
               </div>
             );})}
-            {offers.length===0&&<Emp Icon={Tag} title="Aucune offre" sub="Les offres speciales apparaitront ici"/>}
+            {offers.length===0&&<Emp Icon={Tag} title="Aucune offre" sub="Ajoutez vos offres speciales"/>}
           </div>
         )}
       </div>
@@ -2106,24 +2549,29 @@ function RestOff(props){
 function ProResa(props){
   var proType=props.proType;var onOpenChat=props.onOpenChat;
   var clientPrivacySettings=props.clientPrivacySettings||{locked:false,msgPermission:"everyone"};
-  var CONNECTED_CLIENT_NAME="Moussa Konate";
+  var selfEmail=props.selfEmail||"";
+  var CONNECTED_CLIENT_NAME=selfEmail.split("@")[0]||"Client";
   var color=rC(proType);
-  var s1=useState([
-    {id:"R001",client:"Moussa Konate",service:"Suite Presidentielle",dateIn:"2025-07-24",dateOut:"2025-07-27",nights:3,guests:2,total:1350,payMode:"avec",status:"confirmed",qrScanned:false},
-    {id:"R002",client:"Aicha Mbaye",service:"Chambre Superieure",dateIn:"2025-07-22",dateOut:"2025-07-24",nights:2,guests:4,total:480,payMode:"avec",status:"pending",qrScanned:false},
-    {id:"R003",client:"Ibrahima Diop",service:"Chambre Deluxe",dateIn:"2025-07-21",dateOut:"2025-07-22",nights:1,guests:1,total:0,payMode:"sans",status:"completed",qrScanned:true},
-  ]);
+  var _liveResas=BookingService.getAll().map(function(r){return {id:r.id,client:r.clientName||CONNECTED_CLIENT_NAME,service:r.service||"Reservation",dateIn:r.dateIn||"",dateOut:r.dateOut||r.dateIn||"",nights:r.nights||1,guests:r.guests||1,total:r.total||0,payMode:r.payMode||"sans",status:r.status||"pending",qrScanned:r.status==="consumed"};});
+  var s1=useState(function(){
+    return _liveResas;
+  });
   var resas=s1[0];var setResas=s1[1];
   var s2=useState("all");var filter=s2[0];var setFilter=s2[1];
   var s3=useState(null);var scanTarget=s3[0];var setScanTarget=s3[1];
+  var tkR=useToast();var toastR=tkR.show;var ToastR=tkR.Toast;
+  var sRSk=useState(true);var resaSkLoading=sRSk[0];var setResaSkLoading=sRSk[1];
+  useEffect(function(){var t=setTimeout(function(){setResaSkLoading(false);},350);return function(){clearTimeout(t);};},[]);
   var filtered=filter==="all"?resas:resas.filter(function(r){return r.status===filter;});
-  var sColors={confirmed:DS.success,pending:DS.warning,completed:DS.primary,refused:DS.error,consumed:DS.textDim};
-  var sLabels={confirmed:"Confirmee",pending:"En attente",completed:"Terminee",refused:"Refusee",consumed:"Consommee"};
-  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});}
-  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});}
-  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});setScanTarget(null);}
+  var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim};
+  var sLabels={confirmed:"Confirmee",pending:"En attente",refused:"Refusee",consumed:"Consommee"};
+  function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem("hp_resas_all",JSON.stringify(updated));}catch(e){}}
+  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Reservation confirmee","success");}
+  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Reservation refusee","info");}
+  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivee confirmee - Client marque present","success");}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
+      <ToastR/>
       {scanTarget&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:1300,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}>
           <div style={{width:"100%",maxWidth:360,background:DS.surface,borderRadius:20,overflow:"hidden",border:"1px solid "+DS.border}}>
@@ -2136,7 +2584,7 @@ function ProResa(props){
                 <div style={{fontSize:12,color:DS.textMuted,marginBottom:12}}>Zone de scan (simulation)</div>
                 <div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}>
                   <div style={{width:100,height:100,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                    {[1,1,1,1,0,1,0,1,1,1,1,0,0,1,0,0,1,0,0,1,1,0,1,1,0,1,0,1,1,0,1,0,0,1,0,0,1,0,0,1,1,1,1,1,0,1,0,1,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,1,0,1,0,1,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1,1,1,0,1,0,1,1,1].map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
+                    {genQRPixels(scanTarget.id).map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
                   </div>
                 </div>
                 <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace"}}>{scanTarget.id}</div>
@@ -2157,11 +2605,11 @@ function ProResa(props){
         {[[resas.filter(function(r){return r.status==="pending";}).length,"En attente",DS.warning],[resas.filter(function(r){return r.status==="confirmed";}).length,"Confirmees",DS.success],[resas.reduce(function(a,r){return a+(r.payMode==="avec"?r.total:0);},0)+" EUR","Revenus",DS.gold]].map(function(_i,i){var n=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{background:DS.card,borderRadius:10,padding:"10px 6px",border:"1px solid "+DS.border,textAlign:"center"}}><div style={{fontSize:16,fontWeight:900,color:col}}>{n}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
       </div>
       <div style={{display:"flex",gap:5,padding:"0 14px",marginBottom:12,overflowX:"auto"}}>
-        {[["all","Toutes"],["pending","En attente"],["confirmed","Confirmees"],["completed","Terminees"],["consumed","Consommees"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=filter===v;return <button key={v} onClick={function(){setFilter(v);}} style={{padding:"6px 12px",borderRadius:20,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{l}</button>;})}
+        {[["all","Toutes"],["pending","En attente"],["confirmed","Confirmees"],["consumed","Consommees"],["refused","Refusees"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=filter===v;return <button key={v} onClick={function(){setFilter(v);}} style={{padding:"6px 12px",borderRadius:20,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{l}</button>;})}
       </div>
       <div style={{padding:"0 14px"}}>
-        {filtered.map(function(r){return(
-          <div key={r.id} style={{background:DS.card,borderRadius:14,padding:"14px",marginBottom:12,border:"1px solid "+(r.qrScanned?DS.textDim+"44":DS.border),opacity:r.status==="consumed"?0.7:1}}>
+        {resaSkLoading?<ResaSkeleton/>:<>{filtered.map(function(r,_ri){return(
+          <div key={r.id} style={{background:DS.card,borderRadius:14,padding:"14px",marginBottom:12,border:"1px solid "+(r.qrScanned?DS.textDim+"44":DS.border),opacity:r.status==="consumed"?0.7:1,animation:"hp-item-in 0.32s ease both",animationDelay:(_ri*55)+"ms"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:14,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",gap:6}}>
@@ -2194,17 +2642,19 @@ function ProResa(props){
             </div>
           </div>
         );})}
-        {filtered.length===0&&<Emp Icon={Calendar} title="Aucune reservation" sub="Les demandes apparaitront ici"/>}
+        {filtered.length===0&&<Emp Icon={Calendar} title="Aucune reservation" sub="Les demandes apparaitront ici"/>}</> }
       </div>
     </div>
   );
 }
 function ProProf(props){
-  var proType=props.proType;var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;
+  var proType=props.proType;var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var profilePhoto=props.profilePhoto||null;var onPhotoChange=props.onPhotoChange||null;
   var data=proType==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];var color=rC(proType);
   var s1=useState("about");var tab=s1[0];var setTab=s1[1];
   var s2=useState(false);var showVerif=s2[0];var setShowVerif=s2[1];
-  var s3=useState(null);var verifStatus=s3[0];var setVerifStatus=s3[1];
+  var _vfKey="hp_verif_status_"+(proType||"hotel");
+  var s3=useState(function(){try{return localStorage.getItem(_vfKey)||null;}catch(e){return null;}});var verifStatus=s3[0];var _setVerifStatusRaw=s3[1];
+  function setVerifStatus(v){_setVerifStatusRaw(v);try{if(v)localStorage.setItem(_vfKey,v);else localStorage.removeItem(_vfKey);}catch(e){}}
   useEffect(function(){
     if(verifStatus==="pending"){
       var timer=setTimeout(function(){
@@ -2214,22 +2664,30 @@ function ProProf(props){
       return function(){clearTimeout(timer);};
     }
   },[verifStatus]);
-  var sd=useState(data.description);var description=sd[0];var setDescription=sd[1];
+  var _descKey="hp_pro_desc_"+(proType||"hotel");
+  var sd=useState(function(){try{var v=localStorage.getItem(_descKey);return v||data.description;}catch(e){return data.description;}});var description=sd[0];var setDescription=sd[1];
   var se=useState(false);var editingAbout=se[0];var setEditingAbout=se[1];
-  var sdv=useState(data.description);var draftDesc=sdv[0];var setDraftDesc=sdv[1];
+  var sdv=useState(description);var draftDesc=sdv[0];var setDraftDesc=sdv[1];
   var tkp=useToast();var toastP=tkp.show;var ToastP=tkp.Toast;
-  function saveAbout(){if(!draftDesc.trim())return;setDescription(draftDesc.trim());setEditingAbout(false);toastP("A propos mis a jour","success");}
+  var _proUploadRef=useRef(null);
+  var _sProViewer=useState(null);var _proViewer=_sProViewer[0];var _setProViewer=_sProViewer[1];
+  function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){if(onPhotoChange)onPhotoChange(ev.target.result);};r.readAsDataURL(f);}
+  function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}setEditingAbout(false);toastP("A propos mis a jour","success");}
   var premiumActive=isPremium||data.isPremium;
   var isVerified=data.verified||(verifStatus==="approved");
   return(
     <div style={{paddingBottom:20}}>
+      <ImgViewer src={_proViewer} onClose={function(){_setProViewer(null);}}/>
+      <input ref={_proUploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handleProPhotoFile}/>
       <ToastP/>
-      {showVerif&&<VerifRequestModal isPremium={premiumActive} accType={proType} verifyStatus={verifStatus} initialStep={3} prefillName={data.name} prefillCountry={data.location} onClose={function(){setShowVerif(false);}} onSubmit={function(){setVerifStatus("pending");}}/>}
+      {showVerif&&<VerifRequestModal isPremium={premiumActive} accType={proType} verifyStatus={verifStatus} initialStep={3} prefillName={data.name} prefillCountry={data.location} onClose={function(){setShowVerif(false);}} onSubmit={function(){setVerifStatus("pending");toastP("Demande de verification soumise - Examen sous 48-72h","success");}}/>}
       <div style={{position:"relative",height:120,flexShrink:0}}>
-        <img src={data.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.6))"}}/>
-        <div style={{position:"absolute",bottom:8,left:14,display:"flex",alignItems:"center",gap:6}}>
-          {isVerified&&<VBadge sz={18}/>}
+        <img src={data.img} alt="" onClick={function(){if(data.img)_setProViewer(data.img);}} style={{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}/>
+        <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.6))",pointerEvents:"none"}}/>
+        <div style={{position:"absolute",bottom:-44,left:14,zIndex:3}}>
+          <DualAv sz={72} letter={(data.name[0]||"H").toUpperCase()} innerImg={profilePhoto} outerImg={data.img} verified={isVerified} uploadRef={_proUploadRef} onClickInner={function(){if(profilePhoto){_setProViewer(profilePhoto);}else if(_proUploadRef.current){_proUploadRef.current.click();}}} onClickOuter={data.img?function(){_setProViewer(data.img);}:null}/>
+        </div>
+        <div style={{position:"absolute",bottom:8,right:14,display:"flex",alignItems:"center",gap:6}}>
           {verifStatus==="pending"&&<div style={{background:DS.warning+"22",border:"1px solid "+DS.warning+"44",borderRadius:20,padding:"2px 8px"}}><span style={{fontSize:10,color:DS.warning,fontWeight:700}}>En attente</span></div>}
         </div>
         <div style={{position:"absolute",top:8,right:8,display:"flex",gap:6}}>
@@ -2238,9 +2696,9 @@ function ProProf(props){
         {premiumActive&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{display:"flex",alignItems:"center",gap:5,background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,padding:"6px 12px",color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}
         </div>
       </div>
-      <div style={{padding:"14px 16px 10px"}}>
+      <div style={{padding:"56px 16px 10px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
-          <div style={{fontSize:20,fontWeight:900,color:DS.text}}>{data.name}</div>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={{fontSize:20,fontWeight:900,color:DS.text}}>{data.name}</div>{isVerified&&<VBadge sz={22} showLabel={true}/>}</div>
         </div>
         <div style={{fontSize:12,color:DS.textMuted,marginBottom:10}}>{data.location}</div>
         {!isVerified&&!verifStatus&&(
@@ -2284,15 +2742,42 @@ function ProProf(props){
             </div>
           )
         )}
-        {tab==="services"&&(data.services||data.offers||[]).map(function(s,i){var name=typeof s==="string"?s:s.name;var Ic=getIcon(name);return <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid "+DS.border+"20"}}><div style={{width:30,height:30,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><div style={{fontSize:12,color:DS.text}}>{name}</div></div>;})}
-        {tab==="stats"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{[["Vues","1,247",color],["Reservations","89",DS.success],["Conversion","7.1%",DS.gold],["Avis ce mois","12",DS.primary]].map(function(_i){var l=_i[0];var v=_i[1];var col=_i[2];return <div key={l} style={{background:DS.card,borderRadius:10,padding:"10px",border:"1px solid "+DS.border}}><div style={{fontSize:16,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted}}>{l}</div></div>;})} </div>}
+        {tab==="services"&&(function(){
+          var _svcs=[];
+          try{
+            if(proType==="hotel"){var va=localStorage.getItem("hp_hotelsvc_amenities");_svcs=va?JSON.parse(va).filter(function(a){return a.active;}):(data.services||[]);}
+            else{var vb=localStorage.getItem("hp_restoff_offers");_svcs=vb?JSON.parse(vb):(data.offers||[]);}
+          }catch(ex){_svcs=data.services||data.offers||[];}
+          if(!_svcs.length)_svcs=data.services||data.offers||[];
+          return _svcs.map(function(s,i){var name=typeof s==="string"?s:s.name;var Ic=getIcon(name);return <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid "+DS.border+"20"}}><div style={{width:30,height:30,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><div style={{fontSize:12,color:DS.text}}>{name}</div></div>;});
+        })()}
+        {tab==="stats"&&(function(){
+          var _resas=BookingService.getAll();
+          var _nbResas=_resas.length;
+          var _confirmed=_resas.filter(function(r){return r.status==="confirmed"||r.status==="consumed";}).length;
+          var _conversion=_nbResas>0?Math.round((_confirmed/_nbResas)*1000)/10:0;
+          var _rvKey="hp_reviews_"+(data&&data.id||"x");
+          var _nbAvis=0;try{var _rv=JSON.parse(localStorage.getItem(_rvKey)||"[]");_nbAvis=_rv.length;}catch(ex){}
+          var _revenue=_resas.filter(function(r){return r.payMode==="avec";}).reduce(function(s,r){return s+(r.total||0);},0);
+          return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{[["Reservations",String(_nbResas),color],[_revenue>0?_revenue.toFixed(0)+" EUR":"—","Revenus",DS.gold],[_conversion+"%","Conversion",DS.success],[String(_nbAvis),"Avis recus",DS.primary]].map(function(_i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={l} style={{background:DS.card,borderRadius:10,padding:"10px",border:"1px solid "+DS.border}}><div style={{fontSize:16,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted}}>{l}</div></div>;})} </div>);
+        })()}
       </div>
     </div>
   );
 }
-// == NOTIFICATION DATA (NC = client, NP = pro) ==
-var NC_DATA = [];
-var NP_DATA = [];
+// == NOTIFICATION DATA (NC = client, NP = pro) — defaults avant persistance ==
+// ICON_MAP : cle string → composant React (serialisable en JSON)
+var ICON_MAP={Calendar:Calendar,MessageCircle:MessageCircle,Star:Star,Users:Users,Heart:Heart,Bell:Bell};
+var NC_DATA = [
+  {id:"nc1",icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},
+  {id:"nc2",icon:"MessageCircle",color:DS.success,title:"Nouveau message",body:"Le Jardin Gourmand vous a envoye un message.",time:"1h",read:false,tab:"chat"},
+  {id:"nc3",icon:"Star",color:DS.gold,title:"Premium",body:"Votre abonnement Premium expire dans 7 jours.",time:"1j",read:true,tab:"profile"}
+];
+var NP_DATA = [
+  {id:"np1",icon:"Calendar",color:DS.primary,title:"Nouvelle reservation",body:"Moussa Konate a effectue une reservation.",time:"5 min",read:false,tab:"reservations"},
+  {id:"np2",icon:"MessageCircle",color:DS.success,title:"Nouveau message client",body:"Aicha Mbaye vous a envoye un message.",time:"30 min",read:false,tab:"chat"},
+  {id:"np3",icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un nouvel utilisateur suit votre etablissement.",time:"2h",read:true,tab:"feed"}
+];
 
 export default function App() {
   useAnimations();
@@ -2302,7 +2787,6 @@ export default function App() {
     // Branche le rafraichissement de l'UI sur la couche de donnees
     DataLayer._onUpdate = function(){ setDataVersion(function(v){ return v+1; }); };
     // Declenche la synchronisation Supabase si un client est disponible.
-    // (Dans la version deployee, src/main.jsx fournit window.__supabase.)
     try{
       if(typeof window!=="undefined" && window.__supabase){
         DataLayer.syncFromSupabase(window.__supabase);
@@ -2310,7 +2794,43 @@ export default function App() {
     }catch(e){}
     return function(){ DataLayer._onUpdate = null; };
   },[]);
+
   var s0=useState(null);  var auth=s0[0];          var setAuth=s0[1];
+  var _initNeedsOB=(function(){try{return!localStorage.getItem("hp_acc_type");}catch(e){return true;}})();
+  var sOB=useState(_initNeedsOB);var needsOnboarding=sOB[0];var setNeedsOnboarding=sOB[1];
+  // Persistance de session Supabase : restaure la session au rechargement + ecoute les changements
+  useEffect(function(){
+    var sb = (typeof window!=="undefined" && window.__supabase) ? window.__supabase : null;
+    if(!sb) return;
+    sb.auth.getSession().then(function(res){
+      var session = res.data && res.data.session;
+      if(session && session.user){
+        var meta = session.user.user_metadata || {};
+        var accType = meta.account_type || "client";
+        var status = accType !== "client" ? "pending" : "active";
+        // Sync hp_acc_type with Supabase metadata to avoid onboarding flash
+        try{localStorage.setItem("hp_acc_type", accType);}catch(e){}
+        setNeedsOnboarding(false);
+        setAuth(AuthService.buildSession(accType, status, session.user.email, session.user.id));
+      }
+    }).catch(function(){});
+    var sub = sb.auth.onAuthStateChange(function(event, session){
+      if(event==="SIGNED_IN" && session && session.user){
+        var meta = session.user.user_metadata || {};
+        var accType = meta.account_type || "client";
+        var status = accType !== "client" ? "pending" : "active";
+        try{localStorage.setItem("hp_acc_type", accType);}catch(e){}
+        setNeedsOnboarding(false);
+        setAuth(function(prev){
+          if(prev) return prev;
+          return AuthService.buildSession(accType, status, session.user.email, session.user.id);
+        });
+      } else if(event==="SIGNED_OUT"){
+        setAuth(null);
+      }
+    });
+    return function(){ if(sub && sub.data && sub.data.subscription) sub.data.subscription.unsubscribe(); };
+  },[]);
   var s1=useState(false); var offline=s1[0];        var setOff=s1[1];
   var s2=useState("feed");var cTab=s2[0];           var setCTab=s2[1];
   var s3=useState("feed");var pTab=s3[0];           var setPTab=s3[1];
@@ -2320,15 +2840,17 @@ export default function App() {
   var s7=useState(null);  var book=s7[0];           var setBook=s7[1];
   var s8=useState(false); var showPremium=s8[0];    var setShowPremium=s8[1];
   var s9=useState(false); var showPrivacy=s9[0];    var setShowPrivacy=s9[1];
-  var s9b=useState({locked:false,pseudo:false,vis:"public",msgPermission:"everyone"});var privacySettings=s9b[0];var setPrivacySettings=s9b[1];
-  function updatePrivacy(patch){setPrivacySettings(function(prev){return Object.assign({},prev,patch);});}
-  var s10=useState(null);var premiumData=s10[0];    var setPremiumData=s10[1];
+  var s9b=useState(function(){try{var v=localStorage.getItem("hp_privacy");return v?JSON.parse(v):{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};}catch(e){return{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};}});var privacySettings=s9b[0];var setPrivacySettings=s9b[1];
+  function updatePrivacy(patch){setPrivacySettings(function(prev){var next=Object.assign({},prev,patch);try{localStorage.setItem("hp_privacy",JSON.stringify(next));}catch(e){}return next;});toastApp("Parametres de confidentialite mis a jour","success");}
+  var s10=useState(function(){try{var v=localStorage.getItem("hp_premium");return v?JSON.parse(v):null;}catch(e){return null;}});var premiumData=s10[0];    var setPremiumData=s10[1];
   var isPremium=premiumData!==null && new Date(premiumData.expiresAt)>new Date();
   function subscribePremium(plan,durationMonths){
     var now=new Date();
     var exp=new Date(now);
     exp.setMonth(exp.getMonth()+durationMonths);
-    setPremiumData({plan:plan,durationMonths:durationMonths,startedAt:now.toISOString(),expiresAt:exp.toISOString()});
+    var pd={plan:plan,durationMonths:durationMonths,startedAt:now.toISOString(),expiresAt:exp.toISOString()};
+    setPremiumData(pd);
+    try{localStorage.setItem("hp_premium",JSON.stringify(pd));}catch(e){}
     setShowPremium(false);
     tk.show("Premium actif jusqu au "+exp.toLocaleDateString("fr-FR"),"success");
   }
@@ -2337,44 +2859,65 @@ export default function App() {
     var base=new Date(premiumData.expiresAt)>new Date()?new Date(premiumData.expiresAt):new Date();
     var exp=new Date(base);
     exp.setMonth(exp.getMonth()+premiumData.durationMonths);
-    setPremiumData(Object.assign({},premiumData,{expiresAt:exp.toISOString()}));
+    var pd=Object.assign({},premiumData,{expiresAt:exp.toISOString()});
+    setPremiumData(pd);
+    try{localStorage.setItem("hp_premium",JSON.stringify(pd));}catch(e){}
     tk.show("Abonnement renouvele jusqu au "+exp.toLocaleDateString("fr-FR"),"success");
   }
   function cancelPremium(){
     setPremiumData(null);
+    try{localStorage.removeItem("hp_premium");}catch(e){}
     tk.show("Abonnement Premium annule","success");
   }
-  var s11=useState([]);   var resaHistory=s11[0];   var setResaHistory=s11[1];
-  var s12=useState([]);   var followingIds=s12[0];  var setFollowingIds=s12[1];
-  var tk=useToast(); var Toast=tk.Toast;
+  var s11=useState(function(){try{return JSON.parse(localStorage.getItem("hp_resas")||"[]");}catch(e){return[];}});
+  var resaHistory=s11[0];   var setResaHistory=s11[1];
+  var s12=useState(function(){try{return JSON.parse(localStorage.getItem("hp_following")||"[]");}catch(e){return[];}});
+  var followingIds=s12[0];  var setFollowingIds=s12[1];
+  var s13fav=useState(function(){try{return JSON.parse(localStorage.getItem("hp_fav_estabs")||"[]");}catch(e){return[];}});
+  var favEstabIds=s13fav[0]; var setFavEstabIds=s13fav[1];
+  var sNotif=useState(function(){try{var v=localStorage.getItem("hp_notifs");if(!v)return null;var p=JSON.parse(v);if(Array.isArray(p)&&p.length>0&&!p[0].icon){localStorage.removeItem("hp_notifs");return null;}return p;}catch(e){return null;}});
+  var _notifStored=sNotif[0]; var setNotifStored=sNotif[1];
+  var sNotifPrefs=useState(function(){try{var v=localStorage.getItem("hp_notif_prefs");return v?JSON.parse(v):{reservation:true,message:true,promo:true,follow:true};}catch(e){return{reservation:true,message:true,promo:true,follow:true};}});
+  var notifPrefs=sNotifPrefs[0]; var setNotifPrefs=sNotifPrefs[1];
+  function updateNotifPrefs(patch){setNotifPrefs(function(prev){var next=Object.assign({},prev,patch);try{localStorage.setItem("hp_notif_prefs",JSON.stringify(next));}catch(e){}return next;});}
+  var sPPhoto=useState(function(){try{return localStorage.getItem("hp_profile_photo")||null;}catch(e){return null;}});var profilePhoto=sPPhoto[0];var setProfilePhotoRaw=sPPhoto[1];
+  function setProfilePhoto(v){setProfilePhotoRaw(v);try{if(v)localStorage.setItem("hp_profile_photo",v);else localStorage.removeItem("hp_profile_photo");}catch(e){}}
+  var sCEmail=useState(false);var showChangeEmail=sCEmail[0];var setShowChangeEmail=sCEmail[1];
+  var sCPwd=useState(false);var showChangePwd=sCPwd[0];var setShowChangePwd=sCPwd[1];
+  var tk=useToast(); var Toast=tk.Toast; var toastApp=tk.show;
   // === Bouton retour systeme (Android/navigateur) : ferme l'ecran courant au lieu de quitter l'app ===
-  var anyOverlayOpen=(estab!==null)||(book!==null)||sett||notifsOpen||showPremium||showPrivacy;
+  var anyOverlayOpen=(estab!==null)||(book!==null)||sett||notifsOpen||showPremium||showPrivacy||showChangeEmail||showChangePwd;
   function closeTopOverlay(){
     // Ordre de priorite : du plus "haut" (modale) au plus "bas" (ecran)
+    if(showChangeEmail){setShowChangeEmail(false);return;}
+    if(showChangePwd){setShowChangePwd(false);return;}
     if(showPremium){setShowPremium(false);return;}
     if(showPrivacy){setShowPrivacy(false);return;}
+    if(notifsOpen){setNotifs(false);return;}
     if(book!==null){setBook(null);return;}
     if(estab!==null){setEstab(null);return;}
-    if(notifsOpen){setNotifs(false);return;}
     if(sett){setSett(false);return;}
   }
   var overlayRef=useRef(false);
   overlayRef.current=anyOverlayOpen;
+  // Ref toujours a jour vers closeTopOverlay — evite la closure gelee dans useEffect
+  var closeTopOverlayRef=useRef(null);
+  closeTopOverlayRef.current=closeTopOverlay;
   var guardPushed=useRef(false);
-  // Installe UN SEUL listener popstate pour toute la duree de vie de l'app
+  // Installe UN SEUL listener popstate — utilise les refs pour lire l'etat courant
   useEffect(function(){
+    // Arme une entree initiale pour capturer le premier retour
+    try{window.history.pushState({hpGuard:true},"");}catch(e){}
     function onPop(){
       if(overlayRef.current){
-        // Un ecran est ouvert : on le ferme ET on re-arme une entree d'historique
-        // pour que le PROCHAIN retour soit aussi capture (et ne quitte pas l'app)
-        closeTopOverlay();
+        closeTopOverlayRef.current();
         try{window.history.pushState({hpGuard:true},"");}catch(e){}
       }
     }
     window.addEventListener("popstate",onPop);
     return function(){window.removeEventListener("popstate",onPop);};
   },[]);
-  // Arme une entree d'historique des qu'un ecran s'ouvre (une seule fois)
+  // Re-arme l'entree d'historique a chaque ouverture d'ecran
   useEffect(function(){
     if(anyOverlayOpen&&!guardPushed.current){
       guardPushed.current=true;
@@ -2385,26 +2928,49 @@ export default function App() {
   },[anyOverlayOpen]);
   function toggleFollowGlobal(id){
     var was=followingIds.indexOf(id)>=0;
-    setFollowingIds(function(f){return was?f.filter(function(x){return x!==id;}):f.concat([id]);});
-    tk.show(was?"Vous ne suivez plus":"Vous suivez desormais","success");
+    setFollowingIds(function(f){var next=was?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_following",JSON.stringify(next));}catch(e){}return next;});
+    if(!was&&!isPro){addNotif({id:"notif_follow_"+Date.now(),icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un utilisateur suit maintenant votre etablissement.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
+    tk.show(was?"Vous ne suivez plus cet etablissement":"Vous suivez cet etablissement","success");
+  }
+  function toggleFavEstab(id){
+    var wasFav=favEstabIds.indexOf(id)>=0;
+    setFavEstabIds(function(f){var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_fav_estabs",JSON.stringify(next));}catch(e){}return next;});
+    tk.show(wasFav?"Retire des favoris":"Ajoute aux favoris","success");
   }
 
   // Logout - defini avant le routing pour eviter reference error
-  function logout(){
-    setAuth(AuthService.logout());setEstab(null);setBook(null);
+  async function logout(){
+    await AuthService.logout();
+    try{localStorage.removeItem("hp_acc_type");}catch(e){}
+    setAuth(null);setEstab(null);setBook(null);
     setSett(false);setNotifs(false);
     setCTab("feed");setPTab("feed");
+    setNeedsOnboarding(true);
   }
 
   // === ROUTING =====================================================
 
-  if(!auth){
+  // Mode dev : court-circuit l'auth + sélecteur de compte visible dans l'app
+  var sDevType=useState(DEV_ACCOUNT_TYPE);var devType=sDevType[0];var setDevType=sDevType[1];
+  var _resolvedAuth = auth;
+  if(!auth && DEV_BYPASS_AUTH){
+    _resolvedAuth = AuthService.buildSession(devType, "active", "demo@hotelplatform.travel", "dev-user-001");
+  }
+
+  if(!_resolvedAuth){
+    if(needsOnboarding){
+      return(<AccountTypeScreen onSelect={function(t){try{localStorage.setItem("hp_acc_type",t);}catch(e){}setNeedsOnboarding(false);}}/>);
+    }
+    var _storedAccType="client";try{_storedAccType=localStorage.getItem("hp_acc_type")||"client";}catch(e){}
     return(
-      <AuthScreen onAuth={function(t,status,email){
-        setAuth(AuthService.buildSession(t,status,email));
-      }}/>
+      <AuthScreen initialAccType={_storedAccType} onAuth={function(t,status,email,userId){
+        try{localStorage.setItem("hp_acc_type",t);}catch(e){}
+        setAuth(AuthService.buildSession(t,status,email,userId));
+      }} onBack={function(){try{localStorage.removeItem("hp_acc_type");}catch(e){}setNeedsOnboarding(true);}}/>
     );
   }
+
+  var auth=_resolvedAuth; // alias final — écrase le useState auth si dev bypass actif
 
   var BLOCKED_STATUSES=["pending","suspended","banned","refused","disabled"];
   if(BLOCKED_STATUSES.indexOf(auth.accountStatus)>=0){
@@ -2414,9 +2980,11 @@ export default function App() {
   var isPro  = auth.type!=="client";
   var accent = rC(auth.type);
   var proD   = auth.type==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];
-  var NC     = NC_DATA;
-  var NP     = NP_DATA;
-  var unread = (isPro?NP:NC).filter(function(n){return !n.read;}).length;
+  var _defaultNotifList = isPro ? NP_DATA : NC_DATA;
+  var notifList = _notifStored !== null ? _notifStored : _defaultNotifList;
+  function markNotifRead(id){var next=notifList.map(function(n){return n.id===id?Object.assign({},n,{read:true}):n;});setNotifStored(next);try{localStorage.setItem("hp_notifs",JSON.stringify(next));}catch(e){}}
+  function addNotif(notif){if(!notifPrefs[notif.prefKey!==undefined?notif.prefKey:"reservation"])return;var next=[notif].concat(notifList);setNotifStored(next);try{localStorage.setItem("hp_notifs",JSON.stringify(next));}catch(e){}}
+  var unread = notifList.filter(function(n){return !n.read;}).length;
 
   function openProf(id,type){
     var l=type==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
@@ -2427,8 +2995,21 @@ export default function App() {
     if(!isPro)setCTab("chat");else setPTab("chat");
   }
 
-  if(sett)       return <Ov onClose={function(){setSett(false);}}>{function(close){return <SettingsS onBack={close} accType={auth.type} onLogout={logout} onPremium={function(){setSett(false);setShowPremium(true);}} onPrivacy={function(){setSett(false);setShowPrivacy(true);}} isPremium={isPremium}/>;}}</Ov>;
-  if(notifsOpen) return <Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} onBack={close} onNavigate={function(t){setNotifs(false);if(!isPro)setCTab(t);else setPTab(t);}}/>;}}</Ov>;
+  if(showChangeEmail) return <ChangeEmailModal accent={accent} onClose={function(){setShowChangeEmail(false);}}/>;
+  if(showChangePwd)   return <ChangePwdModal accent={accent} onClose={function(){setShowChangePwd(false);}} onSuccess={function(){toastApp("Mot de passe mis a jour avec succes","success");}}/>;
+  if(sett)       return <Ov onClose={function(){setSett(false);}}>{function(close){return <SettingsS onBack={close} accType={auth.type} onLogout={logout} onPremium={function(){setSett(false);setShowPremium(true);}} onPrivacy={function(){setSett(false);setShowPrivacy(true);}} isPremium={isPremium} premiumData={premiumData} onChangeEmail={function(){setSett(false);setShowChangeEmail(true);}} onChangePwd={function(){setSett(false);setShowChangePwd(true);}} notifPrefs={notifPrefs} onUpdateNotifPrefs={updateNotifPrefs}/>;}}</Ov>;
+  // === BANDEAU DEV (visible uniquement si DEV_BYPASS_AUTH = true) ===
+  var devBanner=DEV_BYPASS_AUTH?(
+    <div style={{background:"#1a1a00",borderBottom:"1px solid #F59E0B55",padding:"6px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0}}>
+      <span style={{fontSize:10,color:"#F59E0B",fontWeight:800}}>⚠ MODE TEST v14</span>
+      <div style={{display:"flex",gap:4}}>
+        {[["client","Client"],["hotel","Hôtel"],["restaurant","Resto"]].map(function(_i){
+          var t=_i[0];var l=_i[1];var isAct=devType===t;
+          return <button key={t} onClick={function(){setDevType(t);setAuth(null);}} style={{padding:"3px 10px",borderRadius:20,border:"1px solid "+(isAct?"#F59E0B":"#444"),background:isAct?"#F59E0B":"transparent",color:isAct?"#000":"#F59E0B",fontSize:10,fontWeight:800,cursor:"pointer"}}>{l}</button>;
+        })}
+      </div>
+    </div>
+  ):null;
 
   // === HEADER RIGHT (notifications + offline toggle) ===============
   var headerRight=(
@@ -2452,23 +3033,25 @@ export default function App() {
       {id:"profile",     icon:User,          label:"Profil"},
     ];
     return(
-      <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",display:"flex",flexDirection:"column",maxWidth:420,margin:"0 auto",position:"relative"}}>
+      <div style={{height:"100%",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",display:"flex",flexDirection:"column",maxWidth:420,margin:"0 auto",position:"relative"}}>
         <TopBar
           left={<div style={{fontSize:16,fontWeight:900,color:DS.text,letterSpacing:-0.5}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>}
           right={headerRight}
         />
+        {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
-        <div key={cTab} style={{flex:1,overflowY:"auto",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal}/></div>}
+        <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
+          {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV"/>}
-          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory}/>}
+          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
-        {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} viewerIsPro={false}/>}
-        {book&&<BookM e={book} onClose={function(){setBook(null);}} onBooked={function(resa){setResaHistory(function(h){return BookingService.appendToHistory(h,resa);});setBook(null);}}/>}
+        {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false}/>}
+        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Votre reservation chez "+(resa.estab||"l etablissement")+" est enregistree.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});setBook(null);}}/>}
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
+        {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setCTab(t);}}/>;}}</Ov>}
         <Toast/>
       </div>
     );
@@ -2488,30 +3071,32 @@ export default function App() {
        {id:"profile",      icon:User,          label:"Profil"}];
 
   return(
-    <div style={{minHeight:"100vh",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",display:"flex",flexDirection:"column",maxWidth:420,margin:"0 auto",position:"relative"}}>
+    <div style={{height:"100%",background:DS.bg,fontFamily:"'DM Sans','Inter','Segoe UI',sans-serif",display:"flex",flexDirection:"column",maxWidth:420,margin:"0 auto",position:"relative"}}>
       <TopBar
         left={
           <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
             <span style={{fontSize:14,fontWeight:900,color:DS.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{proD.name}</span>
-            {proD.verified&&<VBadge sz={14}/>}
+            {proD.verified&&<VBadge sz={16} showLabel={true}/>}
           </div>
         }
         right={headerRight}
       />
+      {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
-      <div key={pTab} style={{flex:1,overflowY:"auto",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal}/></div>}
+      <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
+        {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
-        {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings}/>}
-        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]}/>}
-        {pTab==="profile"      &&<ProProf proType={auth.type} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}}/>}
+        {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
+        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={true} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]}/>}
+        {pTab==="profile"      &&<ProProf proType={auth.type} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
-      {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} viewerIsPro={true}/>}
-      {book&&<BookM e={book} onClose={function(){setBook(null);}} onBooked={function(resa){setResaHistory(function(h){return BookingService.appendToHistory(h,resa);});setBook(null);}}/>}
+      {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true}/>}
+      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Votre reservation chez "+(resa.estab||"l etablissement")+" est enregistree.",time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});setBook(null);}}/>}
       {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
+      {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setPTab(t);}}/>;}}</Ov>}
       <Toast/>
     </div>
   );

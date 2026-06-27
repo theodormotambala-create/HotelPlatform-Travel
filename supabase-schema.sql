@@ -102,9 +102,19 @@ create policy "lecture publique etablissements"
   on public.establishments for select
   using (true);
 
+-- Insertion publique pour le seeding initial (premier deploiement)
+create policy "insertion publique etablissements"
+  on public.establishments for insert
+  with check (true);
+
 create policy "lecture publique posts"
   on public.posts for select
   using (true);
+
+-- Insertion de posts pour les utilisateurs authentifies (pros)
+create policy "insertion posts authentifies"
+  on public.posts for insert
+  with check (true);
 
 -- --- Reservations : chaque utilisateur ne voit/cree que les siennes ---
 create policy "reservations: lecture par proprietaire"
