@@ -1222,7 +1222,17 @@ function ClientDisc(props){
   var s2=useState("");var search=s2[0];var setSearch=s2[1];
   var sDSk=useState(true);var discSkLoading=sDSk[0];var setDiscSkLoading=sDSk[1];
   useEffect(function(){var t=setTimeout(function(){setDiscSkLoading(false);},350);return function(){clearTimeout(t);};},[]);
-  var items=tab==="hotels"?DataLayer.getHotels():DataLayer.getRestaurants();
+  var items=(function(){
+    var _base=tab==="hotels"?DataLayer.getHotels():DataLayer.getRestaurants();
+    var _h0=DataLayer.getHotels()[0];var _r0=DataLayer.getRestaurants()[0];
+    return _base.map(function(item){
+      try{
+        if(tab==="hotels"&&_h0&&item.id===_h0.id){var _rr=localStorage.getItem("hp_hotelsvc_rooms");if(_rr){var _av=JSON.parse(_rr).filter(function(r){return r.available&&r.price>0;});if(_av.length){var _mn=Math.min.apply(null,_av.map(function(r){return r.price;}));if(_mn>0)return Object.assign({},item,{priceFrom:_mn});}}}
+        else if(tab==="restaurants"&&_r0&&item.id===_r0.id){var _ri=localStorage.getItem("hp_restoff_items");if(_ri){var _av2=JSON.parse(_ri).filter(function(d){return d.available&&d.price>0;});if(_av2.length){var _mn2=Math.min.apply(null,_av2.map(function(d){return d.price;}));if(_mn2>0)return Object.assign({},item,{priceFrom:_mn2});}}}
+      }catch(_e){}
+      return item;
+    });
+  })();
   var filtered=items.filter(function(i){return i.name.toLowerCase().indexOf(search.toLowerCase())>=0||i.location.toLowerCase().indexOf(search.toLowerCase())>=0;});
   var color=tab==="hotels"?DS.hotel:DS.restaurant;
   return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{padding:"0 14px",paddingBottom:16}}>{discSkLoading?<DiscSkeleton/>:(filtered.length===0?<Emp Icon={Search} title="Aucun resultat"/>:filtered.map(function(item,_idx){return(<div key={item.id} className="hp-card" style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border,animation:"hp-item-in 0.32s ease both",animationDelay:(_idx*60)+"ms"}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{display:"flex",alignItems:"center",gap:5}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div>{item.verified&&<VBadge sz={18} showLabel={true}/>}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){if(item.svcMode==="combined"){if(onProfile)onProfile(item.id,item.type);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>{item.svcMode==="combined"?"Voir options":"Reserver"}</button></div></div>);}))}</div></div>);
@@ -1355,17 +1365,19 @@ function EstabM(props){
   try{
     var _h0=DataLayer.getHotels()[0];var _r0=DataLayer.getRestaurants()[0];
     if(_h0&&e&&e.id===_h0.id){
-      var _rmsRaw=localStorage.getItem("hp_hotelsvc_rooms");var _amsRaw=localStorage.getItem("hp_hotelsvc_amenities");var _dshRaw=localStorage.getItem("hp_hotelsvc_dishes");
+      var _rmsRaw=localStorage.getItem("hp_hotelsvc_rooms");var _amsRaw=localStorage.getItem("hp_hotelsvc_amenities");var _dshRaw=localStorage.getItem("hp_hotelsvc_dishes");var _descRawH=localStorage.getItem("hp_pro_desc_hotel");
       var _patch={};
-      if(_rmsRaw)_patch.rooms=JSON.parse(_rmsRaw);
+      if(_rmsRaw){var _rms=JSON.parse(_rmsRaw);_patch.rooms=_rms;var _avail=_rms.filter(function(r){return r.available&&r.price>0;});if(_avail.length){var _minH=Math.min.apply(null,_avail.map(function(r){return r.price;}));if(_minH>0)_patch.priceFrom=_minH;}}
       if(_amsRaw)_patch.services=JSON.parse(_amsRaw).filter(function(a){return a.active!==false;});
       if(_dshRaw){var _fl=JSON.parse(_dshRaw);var _mc={};_fl.forEach(function(d){var c=d.category||"Plats";if(!_mc[c])_mc[c]=[];_mc[c].push(d);});_patch.menu=Object.keys(_mc).map(function(c){return{cat:c,items:_mc[c]};});}
+      if(_descRawH)_patch.description=_descRawH;
       if(Object.keys(_patch).length)e=Object.assign({},e,_patch);
     }else if(_r0&&e&&e.id===_r0.id){
-      var _itRaw=localStorage.getItem("hp_restoff_items");var _ofRaw=localStorage.getItem("hp_restoff_offers");
+      var _itRaw=localStorage.getItem("hp_restoff_items");var _ofRaw=localStorage.getItem("hp_restoff_offers");var _descRawR=localStorage.getItem("hp_pro_desc_restaurant");
       var _patch2={};
-      if(_itRaw){var _fl2=JSON.parse(_itRaw);var _mc2={};_fl2.forEach(function(d){var c=d.category||"Plats";if(!_mc2[c])_mc2[c]=[];_mc2[c].push(d);});_patch2.menu=Object.keys(_mc2).map(function(c){return{cat:c,items:_mc2[c]};});}
-      if(_ofRaw)_patch2.offers=JSON.parse(_ofRaw);
+      if(_itRaw){var _fl2=JSON.parse(_itRaw);var _mc2={};_fl2.forEach(function(d){var c=d.category||"Plats";if(!_mc2[c])_mc2[c]=[];_mc2[c].push(d);});_patch2.menu=Object.keys(_mc2).map(function(c){return{cat:c,items:_mc2[c]};});var _availR=_fl2.filter(function(d){return d.available&&d.price>0;});if(_availR.length){var _minR=Math.min.apply(null,_availR.map(function(d){return d.price;}));if(_minR>0)_patch2.priceFrom=_minR;}}
+      if(_ofRaw)_patch2.offers=JSON.parse(_ofRaw).filter(function(o){return o.available!==false;});
+      if(_descRawR)_patch2.description=_descRawR;
       if(Object.keys(_patch2).length)e=Object.assign({},e,_patch2);
     }
   }catch(_ex){}
@@ -1444,22 +1456,38 @@ function EstabM(props){
             </div>
           )}{tab==="menu"&&(resaType==="restaurant"||!isHotel)&&(
             <div>
+              {!isHotel&&(e.offers||[]).length>0&&(
+                <div style={{marginBottom:18}}>
+                  <div style={{fontSize:12,fontWeight:800,color:color,letterSpacing:1.5,marginBottom:8}}>OFFRES SPECIALES</div>
+                  {(e.offers||[]).map(function(o,oi){return(
+                    <div key={o.id||oi} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+color+"44",background:color+"0A"}}>
+                      <div style={{width:32,height:32,borderRadius:9,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Tag size={14} color={color}/></div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:700,color:DS.text}}>{o.name}</div>
+                      </div>
+                      {o.price&&<div style={{fontSize:14,fontWeight:900,color:DS.gold,flexShrink:0}}>{o.price} EUR</div>}
+                    </div>
+                  );})}
+                </div>
+              )}
               {(e.menu||[]).map(function(cat,ci){return(
                 <div key={ci} style={{marginBottom:18}}>
                   <div style={{fontSize:12,fontWeight:800,color:color,letterSpacing:1.5,marginBottom:8}}>{cat.cat.toUpperCase()}</div>
                   {cat.items.map(function(item,ji){
-                    var isSel=selectedDishes.indexOf(cat.cat+"-"+item.name)>=0;
+                    var isAvail=item.available!==false;
+                    var isSel=isAvail&&selectedDishes.indexOf(cat.cat+"-"+item.name)>=0;
                     return(
-                      <div key={ji} onClick={function(){var k=cat.cat+"-"+item.name;setSelectedDishes(function(prev){return prev.indexOf(k)>=0?prev.filter(function(x){return x!==k;}):prev.concat([k]);});}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",marginBottom:6,borderRadius:12,border:"1.5px solid "+(isSel?color+"66":DS.border+"40"),background:isSel?color+"0C":DS.card,cursor:"pointer",transition:"all .15s"}}>
+                      <div key={ji} onClick={function(){if(!isAvail)return;var k=cat.cat+"-"+item.name;setSelectedDishes(function(prev){return prev.indexOf(k)>=0?prev.filter(function(x){return x!==k;}):prev.concat([k]);});}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",marginBottom:6,borderRadius:12,border:"1.5px solid "+(isSel?color+"66":DS.border+"40"),background:isSel?color+"0C":DS.card,cursor:isAvail?"pointer":"not-allowed",transition:"all .15s",opacity:isAvail?1:0.5}}>
                         <div style={{width:22,height:22,borderRadius:6,border:"2px solid "+(isSel?color:DS.border),background:isSel?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                           {isSel&&<CheckCircle size={12} color="#fff"/>}
                         </div>
                         <div style={{flex:1}}>
                           <div style={{fontSize:13,fontWeight:isSel?700:500,color:isSel?color:DS.text}}>{item.name}</div>
                           {item.description&&<div style={{fontSize:10,color:DS.textMuted,marginTop:1}}>{item.description}</div>}
+                          {!isAvail&&<div style={{fontSize:10,color:DS.error,fontWeight:700,marginTop:2}}>Indisponible</div>}
                         </div>
                         <div style={{textAlign:"right",flexShrink:0}}>
-                          <div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{item.price} EUR</div>
+                          <div style={{fontSize:14,fontWeight:900,color:isAvail?DS.gold:DS.textDim}}>{item.price} EUR</div>
                         </div>
                       </div>
                     );
