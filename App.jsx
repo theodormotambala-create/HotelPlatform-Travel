@@ -1099,11 +1099,14 @@ function ClientFeed(props){
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
   function toggleLike(id){
+    var post=posts.find(function(p){return p.id===id;});
+    var wasLiked=post?post.liked:false;
     setPosts(function(ps){
       var next=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});
       try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem("hp_likes",JSON.stringify(lk));}catch(e){}
       return next;
     });
+    if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),Icon:Heart,color:DS.error,title:"Nouveau like",body:selfName+" a aimé la publication de "+post.author+".",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
@@ -1802,9 +1805,12 @@ function ProFeed(props){
   function triggerHeartPro(id){setHeartAnimPro(id);setTimeout(function(){setHeartAnimPro(null);},500);}
   // Fix #6 : persistance likes Pro
   function toggleLikePro(id){
+    var post=posts.find(function(p){return p.id===id;});var wasLiked=post?post.liked:false;
     setPosts(function(ps){
       var next=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});
       try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem("hp_pro_likes",JSON.stringify(lk));}catch(e){}
+      if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),Icon:Heart,color:DS.error,title:"Nouveau like",body:"Quelqu'un a aimé votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
+
       return next;
     });
   }
