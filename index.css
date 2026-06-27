@@ -6,7 +6,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html, body {
+html, body, #root {
+  height: 100%;
   width: 100%;
   background: #09090F;
   overscroll-behavior: none;
@@ -15,12 +16,15 @@ html, body {
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 
 #root {
   max-width: 480px;
   margin: 0 auto;
   position: relative;
+  overflow: hidden;
+  min-height: 100%;
 }
 
 /* Splash de demarrage (avant que React prenne la main) */
