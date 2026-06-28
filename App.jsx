@@ -148,6 +148,71 @@ var DataLayer = {
           DataLayer._seedPosts(supabase);
         }
       });
+      // 3. Chambres — enrichit les hotels du cache
+      supabase.from("establishment_rooms").select("*").then(function(res){
+        if(res && res.data && res.data.length>0){
+          res.data.forEach(function(row){
+            var h = DataLayer._cache.hotels.find(function(x){ return x.id===row.establishment_id; });
+            if(h){ if(!h._rooms) h._rooms=[]; h._rooms.push(row); }
+          });
+          DataLayer._cache.hotels = DataLayer._cache.hotels.map(function(h){
+            if(!h._rooms) return h;
+            var rooms = h._rooms; delete h._rooms;
+            return Object.assign({},h,{rooms:rooms});
+          });
+          if(DataLayer._onUpdate) DataLayer._onUpdate();
+        }
+      });
+      // 4. Plats — enrichit hotels et restaurants
+      supabase.from("establishment_dishes").select("*").then(function(res){
+        if(res && res.data && res.data.length>0){
+          var byEstab={};
+          res.data.forEach(function(row){
+            if(!byEstab[row.establishment_id]) byEstab[row.establishment_id]=[];
+            byEstab[row.establishment_id].push(row);
+          });
+          function buildMenu(dishes){
+            var cats={};
+            dishes.forEach(function(d){ var c=d.category||"Plats"; if(!cats[c])cats[c]=[]; cats[c].push(d); });
+            return Object.keys(cats).map(function(c){ return {cat:c,items:cats[c]}; });
+          }
+          DataLayer._cache.hotels = DataLayer._cache.hotels.map(function(h){
+            return byEstab[h.id] ? Object.assign({},h,{menu:buildMenu(byEstab[h.id])}) : h;
+          });
+          DataLayer._cache.restaurants = DataLayer._cache.restaurants.map(function(r){
+            return byEstab[r.id] ? Object.assign({},r,{menu:buildMenu(byEstab[r.id])}) : r;
+          });
+          if(DataLayer._onUpdate) DataLayer._onUpdate();
+        }
+      });
+      // 5. Services/equipements
+      supabase.from("establishment_amenities").select("*").then(function(res){
+        if(res && res.data && res.data.length>0){
+          var byEstab={};
+          res.data.forEach(function(row){
+            if(!byEstab[row.establishment_id]) byEstab[row.establishment_id]=[];
+            byEstab[row.establishment_id].push(row);
+          });
+          DataLayer._cache.hotels = DataLayer._cache.hotels.map(function(h){
+            return byEstab[h.id] ? Object.assign({},h,{services:byEstab[h.id]}) : h;
+          });
+          if(DataLayer._onUpdate) DataLayer._onUpdate();
+        }
+      });
+      // 6. Offres restaurants
+      supabase.from("establishment_offers").select("*").then(function(res){
+        if(res && res.data && res.data.length>0){
+          var byEstab={};
+          res.data.forEach(function(row){
+            if(!byEstab[row.establishment_id]) byEstab[row.establishment_id]=[];
+            byEstab[row.establishment_id].push(row);
+          });
+          DataLayer._cache.restaurants = DataLayer._cache.restaurants.map(function(r){
+            return byEstab[r.id] ? Object.assign({},r,{offers:byEstab[r.id]}) : r;
+          });
+          if(DataLayer._onUpdate) DataLayer._onUpdate();
+        }
+      });
     }catch(e){ /* hors-ligne ou non configure : on garde la demo */
       // Fix #9 : retry apres 8 secondes si echec au demarrage
       setTimeout(function(){ try{ DataLayer.syncFromSupabase(supabase); }catch(e2){} }, 8000);
@@ -232,6 +297,78 @@ var DataLayer = {
       body: msg.t, deleted: !!msg.deleted, read: !!msg.read,
       reply_to: msg.replyTo || null
     }]);
+  },
+
+  // UPSERT : insere ou met a jour selon la cle de conflit
+  upsert: function(table, rows, onConflict){
+    if(!DataLayer._client) return Promise.resolve({ data: null, error: "no-client" });
+    try{
+      var q = DataLayer._client.from(table).upsert(rows, onConflict ? { onConflict: onConflict } : undefined);
+      return q;
+    }catch(e){ return Promise.resolve({ data: null, error: e }); }
+  },
+
+  // --- Sauvegarde des donnees metier etablissement ---
+  saveEstabRooms: function(estabId, rooms){
+    if(!DataLayer._client||!estabId) return;
+    try{
+      var rows = rooms.map(function(r){
+        return { id: r.id, establishment_id: estabId, name: r.name,
+                 price: r.price||0, capacity: r.capacity||2,
+                 available: r.available!==false, stock: r.stock||1,
+                 description: r.description||null };
+      });
+      DataLayer._client.from("establishment_rooms")
+        .delete().eq("establishment_id", estabId).then(function(){
+          if(rows.length) DataLayer._client.from("establishment_rooms").insert(rows).then(function(){});
+        });
+    }catch(e){}
+  },
+  saveEstabDishes: function(estabId, dishes){
+    if(!DataLayer._client||!estabId) return;
+    try{
+      var rows = dishes.map(function(d){
+        return { id: d.id, establishment_id: estabId, name: d.name,
+                 price: d.price||0, category: d.category||"Plats",
+                 description: d.description||null, available: d.available!==false };
+      });
+      DataLayer._client.from("establishment_dishes")
+        .delete().eq("establishment_id", estabId).then(function(){
+          if(rows.length) DataLayer._client.from("establishment_dishes").insert(rows).then(function(){});
+        });
+    }catch(e){}
+  },
+  saveEstabAmenities: function(estabId, amenities){
+    if(!DataLayer._client||!estabId) return;
+    try{
+      var rows = amenities.map(function(a){
+        return { id: a.id, establishment_id: estabId, name: a.name, active: a.active!==false };
+      });
+      DataLayer._client.from("establishment_amenities")
+        .delete().eq("establishment_id", estabId).then(function(){
+          if(rows.length) DataLayer._client.from("establishment_amenities").insert(rows).then(function(){});
+        });
+    }catch(e){}
+  },
+  saveEstabOffers: function(estabId, offers){
+    if(!DataLayer._client||!estabId) return;
+    try{
+      var rows = offers.map(function(o){
+        return { id: o.id, establishment_id: estabId, name: o.name,
+                 price: o.price||null, available: o.available!==false };
+      });
+      DataLayer._client.from("establishment_offers")
+        .delete().eq("establishment_id", estabId).then(function(){
+          if(rows.length) DataLayer._client.from("establishment_offers").insert(rows).then(function(){});
+        });
+    }catch(e){}
+  },
+  saveEstabDescription: function(estabId, description){
+    if(!DataLayer._client||!estabId||!description) return;
+    try{
+      DataLayer._client.from("establishments")
+        .update({ description: description }).eq("id", estabId).then(function(){});
+    }catch(e){}
   }
 };
 
@@ -2357,9 +2494,10 @@ function HotelSvc(props){
   var sd=useState(null);var confirmDeleteRoom=sd[0];var setConfirmDeleteRoom=sd[1];
   var se=useState(null);var confirmDeleteDish=se[0];var setConfirmDeleteDish=se[1];
   var sf=useState(null);var confirmDeleteSvc=sf[0];var setConfirmDeleteSvc=sf[1];
-  function _saveRooms(rs){try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}}
-  function _saveDishes(ms){try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ms));}catch(e){}}
-  function _saveAmenities(am){try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}}
+  var _hEstabId=data&&data.id?data.id:null;
+  function _saveRooms(rs){try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}try{DataLayer.saveEstabRooms(_hEstabId,rs);}catch(e){}}
+  function _saveDishes(ms){try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ms));}catch(e){}try{DataLayer.saveEstabDishes(_hEstabId,ms);}catch(e){}}
+  function _saveAmenities(am){try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}try{DataLayer.saveEstabAmenities(_hEstabId,am);}catch(e){}}
   function toggleAmenity(id){setAmenities(function(am){var next=am.map(function(a){return a.id===id?Object.assign({},a,{active:!a.active}):a;});_saveAmenities(next);return next;});}
   function addAmenity(){if(!newSvcName.trim())return;var am=amenities.concat([{id:"svc"+Date.now(),name:newSvcName.trim(),active:true}]);setAmenities(am);_saveAmenities(am);setNewSvcName("");setAddSvc(false);}
   function removeAmenity(id){setAmenities(function(am){var next=am.filter(function(a){return a.id!==id;});_saveAmenities(next);return next;});}
@@ -2540,11 +2678,12 @@ function RestOff(props){
   var s4b=useState("");var newOfferName=s4b[0];var setNewOfferName=s4b[1];
   var s4c=useState("");var newOfferPrice=s4c[0];var setNewOfferPrice=s4c[1];
   var s5=useState("menu");var tab=s5[0];var setTab=s5[1];
-  function _saveOffers(next){try{localStorage.setItem("hp_restoff_offers",JSON.stringify(next));}catch(e){}}
+  var _rEstabId=data&&data.id?data.id:null;
+  function _saveOffers(next){try{localStorage.setItem("hp_restoff_offers",JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabOffers(_rEstabId,next);}catch(e){}}
   var tkO=useToast();var toastO=tkO.show;var ToastO=tkO.Toast;
   function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next);toastO("Offre supprimee","info");}
   function addOffer(){if(!newOfferName.trim())return;var o={id:"o"+Date.now(),name:newOfferName.trim(),price:newOfferPrice?parseFloat(newOfferPrice):null,available:true};var next=offers.concat([o]);setOffers(next);_saveOffers(next);setNewOfferName("");setNewOfferPrice("");setShowAddOffer(false);toastO("Offre ajoutee","success");}
-  function _saveItems(next){try{localStorage.setItem("hp_restoff_items",JSON.stringify(next));}catch(e){}}
+  function _saveItems(next){try{localStorage.setItem("hp_restoff_items",JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabDishes(_rEstabId,next);}catch(e){}}
   function saveItem(item){
     if(editItem){setItems(function(is){var next=is.map(function(i){return i.id===item.id?item:i;});_saveItems(next);return next;});toastO("Plat mis a jour","success");}
     else{setItems(function(is){var next=is.concat([item]);_saveItems(next);return next;});toastO("Plat ajoute","success");}
@@ -2751,7 +2890,7 @@ function ProProf(props){
   var _proUploadRef=useRef(null);
   var _sProViewer=useState(null);var _proViewer=_sProViewer[0];var _setProViewer=_sProViewer[1];
   function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){if(onPhotoChange)onPhotoChange(ev.target.result);};r.readAsDataURL(f);}
-  function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}setEditingAbout(false);toastP("A propos mis a jour","success");}
+  function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}setEditingAbout(false);toastP("A propos mis a jour","success");}
   var premiumActive=isPremium||data.isPremium;
   // Periode de grace : badge reste visible 7 jours apres expiration de l abonnement
   var _graceActive=false;
