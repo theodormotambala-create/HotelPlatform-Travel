@@ -1462,6 +1462,24 @@ function ClientFeed(props){
   function triggerHeart(id){setHeartAnim(id);setTimeout(function(){setHeartAnim(null);},500);}
   var _estabMap=useRef(null);
   if(!_estabMap.current){var _em={};DataLayer.getHotels().concat(DataLayer.getRestaurants()).forEach(function(e){_em[e.id]=e;});_estabMap.current=_em;}
+  var postRefs=useRef({});
+  function openCmt(id){
+    var el=postRefs.current[id];
+    if(el){
+      var rect=el.getBoundingClientRect();
+      var viewH=window.innerHeight;
+      // La publication doit être dans le tiers supérieur de l'écran (hors topbar ~52px)
+      var targetTop=64;
+      if(rect.top<targetTop||rect.top>viewH*0.45){
+        var scrollY=window.pageYOffset||document.documentElement.scrollTop;
+        var newY=scrollY+rect.top-targetTop;
+        window.scrollTo({top:newY,behavior:"smooth"});
+        setTimeout(function(){toggleCmt(id);},320);
+        return;
+      }
+    }
+    toggleCmt(id);
+  }
   return(
     <div style={{background:DS.bg,paddingBottom:24,WebkitOverflowScrolling:"touch"}}>
       <Toast/>
@@ -1472,7 +1490,7 @@ function ClientFeed(props){
       {posts.map(function(post,_pi){
         var color=rC(post.type);
         return(
-          <div key={post.id} style={{background:DS.surface,marginBottom:8,borderTop:"1px solid "+DS.border+"22",borderBottom:"1px solid "+DS.border+"22",animation:"hp-item-in 0.38s cubic-bezier(0.22,1,0.36,1) both",animationDelay:(_pi*45)+"ms"}}>
+          <div key={post.id} ref={function(el){postRefs.current[post.id]=el;}} style={{background:DS.surface,marginBottom:8,borderTop:"1px solid "+DS.border+"22",borderBottom:"1px solid "+DS.border+"22",animation:"hp-item-in 0.38s cubic-bezier(0.22,1,0.36,1) both",animationDelay:(_pi*45)+"ms"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px 10px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
                 <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{cursor:"pointer",flexShrink:0}}>
@@ -1510,10 +1528,10 @@ function ClientFeed(props){
             {post.img&&<div style={{position:"relative",overflow:"hidden",background:DS.card}}><img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.parentNode.style.display="none";}} style={{width:"100%",height:"min(500px,62vh)",objectFit:"cover",display:"block"}}/></div>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"10px 16px 2px",fontSize:12,color:DS.textDim}}>
               <span>{post.likes} reaction{post.likes!==1?"s":""}</span>
-              <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
+              <span style={{cursor:"pointer"}} onClick={function(){openCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
             <div style={{display:"flex",borderTop:"1px solid "+DS.border+"28",marginTop:6}}>
-              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLike(post.id);triggerHeart(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
+              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLike(post.id);triggerHeart(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){openCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
                 var lb=_i[0];var Icon=_i[1];var col=_i[2];var fn=_i[3];
                 return(
                   <button key={lb} onClick={fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"11px 0",background:"none",border:"none",cursor:"pointer",color:col,fontSize:13,fontWeight:lb==="Liker"&&post.liked?700:500}}>
