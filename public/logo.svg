@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="rounded">
+      <rect x="16" y="16" width="480" height="480" rx="104" ry="104"/>
+    </clipPath>
+  </defs>
+  <!-- Fond : moitie gauche blanche, moitie droite orange -->
+  <g clip-path="url(#rounded)">
+    <rect x="16" y="16" width="240" height="480" fill="#FFFFFF"/>
+    <rect x="256" y="16" width="240" height="480" fill="#FF6B00"/>
+  </g>
+  <!-- Contour subtil du carre arrondi -->
+  <rect x="16" y="16" width="480" height="480" rx="104" ry="104" fill="none" stroke="#EDEDED" stroke-width="2"/>
+  <!-- Lettre H : couleurs inversees de chaque cote, en damier -->
+  <g clip-path="url(#rounded)">
+    <!-- Montant gauche du H -->
+    <rect x="112" y="104" width="74" height="304" rx="34" fill="#FF6B00"/>
+    <!-- Montant droit du H -->
+    <rect x="326" y="104" width="74" height="304" rx="34" fill="#FFFFFF"/>
+    <!-- Barre horizontale gauche (orange, sur fond blanc) -->
+    <rect x="146" y="222" width="110" height="68" fill="#FF6B00"/>
+    <!-- Barre horizontale droite (blanche, sur fond orange) -->
+    <rect x="256" y="222" width="110" height="68" fill="#FFFFFF"/>
+  </g>
+</svg>
