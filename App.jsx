@@ -1256,6 +1256,12 @@ function CommentsSheet(props){
     window.addEventListener("mousemove",mm);window.addEventListener("mouseup",mu);
     return function(){window.removeEventListener("mousemove",mm);window.removeEventListener("mouseup",mu);};
   },[isDragging]);
+  // Lock body scroll when sheet is open (prevents feed scrolling behind)
+  useEffect(function(){
+    var prev=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    return function(){document.body.style.overflow=prev;};
+  },[]);
   // Scroll management
   var scrollerRef=useRef(null);
   var prevCmtLen=useRef(post.comments.length);
