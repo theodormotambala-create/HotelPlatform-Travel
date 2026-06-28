@@ -5,9 +5,10 @@
 // =====================================================================
 import { createClient } from "@supabase/supabase-js";
 
-// URL et cle publique du projet (la cle "publishable" est faite pour le front-end)
-const SUPABASE_URL = "https://zptnfhmufxjrrkknqlle.supabase.co";
-const SUPABASE_KEY = "sb_publishable_GJBKtE245VFPGf17LbYa_w_zZ3uPgcG";
+// URL et cle publique du projet — lues depuis .env (VITE_SUPABASE_URL / VITE_SUPABASE_KEY)
+// En production : configurer ces variables dans le dashboard Vercel (ou l hebergeur choisi)
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://zptnfhmufxjrrkknqlle.supabase.co";
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY || "sb_publishable_GJBKtE245VFPGf17LbYa_w_zZ3uPgcG";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
