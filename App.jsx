@@ -213,6 +213,54 @@ var DataLayer = {
           if(DataLayer._onUpdate) DataLayer._onUpdate();
         }
       });
+      // 7. Avis clients (reviews) — re-hydrate localStorage par etablissement
+      supabase.from("reviews").select("*").then(function(res){
+        if(res && res.data && res.data.length>0){
+          var byEstab={};
+          res.data.forEach(function(row){
+            if(!byEstab[row.establishment_id]) byEstab[row.establishment_id]=[];
+            byEstab[row.establishment_id].push({
+              id: row.id, rating: row.rating,
+              text: row.text||"", date: row.created_at ? new Date(row.created_at).toLocaleDateString("fr-FR") : "",
+              author: row.author||"Anonyme"
+            });
+          });
+          try{
+            Object.keys(byEstab).forEach(function(eid){
+              var key="hp_reviews_"+eid;
+              var existing=[];try{existing=JSON.parse(localStorage.getItem(key)||"[]");}catch(ex){}
+              var merged=byEstab[eid].concat(existing.filter(function(r){
+                return !byEstab[eid].some(function(sr){ return sr.text===r.text&&sr.rating===r.rating; });
+              }));
+              localStorage.setItem(key,JSON.stringify(merged));
+            });
+          }catch(ex){}
+        }
+      });
+      // 8. Reservations — re-hydrate BookingService depuis Supabase
+      supabase.from("reservations").select("*").then(function(res){
+        if(res && res.data && res.data.length>0){
+          try{
+            var existing=[];try{existing=JSON.parse(localStorage.getItem("hp_resas_all")||"[]");}catch(ex){}
+            var existingIds=existing.map(function(r){return r.id;});
+            var newFromSb=res.data.filter(function(row){ return !existingIds.includes(row.id); })
+              .map(function(row){ return row.data ? Object.assign({},row.data,{status:row.status}) : row; });
+            if(newFromSb.length>0){
+              var merged=existing.concat(newFromSb);
+              localStorage.setItem("hp_resas_all",JSON.stringify(merged));
+              BookingService._all=merged;
+            } else {
+              // Mettre a jour les statuts depuis Supabase pour les reservations existantes
+              var updated=existing.map(function(r){
+                var sbRow=res.data.find(function(row){ return row.id===r.id; });
+                return sbRow ? Object.assign({},r,{status:sbRow.status}) : r;
+              });
+              localStorage.setItem("hp_resas_all",JSON.stringify(updated));
+              BookingService._all=updated;
+            }
+          }catch(ex){}
+        }
+      });
     }catch(e){ /* hors-ligne ou non configure : on garde la demo */
       // Fix #9 : retry apres 8 secondes si echec au demarrage
       setTimeout(function(){ try{ DataLayer.syncFromSupabase(supabase); }catch(e2){} }, 8000);
@@ -368,6 +416,24 @@ var DataLayer = {
     try{
       DataLayer._client.from("establishments")
         .update({ description: description }).eq("id", estabId).then(function(){});
+    }catch(e){}
+  },
+  saveReview: function(estabId, review){
+    if(!DataLayer._client||!estabId||!review) return;
+    try{
+      DataLayer._client.from("reviews").insert([{
+        establishment_id: estabId,
+        rating: review.rating,
+        text: review.text||null,
+        author: review.author||"Anonyme"
+      }]).then(function(){});
+    }catch(e){}
+  },
+  updateReservationStatus: function(id, status){
+    if(!DataLayer._client||!id||!status) return;
+    try{
+      DataLayer._client.from("reservations")
+        .update({ status: status }).eq("id", id).then(function(){});
     }catch(e){}
   }
 };
@@ -1646,7 +1712,7 @@ function EstabM(props){
                 </div>
               )}
             </div>
-          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}toast("Avis publie","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier a partager votre experience"/>}</div>}</div></div>);
+          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{DataLayer.saveReview(e&&e.id,rv);}catch(ex2){}toast("Avis publie","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier a partager votre experience"/>}</div>}</div></div>);
 }
 
 function genQRPixels(id){
@@ -2793,7 +2859,7 @@ function ProResa(props){
   var filtered=filter==="all"?resas:resas.filter(function(r){return r.status===filter;});
   var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim};
   var sLabels={confirmed:"Confirmee",pending:"En attente",refused:"Refusee",consumed:"Consommee"};
-  function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem("hp_resas_all",JSON.stringify(updated));}catch(e){}}
+  function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem("hp_resas_all",JSON.stringify(updated));}catch(e){}try{if(patch&&patch.status)DataLayer.updateReservationStatus(id,patch.status);}catch(e2){}}
   function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Reservation confirmee","success");}
   function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Reservation refusee","info");}
   function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivee confirmee - Client marque present","success");}
