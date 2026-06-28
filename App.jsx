@@ -1293,60 +1293,73 @@ function CommentsSheet(props){
       <div ref={scrollerRef} style={{flex:1,minHeight:0,overflowY:"auto",overflowX:"hidden",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",overscrollBehavior:"contain"}}>
         {post.comments.length===0&&<div style={{textAlign:"center",color:DS.textDim,fontSize:13,padding:"24px 0"}}>Aucun commentaire. Soyez le premier !</div>}
         {(function(){
-          // Séparer commentaires parents et réponses
-          var parents=post.comments.filter(function(c){return !c.replyTo;});
-          var replies=post.comments.filter(function(c){return !!c.replyTo;});
-          // Grouper les réponses par auteur du parent ciblé
-          function getReplies(parent){return replies.filter(function(r){return r.replyTo===parent.author;});}
-          return parents.map(function(cm,i){
+          // Groupement séquentiel : chaque réponse appartient au dernier parent avant elle
+          var groups=[];
+          post.comments.forEach(function(cm){
+            if(!cm.replyTo){
+              groups.push({parent:cm,replies:[]});
+            } else {
+              if(groups.length>0) groups[groups.length-1].replies.push(cm);
+              else groups.push({parent:cm,replies:[]});
+            }
+          });
+          return groups.map(function(g,gi){
+            var cm=g.parent;
             var mine=cm.author===selfName;
-            var isNew=post.comments.indexOf(cm)>=initCmtCount.current;
-            var cmReplies=getReplies(cm);
-            var repCount=cmReplies.length;
-            var expanded=expandedReplies[cm.id||i]||false;
+            var cmIdx=post.comments.indexOf(cm);
+            var isNew=cmIdx>=initCmtCount.current;
+            var repCount=g.replies.length;
+            var key=cm.id||("g"+gi);
+            var expanded=expandedReplies[key]||false;
             return(
-              <div key={cm.id||i} style={{marginBottom:14,animation:isNew?"hp-item-in 0.25s ease both":"none"}}>
+              <div key={key} style={{marginBottom:16,animation:isNew?"hp-item-in 0.25s ease both":"none"}}>
                 {/* Commentaire parent */}
                 <div style={{display:"flex",gap:10}}>
-                  <Av sz={32} letter={cm.author[0]}/>
+                  <Av sz={34} letter={cm.author[0]}/>
                   <div style={{flex:1}}>
-                    <div onTouchStart={function(e){lpStart(cm,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(cm);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(mine)setMenuCm(cm);}} style={{background:DS.card,borderRadius:"0 14px 14px 14px",padding:"8px 12px",cursor:mine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>
-                      <div style={{fontSize:12,fontWeight:700,color:DS.text,marginBottom:3}}>{cm.author}</div>
-                      <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.5}}>{cm.text}</div>
+                    <div onTouchStart={function(e){lpStart(cm,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(cm);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(mine)setMenuCm(cm);}} style={{background:DS.card,borderRadius:"0 16px 16px 16px",padding:"9px 13px",cursor:mine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>
+                      <div style={{fontSize:13,fontWeight:800,color:DS.text,marginBottom:3}}>{cm.author}</div>
+                      <div style={{fontSize:13,color:DS.text,lineHeight:1.55}}>{cm.text}</div>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:10,marginTop:3,paddingLeft:4}}>
-                      <span style={{fontSize:9,color:DS.textDim}}>{cm.time}{mine?" · maintenir pour supprimer":""}</span>
-                      <button onClick={function(){setReplyTo(cm);}} style={{fontSize:10,fontWeight:700,color:DS.primary,background:"none",border:"none",cursor:"pointer",padding:0}}>Répondre</button>
+                    <div style={{display:"flex",alignItems:"center",gap:12,marginTop:4,paddingLeft:4}}>
+                      <span style={{fontSize:11,color:DS.textDim,fontWeight:600}}>{cm.time}</span>
+                      <button onClick={function(){setReplyTo(cm);}} style={{fontSize:12,fontWeight:700,color:DS.textMuted,background:"none",border:"none",cursor:"pointer",padding:0}}>Répondre</button>
+                      {mine&&<span style={{fontSize:10,color:DS.textDim}}>· maintenir pour supprimer</span>}
                     </div>
-                    {/* Bouton "Afficher X réponses" */}
+                    {/* Bouton "Afficher X réponses" — Facebook style */}
                     {repCount>0&&!expanded&&(
-                      <button onClick={function(){var n=Object.assign({},expandedReplies);n[cm.id||i]=true;setExpandedReplies(n);}} style={{display:"flex",alignItems:"center",gap:4,marginTop:6,marginLeft:4,background:"none",border:"none",cursor:"pointer",padding:0,fontSize:12,fontWeight:700,color:DS.primary}}>
-                        <div style={{width:16,height:1,background:DS.primary,opacity:0.5}}/>
-                        Afficher {repCount} réponse{repCount>1?"s":""}
+                      <button onClick={function(){var n=Object.assign({},expandedReplies);n[key]=true;setExpandedReplies(n);}} style={{display:"flex",alignItems:"center",gap:6,marginTop:8,marginLeft:2,background:"none",border:"none",cursor:"pointer",padding:0}}>
+                        <div style={{width:20,height:1.5,background:DS.border,borderRadius:1}}/>
+                        <span style={{fontSize:12,fontWeight:700,color:DS.primary}}>Afficher {repCount} réponse{repCount>1?"s":""}</span>
                       </button>
                     )}
-                    {/* Liste des réponses expandées */}
+                    {/* Réponses expandées */}
                     {expanded&&(
-                      <div style={{marginTop:8,paddingLeft:8,borderLeft:"2px solid "+DS.border}}>
-                        <button onClick={function(){var n=Object.assign({},expandedReplies);n[cm.id||i]=false;setExpandedReplies(n);}} style={{display:"flex",alignItems:"center",gap:4,marginBottom:8,background:"none",border:"none",cursor:"pointer",padding:0,fontSize:12,fontWeight:700,color:DS.textDim}}>
-                          <div style={{width:16,height:1,background:DS.textDim,opacity:0.5}}/>
-                          Masquer les réponses
+                      <div style={{marginTop:10}}>
+                        <button onClick={function(){var n=Object.assign({},expandedReplies);n[key]=false;setExpandedReplies(n);}} style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,marginLeft:2,background:"none",border:"none",cursor:"pointer",padding:0}}>
+                          <div style={{width:20,height:1.5,background:DS.border,borderRadius:1}}/>
+                          <span style={{fontSize:12,fontWeight:700,color:DS.textMuted}}>Masquer les réponses</span>
                         </button>
-                        {cmReplies.map(function(rep,ri){var repMine=rep.author===selfName;var repIsNew=post.comments.indexOf(rep)>=initCmtCount.current;return(
-                          <div key={rep.id||"r"+ri} style={{display:"flex",gap:8,marginBottom:10,animation:repIsNew?"hp-item-in 0.25s ease both":"none"}}>
-                            <Av sz={26} letter={rep.author[0]}/>
-                            <div style={{flex:1}}>
-                              <div onTouchStart={function(e){lpStart(rep,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(rep);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(repMine)setMenuCm(rep);}} style={{background:DS.card,borderRadius:"0 12px 12px 12px",padding:"7px 11px",cursor:repMine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
-                                <div style={{fontSize:11,fontWeight:700,color:DS.text,marginBottom:2}}>{rep.author}</div>
-                                <div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rep.text}</div>
-                              </div>
-                              <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2,paddingLeft:3}}>
-                                <span style={{fontSize:9,color:DS.textDim}}>{rep.time}{repMine?" · maintenir pour supprimer":""}</span>
-                                <button onClick={function(){setReplyTo(cm);}} style={{fontSize:10,fontWeight:700,color:DS.primary,background:"none",border:"none",cursor:"pointer",padding:0}}>Répondre</button>
+                        {g.replies.map(function(rep,ri){
+                          var repMine=rep.author===selfName;
+                          var repIsNew=post.comments.indexOf(rep)>=initCmtCount.current;
+                          return(
+                            <div key={rep.id||("r"+gi+ri)} style={{display:"flex",gap:8,marginBottom:10,paddingLeft:4,animation:repIsNew?"hp-item-in 0.25s ease both":"none"}}>
+                              <Av sz={28} letter={rep.author[0]}/>
+                              <div style={{flex:1}}>
+                                <div onTouchStart={function(e){lpStart(rep,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(rep);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(repMine)setMenuCm(rep);}} style={{background:DS.card,borderRadius:"0 14px 14px 14px",padding:"8px 12px",cursor:repMine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
+                                  <div style={{fontSize:12,fontWeight:800,color:DS.text,marginBottom:3}}>{rep.author}</div>
+                                  <div style={{fontSize:13,color:DS.text,lineHeight:1.55}}>{rep.text}</div>
+                                </div>
+                                <div style={{display:"flex",alignItems:"center",gap:12,marginTop:3,paddingLeft:3}}>
+                                  <span style={{fontSize:11,color:DS.textDim,fontWeight:600}}>{rep.time}</span>
+                                  <button onClick={function(){setReplyTo(cm);}} style={{fontSize:12,fontWeight:700,color:DS.textMuted,background:"none",border:"none",cursor:"pointer",padding:0}}>Répondre</button>
+                                  {repMine&&<span style={{fontSize:10,color:DS.textDim}}>· maintenir pour supprimer</span>}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );})}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
