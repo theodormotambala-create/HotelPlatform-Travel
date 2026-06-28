@@ -1272,7 +1272,7 @@ function CommentsSheet(props){
     }
     prevCmtLen.current=post.comments.length;
   },[post.comments.length]);
-  var backdropStyle={position:"fixed",top:52,left:0,right:0,bottom:0,background:closing?"rgba(0,0,0,0)":"rgba(0,0,0,.45)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center",transition:closing?"background .26s ease":"none",maxWidth:420,marginLeft:"auto",marginRight:"auto"};
+  var backdropStyle={position:"fixed",top:52,left:0,right:0,bottom:62,background:closing?"rgba(0,0,0,0)":"rgba(0,0,0,.45)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center",transition:closing?"background .26s ease":"none",maxWidth:420,marginLeft:"auto",marginRight:"auto"};
   var sheetAnim=closing?"hp-sheet-out 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-up 0.32s cubic-bezier(0.22,1,0.36,1)";
   return(<div style={backdropStyle} onTouchMove={onBackdropTouch}>
     <div style={{width:"100%",maxWidth:420,height:"50vh",background:DS.surface,borderRadius:"20px 20px 0 0",border:"1px solid "+DS.border,display:"flex",flexDirection:"column",overflow:"hidden",animation:sheetAnim,transform:dragY>0?"translateY("+dragY+"px)":"none",transition:isDragging?"none":"transform 0.28s cubic-bezier(0.22,1,0.36,1)"}}>
