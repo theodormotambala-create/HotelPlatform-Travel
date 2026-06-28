@@ -1,4 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+
+var _stripePromise = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+  ? loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
+  : null;
 
 // ⚠️ MODE DEV — mettre à true pour court-circuiter l'authentification en développement
 const DEV_BYPASS_AUTH = false;
@@ -1746,6 +1752,76 @@ function EstabM(props){
           )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{DataLayer.saveReview(e&&e.id,rv);}catch(ex2){}toast("Avis publie","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier a partager votre experience"/>}</div>}</div></div>);
 }
 
+// Formulaire de paiement Stripe — monté dans un Elements provider
+function StripeCheckoutForm(props){
+  var amount=props.amount;var onSuccess=props.onSuccess;var onError=props.onError;var color=props.color;
+  var stripe=useStripe();
+  var elements=useElements();
+  var sProc=useState(false);var processing=sProc[0];var setProcessing=sProc[1];
+  var sErr=useState(null);var stripeError=sErr[0];var setStripeError=sErr[1];
+  async function handlePay(ev){
+    ev.preventDefault();
+    if(!stripe||!elements||processing) return;
+    setProcessing(true);
+    setStripeError(null);
+    var result=await stripe.confirmPayment({elements:elements,redirect:"if_required"});
+    if(result.error){
+      setStripeError(result.error.message);
+      setProcessing(false);
+      if(onError) onError(result.error.message);
+    } else if(result.paymentIntent&&result.paymentIntent.status==="succeeded"){
+      if(onSuccess) onSuccess(result.paymentIntent);
+    }
+  }
+  return(
+    <form onSubmit={handlePay}>
+      <PaymentElement options={{layout:"tabs"}}/>
+      {stripeError&&(
+        <div style={{marginTop:12,padding:"10px 12px",background:"#FEE2E2",borderRadius:10,fontSize:12,color:"#DC2626",lineHeight:1.4}}>{stripeError}</div>
+      )}
+      <button type="submit" disabled={!stripe||processing} style={{width:"100%",marginTop:16,padding:"13px",background:processing?"#9CA3AF":color,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:900,cursor:!stripe||processing?"not-allowed":"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"background .2s"}}>
+        {processing
+          ? <><span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite"}}/><span>Traitement en cours...</span></>
+          : <><CreditCard size={15}/><span>Payer {amount} EUR</span></>
+        }
+      </button>
+      <div style={{textAlign:"center",marginTop:10,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+        <Shield size={11} color="#6B7280"/>
+        <span style={{fontSize:10,color:"#6B7280"}}>Paiement sécurisé par Stripe · Certifié PCI DSS</span>
+      </div>
+    </form>
+  );
+}
+
+// Modal complète Stripe avec Elements provider
+function StripePaymentModal(props){
+  var clientSecret=props.clientSecret;var amount=props.amount;var color=props.color;
+  var onSuccess=props.onSuccess;var onError=props.onError;var onClose=props.onClose;
+  if(!_stripePromise||!clientSecret) return null;
+  var DS_=props.DS||{surface:"#1a1a2e",border:"#2d2d4e",text:"#f0f0f0",textMuted:"#9ca3af"};
+  var appearance={theme:"night",variables:{colorPrimary:color,borderRadius:"10px",fontFamily:"system-ui,sans-serif"}};
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{width:"100%",maxWidth:420,background:DS_.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS_.border,padding:"20px 20px 36px",maxHeight:"90vh",overflowY:"auto",animation:"hp-slide-up 0.3s ease"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:800,color:DS_.text}}>Paiement sécurisé</div>
+            <div style={{fontSize:11,color:DS_.textMuted,marginTop:2}}>Traité par Stripe · Crypté 256-bit</div>
+          </div>
+          <button onClick={onClose} style={{background:"transparent",border:"none",cursor:"pointer",padding:4}}><X size={18} color={DS_.textMuted}/></button>
+        </div>
+        <div style={{background:color+"15",border:"1px solid "+color+"33",borderRadius:10,padding:"10px 14px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:12,color:DS_.textMuted,fontWeight:600}}>Total à payer</span>
+          <span style={{fontSize:20,fontWeight:900,color:color}}>{amount} EUR</span>
+        </div>
+        <Elements stripe={_stripePromise} options={{clientSecret:clientSecret,appearance:appearance}}>
+          <StripeCheckoutForm amount={amount} onSuccess={onSuccess} onError={onError} color={color} DS={DS_}/>
+        </Elements>
+      </div>
+    </div>
+  );
+}
+
 function genQRPixels(id){
   var s=0;for(var ci=0;ci<id.length;ci++){s=((s*31+id.charCodeAt(ci))&0x7FFFFFFF)>>>0;}
   return Array.from({length:100},function(_,j){s=((s*1664525+1013904223)&0x7FFFFFFF)>>>0;return (s>>>15)&1;});
@@ -1764,6 +1840,8 @@ function BookM(props){
   var s5=useState("sans");var payMode=s5[0];var setPayMode=s5[1];
   var s6=useState("mobile");var payMethod=s6[0];var setPayMethod=s6[1];
   var spay=useState(false);var paying=spay[0];var setPaying=spay[1];
+  var sSCS=useState(null);var stripeClientSecret=sSCS[0];var setStripeClientSecret=sSCS[1];
+  var sSM=useState(false);var showStripeModal=sSM[0];var setShowStripeModal=sSM[1];
   var sC=useState(false);var closing=sC[0];var setClosing=sC[1];
   var cT=useRef(null);
   function handleClose(){if(closing)return;setClosing(true);cT.current=setTimeout(function(){onClose();},260);}
@@ -1790,6 +1868,23 @@ function BookM(props){
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1100,display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"hp-fade 0.2s ease"}}>
       <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"94vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.3s ease"}}>
         <Toast/>
+        {showStripeModal&&stripeClientSecret&&(
+          <StripePaymentModal
+            clientSecret={stripeClientSecret}
+            amount={totalPrice.toFixed(0)}
+            color={color}
+            DS={DS}
+            onClose={function(){setShowStripeModal(false);setStripeClientSecret(null);}}
+            onSuccess={function(){
+              setShowStripeModal(false);setStripeClientSecret(null);
+              var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"confirmed",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+              setStep(3);
+              toast("Paiement Stripe confirme !","success");
+              if(props.onBooked)props.onBooked(BookingService.createBooking(resa));
+            }}
+            onError={function(msg){toast(msg||"Echec du paiement","error");}}
+          />
+        )}
         <div style={{padding:"14px 20px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+DS.border}}>
           <div>
             <div style={{fontSize:15,fontWeight:800,color:DS.text}}>Reserver</div>
@@ -1927,17 +2022,42 @@ function BookM(props){
               <div style={{display:"flex",gap:8,marginTop:8}}>
                 <button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
                 <button onClick={function(){
-                  if(paying)return;
-                  setPaying(true);
-                  var delay=payMode==="avec"?1100:500;
-                  setTimeout(function(){
-                    var initStatus=payMode==="avec"?"confirmed":"pending";
-                    var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
-                    setPaying(false);
-                    setStep(3);
-                    toast(payMode==="avec"?"Reservation confirmee !":"Demande envoyee a l etablissement !","success");
-                    if(props.onBooked)props.onBooked(BookingService.createBooking(resa));
-                  },delay);
+                  if(paying) return;
+                  // Flux sans paiement ou Mobile Money : simulation conservée
+                  if(payMode==="sans"||(payMode==="avec"&&payMethod==="mobile")){
+                    setPaying(true);
+                    var delay=payMode==="avec"?1100:500;
+                    setTimeout(function(){
+                      var initStatus=payMode==="avec"?"confirmed":"pending";
+                      var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                      setPaying(false);
+                      setStep(3);
+                      toast(payMode==="avec"?"Paiement Mobile Money confirme !":"Demande envoyee a l etablissement !","success");
+                      if(props.onBooked)props.onBooked(BookingService.createBooking(resa));
+                    },delay);
+                    return;
+                  }
+                  // Paiement carte → Stripe
+                  if(payMode==="avec"&&payMethod==="card"){
+                    if(!_stripePromise){toast("Stripe non configure","error");return;}
+                    setPaying(true);
+                    fetch("/api/create-payment-intent",{
+                      method:"POST",
+                      headers:{"Content-Type":"application/json"},
+                      body:JSON.stringify({amount:Math.round(totalPrice*100),currency:"eur",resaId:resaId,estabName:e.name})
+                    })
+                    .then(function(r){return r.json();})
+                    .then(function(data){
+                      setPaying(false);
+                      if(data.error){toast("Erreur paiement : "+data.error,"error");return;}
+                      setStripeClientSecret(data.clientSecret);
+                      setShowStripeModal(true);
+                    })
+                    .catch(function(){
+                      setPaying(false);
+                      toast("Impossible de contacter le service de paiement","error");
+                    });
+                  }
                 }} style={{flex:2,padding:"11px",background:paying?DS.textDim:color,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:900,cursor:paying?"not-allowed":"pointer",transition:"background .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                   {paying?<span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite"}}/>:null}
                   {paying?"Traitement en cours...":(payMode==="avec"?"Payer "+totalPrice.toFixed(0)+" EUR":"Confirmer la reservation")}
