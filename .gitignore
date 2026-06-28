@@ -5,6 +5,10 @@ node_modules/
 dist/
 dist-ssr/
 
+# Variables d environnement (ne jamais committer)
+.env
+.env.*
+
 # Fichiers systeme
 .DS_Store
 *.local
