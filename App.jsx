@@ -1468,13 +1468,10 @@ function ClientFeed(props){
     if(el){
       var rect=el.getBoundingClientRect();
       var viewH=window.innerHeight;
-      // La publication doit être dans le tiers supérieur de l'écran (hors topbar ~52px)
-      var targetTop=64;
-      if(rect.top<targetTop||rect.top>viewH*0.45){
-        var scrollY=window.pageYOffset||document.documentElement.scrollTop;
-        var newY=scrollY+rect.top-targetTop;
-        window.scrollTo({top:newY,behavior:"smooth"});
-        setTimeout(function(){toggleCmt(id);},320);
+      // Si la publication n'est pas dans la zone visible propre (entre 60px et 45% de l'écran)
+      if(rect.top<60||rect.top>viewH*0.42){
+        el.scrollIntoView({behavior:"smooth",block:"start"});
+        setTimeout(function(){toggleCmt(id);},350);
         return;
       }
     }
