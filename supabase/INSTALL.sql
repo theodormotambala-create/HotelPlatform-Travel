@@ -285,11 +285,18 @@ CREATE POLICY "profiles_read_own"  ON profiles FOR SELECT USING (auth.uid() = us
 CREATE POLICY "profiles_write_own" ON profiles FOR ALL
   USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
--- Messages
+-- Messages — lecture restreinte aux participants de la conversation uniquement
 DROP POLICY IF EXISTS "messages_read_participant"    ON messages;
 DROP POLICY IF EXISTS "messages_insert_authenticated" ON messages;
-CREATE POLICY "messages_read_participant"     ON messages FOR SELECT USING (TRUE);
-CREATE POLICY "messages_insert_authenticated" ON messages FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "messages_delete_own"           ON messages;
+CREATE POLICY "messages_read_participant" ON messages FOR SELECT
+  USING (sender = auth.uid()::text OR conversation_id IN (
+    SELECT DISTINCT conversation_id FROM messages WHERE sender = auth.uid()::text
+  ));
+CREATE POLICY "messages_insert_authenticated" ON messages FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL AND sender = auth.uid()::text);
+CREATE POLICY "messages_delete_own" ON messages FOR DELETE
+  USING (sender = auth.uid()::text);
 
 
 -- =============================================================================

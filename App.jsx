@@ -424,23 +424,31 @@ var DataLayer = {
         .update({ description: description }).eq("id", estabId).then(function(){});
     }catch(e){}
   },
-  saveReview: function(estabId, review){
+  saveReview: function(estabId, review, clientId){
     if(!DataLayer._client||!estabId||!review) return;
     try{
       DataLayer._client.from("reviews").insert([{
         establishment_id: estabId,
+        client_id: clientId||null,
         rating: review.rating,
         text: review.text||null,
         author: review.author||"Anonyme"
-      }]).then(function(){});
-    }catch(e){}
+      }]).then(function(res){
+        if(res&&res.error) console.warn("[DataLayer] saveReview error:", res.error.message);
+      });
+    }catch(e){ console.warn("[DataLayer] saveReview exception:", e); }
   },
-  updateReservationStatus: function(id, status){
+  updateReservationStatus: function(id, status, clientId){
     if(!DataLayer._client||!id||!status) return;
+    var VALID_STATUSES = ["confirmed","pending","cancelled","completed"];
+    if(VALID_STATUSES.indexOf(status)<0){ console.warn("[DataLayer] statut invalide:", status); return; }
     try{
-      DataLayer._client.from("reservations")
-        .update({ status: status }).eq("id", id).then(function(){});
-    }catch(e){}
+      var query = DataLayer._client.from("reservations").update({ status: status }).eq("id", id);
+      if(clientId) query = query.eq("client_id", clientId);
+      query.then(function(res){
+        if(res&&res.error) console.warn("[DataLayer] updateReservationStatus error:", res.error.message);
+      });
+    }catch(e){ console.warn("[DataLayer] updateReservationStatus exception:", e); }
   },
 
   // Upload photo profil vers Supabase Storage — retourne l'URL publique via onSuccess(url)
@@ -1749,7 +1757,7 @@ function EstabM(props){
                 </div>
               )}
             </div>
-          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{DataLayer.saveReview(e&&e.id,rv);}catch(ex2){}toast("Avis publie","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier a partager votre experience"/>}</div>}</div></div>);
+          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{var _uid=null;try{if(window.__supabase){var _cu=window.__supabase.auth.getUser&&window.__supabase.auth.getUser();if(_cu&&typeof _cu.then==="function")_cu.then(function(r){if(r&&r.data&&r.data.user)DataLayer.saveReview(e&&e.id,rv,r.data.user.id);});else DataLayer.saveReview(e&&e.id,rv,_uid);}else{DataLayer.saveReview(e&&e.id,rv,_uid);}}catch(_e2){DataLayer.saveReview(e&&e.id,rv,null);}}catch(ex2){}toast("Avis publie","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier a partager votre experience"/>}</div>}</div></div>);
 }
 
 // Formulaire de paiement Stripe — monté dans un Elements provider
@@ -3355,16 +3363,30 @@ export default function App() {
     // Upload vers Supabase Storage si c'est un DataURL base64
     if(v&&v.startsWith("data:")&&DataLayer._client&&auth&&auth.userId){
       try{
-        var _arr=v.split(",");var _mime=(_arr[0].match(/:(.*?);/)||[])[1]||"image/jpeg";
-        var _bstr=atob(_arr[1]);var _u8=new Uint8Array(_bstr.length);
+        var _arr=v.split(",");
+        // Validation MIME stricte — seuls les formats images autorisés
+        var _mimeMatch=_arr[0].match(/:(image\/(jpeg|jpg|png|webp|gif));/);
+        if(!_mimeMatch){ console.warn("[Photo] Type MIME non autorise"); return; }
+        var _mime=_mimeMatch[1];
+        var _ext=_mimeMatch[2]==="jpg"?"jpg":_mimeMatch[2];
+        var _bstr=atob(_arr[1]);
+        // Validation taille : max 5 MB cote client avant upload
+        if(_bstr.length>5*1024*1024){ console.warn("[Photo] Fichier trop volumineux (max 5 MB)"); return; }
+        var _u8=new Uint8Array(_bstr.length);
         for(var _i=0;_i<_bstr.length;_i++){_u8[_i]=_bstr.charCodeAt(_i);}
         var _blob=new Blob([_u8],{type:_mime});
-        var _ext=_mime.split("/")[1]||"jpg";
+        // Token unique pour eviter les race conditions si l'utilisateur change de photo rapidement
+        var _uploadToken=Date.now();
+        setProfilePhotoRaw._lastToken=_uploadToken;
         var _file=new File([_blob],"profile."+_ext,{type:_mime});
         DataLayer.uploadProfilePhoto(_file, auth.userId, auth.type||"client", function(url){
-          if(url){setProfilePhotoRaw(url);try{localStorage.setItem("hp_profile_photo",url);}catch(e){}}
+          // N'applique l'URL CDN que si c'est toujours le dernier upload demande
+          if(url&&setProfilePhotoRaw._lastToken===_uploadToken){
+            setProfilePhotoRaw(url);
+            try{localStorage.setItem("hp_profile_photo",url);}catch(e){}
+          }
         });
-      }catch(ex){}
+      }catch(ex){ console.warn("[Photo] Erreur conversion base64:", ex); }
     }
   }
   var sCEmail=useState(false);var showChangeEmail=sCEmail[0];var setShowChangeEmail=sCEmail[1];
@@ -3437,34 +3459,33 @@ export default function App() {
     var sb = (typeof window!=="undefined" && window.__supabase) ? window.__supabase : null;
     var userId = auth && auth.userId;
 
-    // 1. Suppression Storage : dossier photo profil
+    // 1. Suppression Storage : dossier photo profil — on attend la fin avant de continuer
     if(sb && userId){
       try{
-        sb.storage.from("profile-photos")
-          .list(userId+"/")
-          .then(function(listRes){
-            if(listRes.data && listRes.data.length>0){
-              var paths = listRes.data.map(function(f){ return userId+"/"+f.name; });
-              sb.storage.from("profile-photos").remove(paths).then(function(){});
-            }
-          });
-      }catch(e){}
+        var listRes = await sb.storage.from("profile-photos").list(userId+"/");
+        if(listRes.data && listRes.data.length>0){
+          var paths = listRes.data.map(function(f){ return userId+"/"+f.name; });
+          await sb.storage.from("profile-photos").remove(paths);
+        }
+      }catch(e){ console.warn("[RGPD] Storage cleanup error:", e); }
     }
 
     // 2. Suppression Supabase via RPC delete_user_account() (SECURITY DEFINER)
-    //    Efface : reviews, reservations, profiles, posts, messages, auth.users
+    //    Efface en cascade : reviews, reservations, profiles, posts, messages, auth.users
     if(sb){
-      try{ await sb.rpc("delete_user_account"); }catch(e){}
+      try{ await sb.rpc("delete_user_account"); }catch(e){ console.warn("[RGPD] RPC error:", e); }
     }
 
-    // 3. Efface toutes les cles localStorage
-    var lsKeys=["hp_acc_type","hp_resas","hp_resas_all","hp_following","hp_fav_estabs","hp_notifs","hp_notif_prefs","hp_profile_photo","hp_premium","hp_privacy","hp_hotelsvc_rooms","hp_hotelsvc_dishes","hp_hotelsvc_amenities","hp_restoff_offers","hp_restoff_items"];
-    lsKeys.forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
+    // 3. Efface TOUTES les cles localStorage prefixees "hp_" (robuste aux futures features)
+    try{
+      var keysToRemove = Object.keys(localStorage).filter(function(k){ return k.startsWith("hp_"); });
+      keysToRemove.forEach(function(k){ try{localStorage.removeItem(k);}catch(e){} });
+    }catch(e){}
 
-    // 4. Deconnexion Supabase Auth (au cas ou delete_user_account n'aurait pas deja invalide la session)
+    // 4. Deconnexion Supabase Auth
     try{ await AuthService.logout(); }catch(e){}
 
-    // 5. Reset de l'etat React
+    // 5. Reset complet de l'etat React
     setProfilePhotoRaw(null);
     setAuth(null);setEstab(null);setBook(null);
     setSett(false);setNotifs(false);
