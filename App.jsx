@@ -3312,11 +3312,40 @@ export default function App() {
     setCTab("feed");setPTab("feed");
     setNeedsOnboarding(true);
   }
-  // Suppression de compte RGPD : efface toutes les donnees locales + deconnexion Supabase
+  // Suppression de compte RGPD Art. 17 : efface toutes les donnees locales + Supabase + Storage
   async function deleteAccount(){
+    var sb = (typeof window!=="undefined" && window.__supabase) ? window.__supabase : null;
+    var userId = auth && auth.userId;
+
+    // 1. Suppression Storage : dossier photo profil
+    if(sb && userId){
+      try{
+        sb.storage.from("profile-photos")
+          .list(userId+"/")
+          .then(function(listRes){
+            if(listRes.data && listRes.data.length>0){
+              var paths = listRes.data.map(function(f){ return userId+"/"+f.name; });
+              sb.storage.from("profile-photos").remove(paths).then(function(){});
+            }
+          });
+      }catch(e){}
+    }
+
+    // 2. Suppression Supabase via RPC delete_user_account() (SECURITY DEFINER)
+    //    Efface : reviews, reservations, profiles, posts, messages, auth.users
+    if(sb){
+      try{ await sb.rpc("delete_user_account"); }catch(e){}
+    }
+
+    // 3. Efface toutes les cles localStorage
     var lsKeys=["hp_acc_type","hp_resas","hp_resas_all","hp_following","hp_fav_estabs","hp_notifs","hp_notif_prefs","hp_profile_photo","hp_premium","hp_privacy","hp_hotelsvc_rooms","hp_hotelsvc_dishes","hp_hotelsvc_amenities","hp_restoff_offers","hp_restoff_items"];
     lsKeys.forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
-    await AuthService.logout();
+
+    // 4. Deconnexion Supabase Auth (au cas ou delete_user_account n'aurait pas deja invalide la session)
+    try{ await AuthService.logout(); }catch(e){}
+
+    // 5. Reset de l'etat React
+    setProfilePhotoRaw(null);
     setAuth(null);setEstab(null);setBook(null);
     setSett(false);setNotifs(false);
     setCTab("feed");setPTab("feed");
