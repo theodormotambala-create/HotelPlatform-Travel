@@ -435,6 +435,37 @@ var DataLayer = {
       DataLayer._client.from("reservations")
         .update({ status: status }).eq("id", id).then(function(){});
     }catch(e){}
+  },
+
+  // Upload photo profil vers Supabase Storage — retourne l'URL publique via onSuccess(url)
+  uploadProfilePhoto: function(file, userId, accountType, onSuccess){
+    if(!DataLayer._client||!file||!userId){ if(onSuccess)onSuccess(null); return; }
+    var ext = (file.name||"photo").split(".").pop().toLowerCase()||"jpg";
+    var path = userId+"/profile."+ext;
+    DataLayer._client.storage.from("profile-photos")
+      .upload(path, file, { upsert: true, contentType: file.type||"image/jpeg" })
+      .then(function(res){
+        if(res.error){ if(onSuccess)onSuccess(null); return; }
+        var urlRes = DataLayer._client.storage.from("profile-photos").getPublicUrl(path);
+        var publicUrl = urlRes&&urlRes.data&&urlRes.data.publicUrl ? urlRes.data.publicUrl : null;
+        if(publicUrl && userId){
+          DataLayer._client.from("profiles")
+            .upsert([{ user_id: userId, photo_url: publicUrl, account_type: accountType||"client" }],
+              { onConflict: "user_id", ignoreDuplicates: false })
+            .then(function(){});
+        }
+        if(onSuccess) onSuccess(publicUrl);
+      });
+  },
+
+  // Sync photo profil depuis Supabase au démarrage
+  syncProfilePhoto: function(userId, onPhotoUrl){
+    if(!DataLayer._client||!userId||!onPhotoUrl) return;
+    DataLayer._client.from("profiles")
+      .select("photo_url").eq("user_id", userId).maybeSingle()
+      .then(function(res){
+        if(res&&res.data&&res.data.photo_url) onPhotoUrl(res.data.photo_url);
+      });
   }
 };
 
@@ -3113,6 +3144,14 @@ export default function App() {
         try{localStorage.setItem("hp_acc_type", accType);}catch(e){}
         setNeedsOnboarding(false);
         setAuth(AuthService.buildSession(accType, status, session.user.email, session.user.id));
+        // Sync photo profil depuis Supabase si localStorage vide
+        try{
+          if(!localStorage.getItem("hp_profile_photo")){
+            DataLayer.syncProfilePhoto(session.user.id, function(url){
+              if(url){setProfilePhotoRaw(url);try{localStorage.setItem("hp_profile_photo",url);}catch(e){}}
+            });
+          }
+        }catch(e){}
       }
     }).catch(function(){});
     var sub = sb.auth.onAuthStateChange(function(event, session){
@@ -3124,6 +3163,14 @@ export default function App() {
         setNeedsOnboarding(false);
         setAuth(function(prev){
           if(prev) return prev;
+          // Sync photo profil depuis Supabase à la connexion si localStorage vide
+          try{
+            if(!localStorage.getItem("hp_profile_photo")){
+              DataLayer.syncProfilePhoto(session.user.id, function(url){
+                if(url){setProfilePhotoRaw(url);try{localStorage.setItem("hp_profile_photo",url);}catch(e){}}
+              });
+            }
+          }catch(e){}
           return AuthService.buildSession(accType, status, session.user.email, session.user.id);
         });
       } else if(event==="SIGNED_OUT"){
@@ -3182,7 +3229,24 @@ export default function App() {
   var notifPrefs=sNotifPrefs[0]; var setNotifPrefs=sNotifPrefs[1];
   function updateNotifPrefs(patch){setNotifPrefs(function(prev){var next=Object.assign({},prev,patch);try{localStorage.setItem("hp_notif_prefs",JSON.stringify(next));}catch(e){}return next;});}
   var sPPhoto=useState(function(){try{return localStorage.getItem("hp_profile_photo")||null;}catch(e){return null;}});var profilePhoto=sPPhoto[0];var setProfilePhotoRaw=sPPhoto[1];
-  function setProfilePhoto(v){setProfilePhotoRaw(v);try{if(v)localStorage.setItem("hp_profile_photo",v);else localStorage.removeItem("hp_profile_photo");}catch(e){}}
+  function setProfilePhoto(v){
+    setProfilePhotoRaw(v);
+    try{if(v)localStorage.setItem("hp_profile_photo",v);else localStorage.removeItem("hp_profile_photo");}catch(e){}
+    // Upload vers Supabase Storage si c'est un DataURL base64
+    if(v&&v.startsWith("data:")&&DataLayer._client&&auth&&auth.userId){
+      try{
+        var _arr=v.split(",");var _mime=(_arr[0].match(/:(.*?);/)||[])[1]||"image/jpeg";
+        var _bstr=atob(_arr[1]);var _u8=new Uint8Array(_bstr.length);
+        for(var _i=0;_i<_bstr.length;_i++){_u8[_i]=_bstr.charCodeAt(_i);}
+        var _blob=new Blob([_u8],{type:_mime});
+        var _ext=_mime.split("/")[1]||"jpg";
+        var _file=new File([_blob],"profile."+_ext,{type:_mime});
+        DataLayer.uploadProfilePhoto(_file, auth.userId, auth.type||"client", function(url){
+          if(url){setProfilePhotoRaw(url);try{localStorage.setItem("hp_profile_photo",url);}catch(e){}}
+        });
+      }catch(ex){}
+    }
+  }
   var sCEmail=useState(false);var showChangeEmail=sCEmail[0];var setShowChangeEmail=sCEmail[1];
   var sCPwd=useState(false);var showChangePwd=sCPwd[0];var setShowChangePwd=sCPwd[1];
   var tk=useToast(); var Toast=tk.Toast; var toastApp=tk.show;
