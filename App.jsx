@@ -244,7 +244,18 @@ var DataLayer = {
           }catch(ex){}
         }
       });
-      // 8. Reservations — re-hydrate BookingService depuis Supabase
+      // 8. Profils Pro — ajoute les vrais etablissements inscrits au cache
+      supabase.from("profiles").select("*").in("account_type",["hotel","restaurant"]).neq("display_name","")
+        .then(function(res){
+          if(res&&res.data&&res.data.length>0){
+            var newHotels=res.data.filter(function(p){return p.account_type==="hotel";}).map(function(p){return{id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:"hotel",svcMode:p.svc_mode||"hotel",location:p.location||"",description:p.description||"",img:p.cover_url||"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70",verified:p.verified||false,services:[],rooms:[],offers:[]};});
+            var newRestos=res.data.filter(function(p){return p.account_type==="restaurant";}).map(function(p){return{id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:"restaurant",svcMode:"restaurant",location:p.location||"",description:p.description||"",img:p.cover_url||"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70",verified:p.verified||false,services:[],rooms:[],offers:[]};});
+            if(newHotels.length){DataLayer._cache.hotels=DataLayer._cache.hotels.filter(function(h){return!h.userId;}).concat(newHotels);}
+            if(newRestos.length){DataLayer._cache.restaurants=DataLayer._cache.restaurants.filter(function(r){return!r.userId;}).concat(newRestos);}
+            if(DataLayer._onUpdate)DataLayer._onUpdate();
+          }
+        });
+      // 9. Reservations — re-hydrate BookingService depuis Supabase
       supabase.from("reservations").select("*").then(function(res){
         if(res && res.data && res.data.length>0){
           try{
@@ -528,6 +539,7 @@ var AuthService = {
       var status = accType !== "client" ? "pending" : "active";
       var s = AuthService.buildSession(accType, status, (r.data.user&&r.data.user.email)||email, r.data.user&&r.data.user.id);
       s.needsEmailConfirm = !r.data.session;
+      if(r.data.user&&r.data.user.id){try{sb.from("profiles").upsert([{user_id:r.data.user.id,display_name:"",account_type:accType,svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){});}catch(e){}}
       return s;
     }
     var status = accType !== "client" ? "pending" : "active";
@@ -1114,24 +1126,81 @@ function PrivacyModal(props){
 
 function ChatUI(props){
   var init=props.chats;var myColor=props.myColor;var nK=props.nK;var iK=props.iK;var vK=props.vK;var qR=props.qR;var isClientChat=props.isClientChat||false;
+  var myId=props.myId||null;var myName=props.myName||"";
   var initialConv=props.initialConv!==undefined&&props.initialConv!==null?props.initialConv:null;
   var s1=useState(initialConv);var active=s1[0];var setActive=s1[1];
   var s2=useState("");var msg=s2[0];var setMsg=s2[1];
   var s3=useState(null);var replyTo=s3[0];var setReplyTo=s3[1];
   var smnu=useState(null);var menuMsg=smnu[0];var setMenuMsg=smnu[1];
   var mlpTimer=useRef(null);
+  var rtChan=useRef(null);
   function mlpStart(m,e){if(m.f!=="me"||m.deleted)return;mlpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuMsg(m);},480);}
   function mlpCancel(){if(mlpTimer.current){clearTimeout(mlpTimer.current);mlpTimer.current=null;}}
-  var s4=useState(init.map(function(c){return Object.assign({},c,{msgs:(c.messages||[]).slice()});}));
+  var s4=useState(myId?[]:init.map(function(c){return Object.assign({},c,{msgs:(c.messages||[]).slice()});}));
   var thr=s4[0];var setThr=s4[1];
-  var _autoReplies=["Je vous repondrai dans les plus brefs delais.","Bien recu, notre equipe traite votre demande.","Merci pour votre message !","Nous revenons vers vous tres rapidement.","Merci ! Avez-vous d autres questions ?"];
-  function send(){if(!msg.trim())return;var nm=MessageService.buildMessage(msg,replyTo);var curActive=active;setThr(function(ts){return ts.map(function(c,i){return i===curActive?Object.assign({},c,{msgs:c.msgs.concat([nm])}):c;});});setMsg("");setReplyTo(null);setTimeout(function(){var reply={id:Date.now()+1,f:"them",t:_autoReplies[Math.floor(Math.random()*_autoReplies.length)],time:MessageService.timeNow(),read:false};setThr(function(ts){return ts.map(function(c,i){return i===curActive?Object.assign({},c,{msgs:c.msgs.concat([reply])}):c;});});},1400+Math.random()*800);}
-  function delMsg(id){setThr(function(ts){return ts.map(function(c,i){return i===active?Object.assign({},c,{msgs:c.msgs.map(function(m){return MessageService.markDeleted(m,id);})}):c;});});}
+  var sLoad=useState(!!myId);var convLoading=sLoad[0];var setConvLoading=sLoad[1];
+  // Charge la liste des conversations depuis Supabase
+  useEffect(function(){
+    var client=DataLayer._client;
+    if(!myId||!client)return;
+    var col=isClientChat?"pro_id":"client_id";
+    client.from("conversations").select("*").eq(col,myId).order("updated_at",{ascending:false})
+      .then(function(res){
+        setConvLoading(false);
+        if(res.error||!res.data||res.data.length===0)return;
+        var newThr=res.data.map(function(c){
+          var obj={convId:c.id,msgs:[]};
+          obj[nK]=isClientChat?c.client_name:c.pro_name;
+          if(iK)obj[iK]=isClientChat?c.client_img:c.pro_img;
+          obj[vK]=isClientChat?(c.client_verified||false):(c.pro_verified||false);
+          return obj;
+        });
+        setThr(newThr);
+      }).catch(function(){setConvLoading(false);});
+  },[myId,isClientChat]);
+  // Charge les messages et souscrit au Realtime quand une conversation est ouverte
+  var convId=active!==null&&thr[active]?thr[active].convId:null;
+  useEffect(function(){
+    var client=DataLayer._client;
+    if(!convId||!myId||!client)return;
+    client.from("messages").select("*").eq("conversation_id",convId).order("created_at",{ascending:true})
+      .then(function(res){
+        if(res.error||!res.data)return;
+        var msgs=res.data.map(function(m){var d=new Date(m.created_at);var mn=d.getMinutes();return{id:m.id,f:m.sender_id===myId?"me":"them",t:m.deleted?"[Message supprime]":m.body,time:d.getHours()+":"+(mn<10?"0":"")+mn,read:m.read,deleted:m.deleted,replyTo:m.reply_to_body?{t:m.reply_to_body,f:m.reply_to_sender===myId?"me":"them"}:null};});
+        setThr(function(ts){return ts.map(function(c){return c.convId===convId?Object.assign({},c,{msgs:msgs}):c;});});
+        client.from("messages").update({read:true}).eq("conversation_id",convId).neq("sender_id",myId).eq("read",false).then(function(){});
+      });
+    if(rtChan.current){try{client.removeChannel(rtChan.current);}catch(e){} rtChan.current=null;}
+    var chan=client.channel("conv:"+convId)
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:"conversation_id=eq."+convId},function(payload){
+        var m=payload.new;if(m.sender_id===myId)return;
+        var d=new Date(m.created_at);var mn2=d.getMinutes();
+        var nm2={id:m.id,f:"them",t:m.deleted?"[Message supprime]":m.body,time:d.getHours()+":"+(mn2<10?"0":"")+mn2,read:false,deleted:m.deleted,replyTo:m.reply_to_body?{t:m.reply_to_body,f:"them"}:null};
+        setThr(function(ts){return ts.map(function(c){return c.convId===convId?Object.assign({},c,{msgs:c.msgs.concat([nm2])}):c;});});
+      }).subscribe();
+    rtChan.current=chan;
+    return function(){if(rtChan.current&&client){try{client.removeChannel(rtChan.current);}catch(e){}rtChan.current=null;}};
+  },[convId,myId]);
+  function send(){
+    if(!msg.trim())return;
+    var nm=MessageService.buildMessage(msg,replyTo);
+    var curActive=active;var curConv=thr[curActive];
+    var sentMsg=msg.trim();var sentReply=replyTo;
+    setThr(function(ts){return ts.map(function(c,i){return i===curActive?Object.assign({},c,{msgs:c.msgs.concat([nm])}):c;});});
+    setMsg("");setReplyTo(null);
+    if(curConv&&curConv.convId&&myId&&DataLayer._client){
+      DataLayer._client.from("messages").insert([{conversation_id:curConv.convId,sender_id:myId,sender_name:myName,body:sentMsg,reply_to_body:sentReply?sentReply.t:null,reply_to_sender:sentReply?(sentReply.f==="me"?myId:null):null,deleted:false,read:false}]).then(function(){});
+    }
+  }
+  function delMsg(id){
+    setThr(function(ts){return ts.map(function(c,i){return i===active?Object.assign({},c,{msgs:c.msgs.map(function(m){return MessageService.markDeleted(m,id);})}):c;});});
+    if(myId&&DataLayer._client){DataLayer._client.from("messages").update({deleted:true}).eq("id",id).eq("sender_id",myId).then(function(){});}
+  }
   function markRead(idx){setThr(function(ts){return ts.map(function(c,i){return i===idx?Object.assign({},c,{msgs:c.msgs.map(function(m){return MessageService.markRead(m);})}):c;});});}
   var conv=active!==null?thr[active]:null;
   var sChatSk=useState(true);var chatSkLoading=sChatSk[0];var setChatSkLoading=sChatSk[1];
   useEffect(function(){if(active!==null)return;var t=setTimeout(function(){setChatSkLoading(false);},280);return function(){clearTimeout(t);};},[active]);
-  if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</div></div>{chatSkLoading?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length;return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"..."}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
+  if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</div></div>{(chatSkLoading||convLoading)?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length;return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"Debut de la conversation"}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
   var msgs=conv?conv.msgs:[];
   return(<div style={{display:"flex",flexDirection:"column",height:"100%",background:DS.bg}}><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false} isClient={isClientChat}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>Membre HotelPlatform</div></div></div><div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",animation:"hp-msg-in 0.3s ease both",animationDelay:Math.min(i*20,200)+"ms"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprime]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoye"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Repondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Repondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()} style={{width:40,height:40,borderRadius:"50%",background:msg.trim()?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
 }
@@ -2795,11 +2864,12 @@ function VerifRequestModal(props){
 
 function HotelSvc(props){
   var data=props.data||DataLayer.getHotels()[0];
+  var userId=props.userId||null;
   var color=DS.hotel;
   var s1=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_rooms");return v?JSON.parse(v):(data.rooms||[]);}catch(e){return data.rooms||[];}});var rooms=s1[0];var setRooms=s1[1];
   var s2=useState(null);var editItem=s2[0];var setEditItem=s2[1];
   var s3=useState(false);var showAdd=s3[0];var setShowAdd=s3[1];
-  var s4=useState(data.svcMode||"hotel");var svcMode=s4[0];var setSvcMode=s4[1];
+  var s4=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_svcmode");return v||data.svcMode||"hotel";}catch(e){return data.svcMode||"hotel";}});var svcMode=s4[0];var setSvcMode=s4[1];
   var hasResto=svcMode==="combined";
   var s5=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_dishes");return v?JSON.parse(v):[];}catch(e){return[];}});var menu=s5[0];var setMenu=s5[1];
   var s6=useState(data.svcMode==="restaurant"?"menu":"rooms");var tab=s6[0];var setTab=s6[1];
@@ -2811,6 +2881,10 @@ function HotelSvc(props){
   var se=useState(null);var confirmDeleteDish=se[0];var setConfirmDeleteDish=se[1];
   var sf=useState(null);var confirmDeleteSvc=sf[0];var setConfirmDeleteSvc=sf[1];
   var _hEstabId=data&&data.id?data.id:null;
+  function _saveSvcMode(v){
+    try{localStorage.setItem("hp_hotelsvc_svcmode",v);}catch(e){}
+    if(userId&&DataLayer._client){DataLayer._client.from("profiles").update({svc_mode:v,updated_at:new Date().toISOString()}).eq("user_id",userId).then(function(){});}
+  }
   function _saveRooms(rs){try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}try{DataLayer.saveEstabRooms(_hEstabId,rs);}catch(e){}}
   function _saveDishes(ms){try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ms));}catch(e){}try{DataLayer.saveEstabDishes(_hEstabId,ms);}catch(e){}}
   function _saveAmenities(am){try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}try{DataLayer.saveEstabAmenities(_hEstabId,am);}catch(e){}}
@@ -2846,7 +2920,7 @@ function HotelSvc(props){
             {[["hotel","Hotel uniquement",DS.hotel],["restaurant","Restaurant uniquement",DS.restaurant],["combined","Hotel + Restaurant",DS.primary]].map(function(_i){
               var v=_i[0];var l=_i[1];var col=_i[2];var isSel=svcMode===v;
               return(
-                <button key={v} onClick={function(){setSvcMode(v);if(v==="hotel")setTab("rooms");if(v==="restaurant")setTab("menu");}} style={{flex:1,padding:"8px 6px",borderRadius:10,border:"1.5px solid "+(isSel?col:DS.border),background:isSel?col+"18":"transparent",cursor:"pointer",textAlign:"center"}}>
+                <button key={v} onClick={function(){setSvcMode(v);_saveSvcMode(v);if(v==="hotel")setTab("rooms");if(v==="restaurant")setTab("menu");}} style={{flex:1,padding:"8px 6px",borderRadius:10,border:"1.5px solid "+(isSel?col:DS.border),background:isSel?col+"18":"transparent",cursor:"pointer",textAlign:"center"}}>
                   <div style={{width:14,height:14,borderRadius:"50%",border:"2px solid "+(isSel?col:DS.border),background:isSel?col:"transparent",margin:"0 auto 4px",display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel&&<div style={{width:5,height:5,borderRadius:"50%",background:"#fff"}}/>}</div>
                   <span style={{fontSize:9,fontWeight:700,color:isSel?col:DS.textMuted,lineHeight:1.2,display:"block"}}>{l}</span>
                 </button>
@@ -3329,6 +3403,47 @@ var NP_DATA = [
   {id:"np3",icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un nouvel utilisateur suit votre etablissement.",time:"2h",read:true,tab:"feed"}
 ];
 
+function ProOnboarding(props){
+  var auth=props.auth;var onComplete=props.onComplete;var accent=rC(auth.type);
+  var s1=useState("");var name=s1[0];var setName=s1[1];
+  var s2=useState("");var loc=s2[0];var setLoc=s2[1];
+  var s3=useState(auth.type==="hotel"?"hotel":"restaurant");var svcMode=s3[0];var setSvcMode=s3[1];
+  var s4=useState(false);var loading=s4[0];var setLoading=s4[1];
+  var s5=useState("");var err=s5[0];var setErr=s5[1];
+  async function save(){
+    if(!name.trim()){setErr("Veuillez saisir le nom de votre etablissement.");return;}
+    setLoading(true);setErr("");
+    var client=DataLayer._client;
+    if(client){
+      var r=await client.from("profiles").upsert([{user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:loc.trim()}],{onConflict:"user_id"});
+      if(r.error){setErr("Erreur lors de la sauvegarde. Veuillez reessayer.");setLoading(false);return;}
+    }
+    onComplete({user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:loc.trim(),description:"",verified:false});
+  }
+  return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:DS.bg,padding:"24px 20px",fontFamily:"'DM Sans','Inter',sans-serif",overflowY:"auto"}}>
+    <div style={{width:"100%",maxWidth:400}}>
+      <div style={{fontSize:22,fontWeight:900,color:DS.text,marginBottom:4}}>Configurer votre etablissement</div>
+      <div style={{fontSize:13,color:DS.textMuted,marginBottom:24}}>Ces informations seront visibles par les clients sur la plateforme.</div>
+      {auth.type==="hotel"&&<div style={{marginBottom:18}}>
+        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:8}}>Type de service</div>
+        {[["hotel","Hotel uniquement",DS.hotel],["restaurant","Restaurant uniquement",DS.restaurant],["combined","Hotel + Restaurant",DS.primary]].map(function(_i){var v=_i[0];var l=_i[1];var col=_i[2];var isSel=svcMode===v;return(<button key={v} onClick={function(){setSvcMode(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:6,borderRadius:10,border:"1px solid "+(isSel?col+"66":DS.border),background:isSel?col+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,boxSizing:"border-box"}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isSel?col:DS.border),background:isSel?col:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isSel?col:DS.textMuted,fontWeight:isSel?700:400}}>{l}</span></button>);})}
+      </div>}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:6}}>Nom de l'etablissement *</div>
+        <input value={name} onChange={function(e){setName(e.target.value);}} placeholder={auth.type==="hotel"?"Ex: Grand Hotel Royal":"Ex: Le Jardin Gourmand"} style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.card,color:DS.text,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+      </div>
+      <div style={{marginBottom:22}}>
+        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:6}}>Ville / Pays</div>
+        <input value={loc} onChange={function(e){setLoc(e.target.value);}} placeholder="Ex: Dakar, Senegal" style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.card,color:DS.text,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+      </div>
+      {err&&<div style={{color:DS.error,fontSize:12,marginBottom:12,fontWeight:600}}>{err}</div>}
+      <button onClick={save} disabled={loading||!name.trim()} style={{width:"100%",padding:"14px",background:loading||!name.trim()?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:loading||!name.trim()?"default":"pointer",opacity:loading||!name.trim()?0.6:1}}>
+        {loading?<span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite",verticalAlign:"middle",marginRight:6}}/>:null}Enregistrer et continuer
+      </button>
+    </div>
+  </div>);
+}
+
 export default function App() {
   useAnimations();
   // Rafraichissement quand les donnees Supabase arrivent (remplace la demo)
@@ -3583,6 +3698,23 @@ export default function App() {
     setNeedsOnboarding(true);
   }
 
+  // Profil Pro : charge depuis Supabase apres connexion
+  var sProProfile=useState(null);var proProfile=sProProfile[0];var setProProfile=sProProfile[1];
+  var sProProfLoaded=useState(false);var proProfLoaded=sProProfLoaded[0];var setProProfLoaded=sProProfLoaded[1];
+  var sShowProOB=useState(false);var showProOB=sShowProOB[0];var setShowProOB=sShowProOB[1];
+  var _authForProf=s0[0]; // ref au auth brut avant re-assignation
+  useEffect(function(){
+    if(!_authForProf||!_authForProf.userId||_authForProf.type==="client"){setProProfLoaded(true);return;}
+    var client=DataLayer._client;
+    if(!client){setProProfLoaded(true);return;}
+    client.from("profiles").select("*").eq("user_id",_authForProf.userId).maybeSingle()
+      .then(function(res){
+        if(res.data&&res.data.display_name){setProProfile(res.data);setShowProOB(false);}
+        else{setShowProOB(true);}
+        setProProfLoaded(true);
+      }).catch(function(){setProProfLoaded(true);});
+  },[_authForProf&&_authForProf.userId]);
+
   // === ROUTING =====================================================
 
   // Mode dev : court-circuit l'auth + sélecteur de compte visible dans l'app
@@ -3614,7 +3746,20 @@ export default function App() {
 
   var isPro  = auth.type!=="client";
   var accent = rC(auth.type);
-  var proD   = auth.type==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];
+  // Afficher l'onboarding Pro si necessaire (premiere connexion)
+  if(isPro&&proProfLoaded&&showProOB){
+    return(<div style={{height:"100%",fontFamily:"'DM Sans','Inter',sans-serif"}}><ProOnboarding auth={auth} onComplete={function(prof){setProProfile(prof);setShowProOB(false);}}/></div>);
+  }
+  var _fallbackProD=auth.type==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];
+  var proD=proProfile&&proProfile.display_name?{
+    id:auth.userId,userId:auth.userId,
+    name:proProfile.display_name,author:proProfile.display_name,
+    type:auth.type,svcMode:proProfile.svc_mode||auth.type,
+    location:proProfile.location||"",description:proProfile.description||"",
+    img:proProfile.cover_url||_fallbackProD.img,
+    verified:proProfile.verified||false,
+    services:_fallbackProD.services||[],rooms:_fallbackProD.rooms||[],offers:_fallbackProD.offers||[]
+  }:_fallbackProD;
   var _defaultNotifList = isPro ? NP_DATA : NC_DATA;
   var notifList = _notifStored !== null ? _notifStored : _defaultNotifList;
   function markNotifRead(id){var next=notifList.map(function(n){return n.id===id?Object.assign({},n,{read:true}):n;});setNotifStored(next);try{localStorage.setItem("hp_notifs",JSON.stringify(next));}catch(e){}}
@@ -3625,7 +3770,17 @@ export default function App() {
     var l=type==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
     setEstab(l.find(function(e){return e.id===id;})||l[0]);
   }
-  function openChat(){
+  function openChat(e){
+    // Creer la conversation en base si l'etablissement est un vrai Pro inscrit
+    if(e&&e.userId&&auth&&auth.userId&&!isPro&&DataLayer._client){
+      var convId=[auth.userId,e.userId].sort().join("_");
+      var clientName=(auth.email||"").split("@")[0];
+      DataLayer._client.from("conversations").upsert([{
+        id:convId,client_id:auth.userId,pro_id:e.userId,
+        client_name:clientName,pro_name:e.name||e.author||"",
+        pro_img:e.img||null,pro_verified:e.verified||false,pro_type:e.type||"hotel"
+      }],{onConflict:"id"}).then(function(){});
+    }
     setEstab(null);
     if(!isPro)setCTab("chat");else setPTab("chat");
   }
@@ -3678,7 +3833,7 @@ export default function App() {
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
           {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
-          {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV"/>}
+          {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
@@ -3720,10 +3875,10 @@ export default function App() {
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
         {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
-        {pTab==="services"     &&<HotelSvc data={proD}/>}
+        {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
-        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={true} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]}/>}
+        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={true} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
         {pTab==="profile"      &&<ProProf proType={auth.type} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
