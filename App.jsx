@@ -3586,7 +3586,38 @@ export default function App() {
   var _notifStored=sNotif[0]; var setNotifStored=sNotif[1];
   var sNotifPrefs=useState(function(){try{var v=localStorage.getItem("hp_notif_prefs");return v?JSON.parse(v):{reservation:true,message:true,promo:true,follow:true};}catch(e){return{reservation:true,message:true,promo:true,follow:true};}});
   var notifPrefs=sNotifPrefs[0]; var setNotifPrefs=sNotifPrefs[1];
-  function updateNotifPrefs(patch){setNotifPrefs(function(prev){var next=Object.assign({},prev,patch);try{localStorage.setItem("hp_notif_prefs",JSON.stringify(next));}catch(e){}return next;});}
+  function updateNotifPrefs(patch){
+    setNotifPrefs(function(prev){
+      var next=Object.assign({},prev,patch);
+      try{localStorage.setItem("hp_notif_prefs",JSON.stringify(next));}catch(e){}
+      if(DataLayer._client&&auth&&auth.userId){
+        DataLayer._client.from("profiles").update({notif_prefs:next,updated_at:new Date().toISOString()}).eq("user_id",auth.userId).then(function(){});
+      }
+      return next;
+    });
+  }
+  // Charge favoris, follows et notif_prefs depuis Supabase au login
+  var _authForUserData=s0[0];
+  useEffect(function(){
+    if(!_authForUserData||!_authForUserData.userId||!DataLayer._client)return;
+    DataLayer._client.from("profiles").select("following,fav_estabs,notif_prefs").eq("user_id",_authForUserData.userId).maybeSingle()
+      .then(function(res){
+        if(!res||!res.data)return;
+        var d=res.data;
+        if(d.following&&Array.isArray(d.following)&&d.following.length>0){
+          setFollowingIds(d.following);
+          try{localStorage.setItem("hp_following",JSON.stringify(d.following));}catch(e){}
+        }
+        if(d.fav_estabs&&Array.isArray(d.fav_estabs)&&d.fav_estabs.length>0){
+          setFavEstabIds(d.fav_estabs);
+          try{localStorage.setItem("hp_fav_estabs",JSON.stringify(d.fav_estabs));}catch(e){}
+        }
+        if(d.notif_prefs&&typeof d.notif_prefs==="object"){
+          setNotifPrefs(d.notif_prefs);
+          try{localStorage.setItem("hp_notif_prefs",JSON.stringify(d.notif_prefs));}catch(e){}
+        }
+      }).catch(function(){});
+  },[_authForUserData&&_authForUserData.userId]);
   var sPPhoto=useState(function(){try{return localStorage.getItem("hp_profile_photo")||null;}catch(e){return null;}});var profilePhoto=sPPhoto[0];var setProfilePhotoRaw=sPPhoto[1];
   function setProfilePhoto(v){
     setProfilePhotoRaw(v);
@@ -3666,13 +3697,27 @@ export default function App() {
   },[anyOverlayOpen]);
   function toggleFollowGlobal(id){
     var was=followingIds.indexOf(id)>=0;
-    setFollowingIds(function(f){var next=was?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_following",JSON.stringify(next));}catch(e){}return next;});
+    setFollowingIds(function(f){
+      var next=was?f.filter(function(x){return x!==id;}):f.concat([id]);
+      try{localStorage.setItem("hp_following",JSON.stringify(next));}catch(e){}
+      if(DataLayer._client&&auth&&auth.userId){
+        DataLayer._client.from("profiles").update({following:next,updated_at:new Date().toISOString()}).eq("user_id",auth.userId).then(function(){});
+      }
+      return next;
+    });
     if(!was&&!isPro){addNotif({id:"notif_follow_"+Date.now(),icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un utilisateur suit maintenant votre etablissement.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
     tk.show(was?"Vous ne suivez plus cet etablissement":"Vous suivez cet etablissement","success");
   }
   function toggleFavEstab(id){
     var wasFav=favEstabIds.indexOf(id)>=0;
-    setFavEstabIds(function(f){var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_fav_estabs",JSON.stringify(next));}catch(e){}return next;});
+    setFavEstabIds(function(f){
+      var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);
+      try{localStorage.setItem("hp_fav_estabs",JSON.stringify(next));}catch(e){}
+      if(DataLayer._client&&auth&&auth.userId){
+        DataLayer._client.from("profiles").update({fav_estabs:next,updated_at:new Date().toISOString()}).eq("user_id",auth.userId).then(function(){});
+      }
+      return next;
+    });
     tk.show(wasFav?"Retire des favoris":"Ajoute aux favoris","success");
   }
 
