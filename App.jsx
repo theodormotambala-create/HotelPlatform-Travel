@@ -244,7 +244,18 @@ var DataLayer = {
           }catch(ex){}
         }
       });
-      // 8. Reservations — re-hydrate BookingService depuis Supabase
+      // 8. Profils Pro — ajoute les vrais etablissements inscrits au cache
+      supabase.from("profiles").select("*").in("account_type",["hotel","restaurant"]).neq("display_name","")
+        .then(function(res){
+          if(res&&res.data&&res.data.length>0){
+            var newHotels=res.data.filter(function(p){return p.account_type==="hotel";}).map(function(p){return{id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:"hotel",svcMode:p.svc_mode||"hotel",location:p.location||"",description:p.description||"",img:p.cover_url||"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70",verified:p.verified||false,services:[],rooms:[],offers:[]};});
+            var newRestos=res.data.filter(function(p){return p.account_type==="restaurant";}).map(function(p){return{id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:"restaurant",svcMode:"restaurant",location:p.location||"",description:p.description||"",img:p.cover_url||"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70",verified:p.verified||false,services:[],rooms:[],offers:[]};});
+            if(newHotels.length){DataLayer._cache.hotels=DataLayer._cache.hotels.filter(function(h){return!h.userId;}).concat(newHotels);}
+            if(newRestos.length){DataLayer._cache.restaurants=DataLayer._cache.restaurants.filter(function(r){return!r.userId;}).concat(newRestos);}
+            if(DataLayer._onUpdate)DataLayer._onUpdate();
+          }
+        });
+      // 9. Reservations — re-hydrate BookingService depuis Supabase
       supabase.from("reservations").select("*").then(function(res){
         if(res && res.data && res.data.length>0){
           try{
@@ -528,6 +539,7 @@ var AuthService = {
       var status = accType !== "client" ? "pending" : "active";
       var s = AuthService.buildSession(accType, status, (r.data.user&&r.data.user.email)||email, r.data.user&&r.data.user.id);
       s.needsEmailConfirm = !r.data.session;
+      if(r.data.user&&r.data.user.id){try{sb.from("profiles").upsert([{user_id:r.data.user.id,display_name:"",account_type:accType,svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){});}catch(e){}}
       return s;
     }
     var status = accType !== "client" ? "pending" : "active";
@@ -3386,6 +3398,47 @@ var NP_DATA = [
   {id:"np3",icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un nouvel utilisateur suit votre etablissement.",time:"2h",read:true,tab:"feed"}
 ];
 
+function ProOnboarding(props){
+  var auth=props.auth;var onComplete=props.onComplete;var accent=rC(auth.type);
+  var s1=useState("");var name=s1[0];var setName=s1[1];
+  var s2=useState("");var loc=s2[0];var setLoc=s2[1];
+  var s3=useState(auth.type==="hotel"?"hotel":"restaurant");var svcMode=s3[0];var setSvcMode=s3[1];
+  var s4=useState(false);var loading=s4[0];var setLoading=s4[1];
+  var s5=useState("");var err=s5[0];var setErr=s5[1];
+  async function save(){
+    if(!name.trim()){setErr("Veuillez saisir le nom de votre etablissement.");return;}
+    setLoading(true);setErr("");
+    var client=DataLayer._client;
+    if(client){
+      var r=await client.from("profiles").upsert([{user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:loc.trim()}],{onConflict:"user_id"});
+      if(r.error){setErr("Erreur lors de la sauvegarde. Veuillez reessayer.");setLoading(false);return;}
+    }
+    onComplete({user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:loc.trim(),description:"",verified:false});
+  }
+  return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:DS.bg,padding:"24px 20px",fontFamily:"'DM Sans','Inter',sans-serif",overflowY:"auto"}}>
+    <div style={{width:"100%",maxWidth:400}}>
+      <div style={{fontSize:22,fontWeight:900,color:DS.text,marginBottom:4}}>Configurer votre etablissement</div>
+      <div style={{fontSize:13,color:DS.textMuted,marginBottom:24}}>Ces informations seront visibles par les clients sur la plateforme.</div>
+      {auth.type==="hotel"&&<div style={{marginBottom:18}}>
+        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:8}}>Type de service</div>
+        {[["hotel","Hotel uniquement",DS.hotel],["restaurant","Restaurant uniquement",DS.restaurant],["combined","Hotel + Restaurant",DS.primary]].map(function(_i){var v=_i[0];var l=_i[1];var col=_i[2];var isSel=svcMode===v;return(<button key={v} onClick={function(){setSvcMode(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:6,borderRadius:10,border:"1px solid "+(isSel?col+"66":DS.border),background:isSel?col+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,boxSizing:"border-box"}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isSel?col:DS.border),background:isSel?col:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isSel?col:DS.textMuted,fontWeight:isSel?700:400}}>{l}</span></button>);})}
+      </div>}
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:6}}>Nom de l'etablissement *</div>
+        <input value={name} onChange={function(e){setName(e.target.value);}} placeholder={auth.type==="hotel"?"Ex: Grand Hotel Royal":"Ex: Le Jardin Gourmand"} style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.card,color:DS.text,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+      </div>
+      <div style={{marginBottom:22}}>
+        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:6}}>Ville / Pays</div>
+        <input value={loc} onChange={function(e){setLoc(e.target.value);}} placeholder="Ex: Dakar, Senegal" style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.card,color:DS.text,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+      </div>
+      {err&&<div style={{color:DS.error,fontSize:12,marginBottom:12,fontWeight:600}}>{err}</div>}
+      <button onClick={save} disabled={loading||!name.trim()} style={{width:"100%",padding:"14px",background:loading||!name.trim()?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:loading||!name.trim()?"default":"pointer",opacity:loading||!name.trim()?0.6:1}}>
+        {loading?<span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite",verticalAlign:"middle",marginRight:6}}/>:null}Enregistrer et continuer
+      </button>
+    </div>
+  </div>);
+}
+
 export default function App() {
   useAnimations();
   // Rafraichissement quand les donnees Supabase arrivent (remplace la demo)
@@ -3640,6 +3693,23 @@ export default function App() {
     setNeedsOnboarding(true);
   }
 
+  // Profil Pro : charge depuis Supabase apres connexion
+  var sProProfile=useState(null);var proProfile=sProProfile[0];var setProProfile=sProProfile[1];
+  var sProProfLoaded=useState(false);var proProfLoaded=sProProfLoaded[0];var setProProfLoaded=sProProfLoaded[1];
+  var sShowProOB=useState(false);var showProOB=sShowProOB[0];var setShowProOB=sShowProOB[1];
+  var _authForProf=s0[0]; // ref au auth brut avant re-assignation
+  useEffect(function(){
+    if(!_authForProf||!_authForProf.userId||_authForProf.type==="client"){setProProfLoaded(true);return;}
+    var client=DataLayer._client;
+    if(!client){setProProfLoaded(true);return;}
+    client.from("profiles").select("*").eq("user_id",_authForProf.userId).maybeSingle()
+      .then(function(res){
+        if(res.data&&res.data.display_name){setProProfile(res.data);setShowProOB(false);}
+        else{setShowProOB(true);}
+        setProProfLoaded(true);
+      }).catch(function(){setProProfLoaded(true);});
+  },[_authForProf&&_authForProf.userId]);
+
   // === ROUTING =====================================================
 
   // Mode dev : court-circuit l'auth + sélecteur de compte visible dans l'app
@@ -3671,7 +3741,20 @@ export default function App() {
 
   var isPro  = auth.type!=="client";
   var accent = rC(auth.type);
-  var proD   = auth.type==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];
+  // Afficher l'onboarding Pro si necessaire (premiere connexion)
+  if(isPro&&proProfLoaded&&showProOB){
+    return(<div style={{height:"100%",fontFamily:"'DM Sans','Inter',sans-serif"}}><ProOnboarding auth={auth} onComplete={function(prof){setProProfile(prof);setShowProOB(false);}}/></div>);
+  }
+  var _fallbackProD=auth.type==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];
+  var proD=proProfile&&proProfile.display_name?{
+    id:auth.userId,userId:auth.userId,
+    name:proProfile.display_name,author:proProfile.display_name,
+    type:auth.type,svcMode:proProfile.svc_mode||auth.type,
+    location:proProfile.location||"",description:proProfile.description||"",
+    img:proProfile.cover_url||_fallbackProD.img,
+    verified:proProfile.verified||false,
+    services:_fallbackProD.services||[],rooms:_fallbackProD.rooms||[],offers:_fallbackProD.offers||[]
+  }:_fallbackProD;
   var _defaultNotifList = isPro ? NP_DATA : NC_DATA;
   var notifList = _notifStored !== null ? _notifStored : _defaultNotifList;
   function markNotifRead(id){var next=notifList.map(function(n){return n.id===id?Object.assign({},n,{read:true}):n;});setNotifStored(next);try{localStorage.setItem("hp_notifs",JSON.stringify(next));}catch(e){}}
@@ -3682,7 +3765,17 @@ export default function App() {
     var l=type==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
     setEstab(l.find(function(e){return e.id===id;})||l[0]);
   }
-  function openChat(){
+  function openChat(e){
+    // Creer la conversation en base si l'etablissement est un vrai Pro inscrit
+    if(e&&e.userId&&auth&&auth.userId&&!isPro&&DataLayer._client){
+      var convId=[auth.userId,e.userId].sort().join("_");
+      var clientName=(auth.email||"").split("@")[0];
+      DataLayer._client.from("conversations").upsert([{
+        id:convId,client_id:auth.userId,pro_id:e.userId,
+        client_name:clientName,pro_name:e.name||e.author||"",
+        pro_img:e.img||null,pro_verified:e.verified||false,pro_type:e.type||"hotel"
+      }],{onConflict:"id"}).then(function(){});
+    }
     setEstab(null);
     if(!isPro)setCTab("chat");else setPTab("chat");
   }
