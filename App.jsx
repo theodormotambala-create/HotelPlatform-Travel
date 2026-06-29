@@ -352,8 +352,8 @@ var DataLayer = {
   saveReservation: function(resa, clientId){
     return DataLayer.create("reservations", [{
       id: resa.id, client_id: clientId || null,
-      estab: resa.estab, estab_type: resa.estabType,
-      status: resa.status, data: resa
+      estab_id: resa.estab||resa.id||null, estab_type: resa.estabType||resa.type||null,
+      status: resa.status||"pending", data: resa
     }]);
   },
   // Enregistre un message dans Supabase
@@ -441,7 +441,7 @@ var DataLayer = {
     try{
       DataLayer._client.from("reviews").insert([{
         establishment_id: estabId,
-        client_id: clientId||null,
+        user_id: clientId||null,
         rating: review.rating,
         text: review.text||null,
         author: review.author||"Anonyme"
@@ -582,13 +582,13 @@ var BookingService = {
   generateId: function(){
     return "R" + Date.now().toString().slice(-8);
   },
-  createBooking: function(resa){
+  createBooking: function(resa,clientId){
     if(!resa) return null;
     if(!resa.id){ resa.id = BookingService.generateId(); }
     if(!resa.createdAt){ resa.createdAt = new Date().toISOString(); }
     BookingService._all.push(resa);
     try{localStorage.setItem("hp_resas_all",JSON.stringify(BookingService._all));}catch(e){}
-    try{ if(DataLayer._client){ DataLayer.saveReservation(resa).then(function(){}); } }catch(e){}
+    try{ if(DataLayer._client){ DataLayer.saveReservation(resa,clientId||null).then(function(){}); } }catch(e){}
     return resa;
   },
   getAll: function(){ return BookingService._all.slice(); },
@@ -1468,6 +1468,7 @@ function FeedText(props){
 function ClientFeed(props){
   var onProfile=props.onProfile;var onAddNotif=props.onAddNotif||null;
   var selfEmail=props.selfEmail||"";
+  var selfUserId=props.selfUserId||null;
   var selfName=selfEmail?selfEmail.split("@")[0]:"Vous";
   var selfLetter=(selfName[0]||"V").toUpperCase();
   var _init=useRef(null);
@@ -1507,8 +1508,10 @@ function ClientFeed(props){
       return next;
     });
     try{
-      if(!wasLiked){DataLayer.create("likes",[{post_id:id,user_email:selfEmail,created_at:new Date().toISOString()}]).catch(function(){});}
-      else{if(DataLayer._client)DataLayer._client.from("likes").delete().eq("post_id",id).eq("user_email",selfEmail).then(function(){}).catch(function(){});}
+      if(DataLayer._client&&selfUserId){
+        if(!wasLiked){DataLayer._client.from("post_likes").insert([{user_id:selfUserId,post_id:id}]).then(function(){}).catch(function(){});}
+        else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}
+      }
     }catch(e){}
     if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:selfName+" a aimé la publication de "+post.author+".",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
   }
@@ -1520,12 +1523,12 @@ function ClientFeed(props){
     var cm={id:Date.now(),author:selfName,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    try{DataLayer.create("comments",[{id:String(cm.id),post_id:id,author:selfName,text:text,reply_to:cm.replyTo||null,created_at:new Date().toISOString()}]).catch(function(){});}catch(e){}
+    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:selfName,body:text}]).then(function(){}).catch(function(){});}}catch(e){}
     toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
-    try{if(DataLayer._client)DataLayer._client.from("comments").delete().eq("id",String(cmId)).then(function(){}).catch(function(){});}catch(e){}
+    try{if(DataLayer._client)DataLayer._client.from("post_comments").delete().eq("id",String(cmId)).then(function(){}).catch(function(){});}catch(e){}
     toast("Commentaire supprimé","neutral");
   }
   var sLoad=useState(true);var loading=sLoad[0];var setLoading=sLoad[1];
@@ -1553,7 +1556,7 @@ function ClientFeed(props){
     <div style={{background:DS.bg,paddingBottom:24,WebkitOverflowScrolling:"touch"}}>
       <Toast/>
       {loading&&<FeedSkeleton/>}
-      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
+      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} reporterId={selfUserId} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       {posts.length===0&&<Emp Icon={Home} title="Aucune publication" sub="Les publications des etablissements apparaitront ici"/>}
       {posts.map(function(post,_pi){
@@ -1760,7 +1763,7 @@ function ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro){
   return tabs;
 }
 function EstabM(props){
-  var e=props.e;var rawOnClose=props.onClose;var onBook=props.onBook;var onChat=props.onChat;var viewerIsPro=props.viewerIsPro||false;
+  var e=props.e;var rawOnClose=props.onClose;var onBook=props.onBook;var onChat=props.onChat;var viewerIsPro=props.viewerIsPro||false;var selfUserId=props.selfUserId||null;
   try{
     var _h0=DataLayer.getHotels()[0];var _r0=DataLayer.getRestaurants()[0];
     if(_h0&&e&&e.id===_h0.id){
@@ -1907,7 +1910,7 @@ function EstabM(props){
                 </div>
               )}
             </div>
-          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{var _uid=null;try{if(window.__supabase){var _cu=window.__supabase.auth.getUser&&window.__supabase.auth.getUser();if(_cu&&typeof _cu.then==="function")_cu.then(function(r){if(r&&r.data&&r.data.user)DataLayer.saveReview(e&&e.id,rv,r.data.user.id);});else DataLayer.saveReview(e&&e.id,rv,_uid);}else{DataLayer.saveReview(e&&e.id,rv,_uid);}}catch(_e2){DataLayer.saveReview(e&&e.id,rv,null);}}catch(ex2){}toast("Avis publie","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier a partager votre experience"/>}</div>}</div></div>);
+          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{DataLayer.saveReview(e&&e.id,rv,selfUserId||null);}catch(ex2){}toast("Avis publie","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier a partager votre experience"/>}</div>}</div></div>);
 }
 
 // Formulaire de paiement Stripe — monté dans un Elements provider
@@ -2006,6 +2009,7 @@ function BookM(props){
   var resaId=_ridRef.current;
   var _today=new Date().toISOString().slice(0,10);
   var selfEmail=props.selfEmail||"";
+  var selfUserId=props.selfUserId||null;
   var clientName=selfEmail.split("@")[0]||"Client";
   var isCombo=e.isCombo===true;
   var hasDishes=e.selectedDishes&&e.selectedDishes.length>0;
@@ -2034,7 +2038,7 @@ function BookM(props){
               var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"confirmed",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
               setStep(3);
               toast("Paiement Stripe confirme !","success");
-              if(props.onBooked)props.onBooked(BookingService.createBooking(resa));
+              if(props.onBooked)props.onBooked(BookingService.createBooking(resa,selfUserId));
             }}
             onError={function(msg){toast(msg||"Echec du paiement","error");}}
           />
@@ -2187,7 +2191,7 @@ function BookM(props){
                       setPaying(false);
                       setStep(3);
                       toast(payMode==="avec"?"Paiement Mobile Money confirme !":"Demande envoyee à l'établissement !","success");
-                      if(props.onBooked)props.onBooked(BookingService.createBooking(resa));
+                      if(props.onBooked)props.onBooked(BookingService.createBooking(resa,selfUserId));
                     },delay);
                     return;
                   }
@@ -2326,6 +2330,7 @@ function ProFeed(props){
   var color=rC(proType);
   var _allData=proType==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
   var selfEmail=props.selfEmail||"";
+  var selfUserId=props.selfUserId||null;
   var data=_allData.length>0?_allData[0]:{name:selfEmail.split("@")[0]||"Pro",verified:false,followers:0,rating:0,reviewCount:0};
   // Fix #6 : localStorage pour likes et favs
   var _initPro=useRef(null);
@@ -2343,12 +2348,12 @@ function ProFeed(props){
     var cm={id:Date.now(),author:data.name,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    try{DataLayer.create("comments",[{id:String(cm.id),post_id:id,author:data.name,text:text,reply_to:cm.replyTo||null,created_at:new Date().toISOString()}]).catch(function(){});}catch(e){}
+    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:data.name,body:text}]).then(function(){}).catch(function(){});}}catch(e){}
     toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
-    try{if(DataLayer._client)DataLayer._client.from("comments").delete().eq("id",String(cmId)).then(function(){}).catch(function(){});}catch(e){}
+    try{if(DataLayer._client)DataLayer._client.from("post_comments").delete().eq("id",String(cmId)).then(function(){}).catch(function(){});}catch(e){}
     toast("Commentaire supprimé","neutral");
   }
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
@@ -2378,8 +2383,10 @@ function ProFeed(props){
       return next;
     });
     try{
-      if(!wasLiked){DataLayer.create("likes",[{post_id:id,user_email:selfEmail||"pro",created_at:new Date().toISOString()}]).catch(function(){});}
-      else{if(DataLayer._client)DataLayer._client.from("likes").delete().eq("post_id",id).then(function(){}).catch(function(){});}
+      if(DataLayer._client&&selfUserId){
+        if(!wasLiked){DataLayer._client.from("post_likes").insert([{user_id:selfUserId,post_id:id}]).then(function(){}).catch(function(){});}
+        else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}
+      }
     }catch(e){}
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
@@ -2428,7 +2435,7 @@ function ProFeed(props){
   return(
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
-      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
+      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} reporterId={selfUserId} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",background:DS.surface,borderBottom:"1px solid "+DS.border,marginBottom:10}}>
         {[[fmtK(data.followers),"Abonnes",color],[data.rating+" ★","Note",DS.gold],[fmtK(data.reviewCount),"Avis",DS.success]].map(function(_i,i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{padding:"14px 4px",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><div style={{fontSize:20,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
@@ -2553,6 +2560,7 @@ function ProFeed(props){
 // == ReportM : procedure complete de signalement de contenu ==
 function ReportM(props){
   var onClose=props.onClose;var onSubmit=props.onSubmit;var targetName=props.targetName||"ce contenu";
+  var targetId=props.targetId||null;var reporterId=props.reporterId||null;
   var s1=useState(1);var step=s1[0];var setStep=s1[1];
   var s2=useState(null);var reason=s2[0];var setReason=s2[1];
   var s3=useState("");var details=s3[0];var setDetails=s3[1];
@@ -2567,6 +2575,7 @@ function ReportM(props){
   function submit(){
     var report={id:"rpt"+Date.now(),target:targetName,reason:reason,details:details,date:new Date().toISOString()};
     try{var existing=JSON.parse(localStorage.getItem("hp_reports")||"[]");localStorage.setItem("hp_reports",JSON.stringify(existing.concat([report])));}catch(ex){}
+    try{if(DataLayer._client&&reporterId){DataLayer._client.from("reports").insert([{reporter_id:reporterId,target_id:targetId||targetName,target_type:"post",reason:reason+(details?(" : "+details):""),}]).then(function(){}).catch(function(){});}}catch(ex2){}
     if(onSubmit)onSubmit(reason,details);setStep(3);
   }
   return(
@@ -3902,14 +3911,14 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
+          {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
-        {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false}/>}
-        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Votre réservation chez "+(resa.estab||"l'établissement")+" est enregistrée.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});setBook(null);}}/>}
+        {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId}/>}
+        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Votre réservation chez "+(resa.estab||"l'établissement")+" est enregistrée.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});setBook(null);}}/>}
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
         {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setCTab(t);}}/>;}}</Ov>}
@@ -3945,7 +3954,7 @@ export default function App() {
       {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
+        {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
@@ -3953,8 +3962,8 @@ export default function App() {
         {pTab==="profile"      &&<ProProf proType={auth.type} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
-      {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true}/>}
-      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Votre réservation chez "+(resa.estab||"l'établissement")+" est enregistrée.",time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});setBook(null);}}/>}
+      {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId}/>}
+      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Votre réservation chez "+(resa.estab||"l'établissement")+" est enregistrée.",time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});setBook(null);}}/>}
       {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
       {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setPTab(t);}}/>;}}</Ov>}
