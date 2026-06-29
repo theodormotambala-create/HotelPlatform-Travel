@@ -1114,24 +1114,81 @@ function PrivacyModal(props){
 
 function ChatUI(props){
   var init=props.chats;var myColor=props.myColor;var nK=props.nK;var iK=props.iK;var vK=props.vK;var qR=props.qR;var isClientChat=props.isClientChat||false;
+  var myId=props.myId||null;var myName=props.myName||"";
   var initialConv=props.initialConv!==undefined&&props.initialConv!==null?props.initialConv:null;
   var s1=useState(initialConv);var active=s1[0];var setActive=s1[1];
   var s2=useState("");var msg=s2[0];var setMsg=s2[1];
   var s3=useState(null);var replyTo=s3[0];var setReplyTo=s3[1];
   var smnu=useState(null);var menuMsg=smnu[0];var setMenuMsg=smnu[1];
   var mlpTimer=useRef(null);
+  var rtChan=useRef(null);
   function mlpStart(m,e){if(m.f!=="me"||m.deleted)return;mlpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuMsg(m);},480);}
   function mlpCancel(){if(mlpTimer.current){clearTimeout(mlpTimer.current);mlpTimer.current=null;}}
-  var s4=useState(init.map(function(c){return Object.assign({},c,{msgs:(c.messages||[]).slice()});}));
+  var s4=useState(myId?[]:init.map(function(c){return Object.assign({},c,{msgs:(c.messages||[]).slice()});}));
   var thr=s4[0];var setThr=s4[1];
-  var _autoReplies=["Je vous repondrai dans les plus brefs delais.","Bien recu, notre equipe traite votre demande.","Merci pour votre message !","Nous revenons vers vous tres rapidement.","Merci ! Avez-vous d autres questions ?"];
-  function send(){if(!msg.trim())return;var nm=MessageService.buildMessage(msg,replyTo);var curActive=active;setThr(function(ts){return ts.map(function(c,i){return i===curActive?Object.assign({},c,{msgs:c.msgs.concat([nm])}):c;});});setMsg("");setReplyTo(null);setTimeout(function(){var reply={id:Date.now()+1,f:"them",t:_autoReplies[Math.floor(Math.random()*_autoReplies.length)],time:MessageService.timeNow(),read:false};setThr(function(ts){return ts.map(function(c,i){return i===curActive?Object.assign({},c,{msgs:c.msgs.concat([reply])}):c;});});},1400+Math.random()*800);}
-  function delMsg(id){setThr(function(ts){return ts.map(function(c,i){return i===active?Object.assign({},c,{msgs:c.msgs.map(function(m){return MessageService.markDeleted(m,id);})}):c;});});}
+  var sLoad=useState(!!myId);var convLoading=sLoad[0];var setConvLoading=sLoad[1];
+  // Charge la liste des conversations depuis Supabase
+  useEffect(function(){
+    var client=DataLayer._client;
+    if(!myId||!client)return;
+    var col=isClientChat?"pro_id":"client_id";
+    client.from("conversations").select("*").eq(col,myId).order("updated_at",{ascending:false})
+      .then(function(res){
+        setConvLoading(false);
+        if(res.error||!res.data||res.data.length===0)return;
+        var newThr=res.data.map(function(c){
+          var obj={convId:c.id,msgs:[]};
+          obj[nK]=isClientChat?c.client_name:c.pro_name;
+          if(iK)obj[iK]=isClientChat?c.client_img:c.pro_img;
+          obj[vK]=isClientChat?(c.client_verified||false):(c.pro_verified||false);
+          return obj;
+        });
+        setThr(newThr);
+      }).catch(function(){setConvLoading(false);});
+  },[myId,isClientChat]);
+  // Charge les messages et souscrit au Realtime quand une conversation est ouverte
+  var convId=active!==null&&thr[active]?thr[active].convId:null;
+  useEffect(function(){
+    var client=DataLayer._client;
+    if(!convId||!myId||!client)return;
+    client.from("messages").select("*").eq("conversation_id",convId).order("created_at",{ascending:true})
+      .then(function(res){
+        if(res.error||!res.data)return;
+        var msgs=res.data.map(function(m){var d=new Date(m.created_at);var mn=d.getMinutes();return{id:m.id,f:m.sender_id===myId?"me":"them",t:m.deleted?"[Message supprime]":m.body,time:d.getHours()+":"+(mn<10?"0":"")+mn,read:m.read,deleted:m.deleted,replyTo:m.reply_to_body?{t:m.reply_to_body,f:m.reply_to_sender===myId?"me":"them"}:null};});
+        setThr(function(ts){return ts.map(function(c){return c.convId===convId?Object.assign({},c,{msgs:msgs}):c;});});
+        client.from("messages").update({read:true}).eq("conversation_id",convId).neq("sender_id",myId).eq("read",false).then(function(){});
+      });
+    if(rtChan.current){try{client.removeChannel(rtChan.current);}catch(e){} rtChan.current=null;}
+    var chan=client.channel("conv:"+convId)
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:"conversation_id=eq."+convId},function(payload){
+        var m=payload.new;if(m.sender_id===myId)return;
+        var d=new Date(m.created_at);var mn2=d.getMinutes();
+        var nm2={id:m.id,f:"them",t:m.deleted?"[Message supprime]":m.body,time:d.getHours()+":"+(mn2<10?"0":"")+mn2,read:false,deleted:m.deleted,replyTo:m.reply_to_body?{t:m.reply_to_body,f:"them"}:null};
+        setThr(function(ts){return ts.map(function(c){return c.convId===convId?Object.assign({},c,{msgs:c.msgs.concat([nm2])}):c;});});
+      }).subscribe();
+    rtChan.current=chan;
+    return function(){if(rtChan.current&&client){try{client.removeChannel(rtChan.current);}catch(e){}rtChan.current=null;}};
+  },[convId,myId]);
+  function send(){
+    if(!msg.trim())return;
+    var nm=MessageService.buildMessage(msg,replyTo);
+    var curActive=active;var curConv=thr[curActive];
+    var sentMsg=msg.trim();var sentReply=replyTo;
+    setThr(function(ts){return ts.map(function(c,i){return i===curActive?Object.assign({},c,{msgs:c.msgs.concat([nm])}):c;});});
+    setMsg("");setReplyTo(null);
+    if(curConv&&curConv.convId&&myId&&DataLayer._client){
+      DataLayer._client.from("messages").insert([{conversation_id:curConv.convId,sender_id:myId,sender_name:myName,body:sentMsg,reply_to_body:sentReply?sentReply.t:null,reply_to_sender:sentReply?(sentReply.f==="me"?myId:null):null,deleted:false,read:false}]).then(function(){});
+    }
+  }
+  function delMsg(id){
+    setThr(function(ts){return ts.map(function(c,i){return i===active?Object.assign({},c,{msgs:c.msgs.map(function(m){return MessageService.markDeleted(m,id);})}):c;});});
+    if(myId&&DataLayer._client){DataLayer._client.from("messages").update({deleted:true}).eq("id",id).eq("sender_id",myId).then(function(){});}
+  }
   function markRead(idx){setThr(function(ts){return ts.map(function(c,i){return i===idx?Object.assign({},c,{msgs:c.msgs.map(function(m){return MessageService.markRead(m);})}):c;});});}
   var conv=active!==null?thr[active]:null;
   var sChatSk=useState(true);var chatSkLoading=sChatSk[0];var setChatSkLoading=sChatSk[1];
   useEffect(function(){if(active!==null)return;var t=setTimeout(function(){setChatSkLoading(false);},280);return function(){clearTimeout(t);};},[active]);
-  if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</div></div>{chatSkLoading?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length;return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"..."}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
+  if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</div></div>{(chatSkLoading||convLoading)?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length;return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"Debut de la conversation"}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
   var msgs=conv?conv.msgs:[];
   return(<div style={{display:"flex",flexDirection:"column",height:"100%",background:DS.bg}}><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false} isClient={isClientChat}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>Membre HotelPlatform</div></div></div><div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",animation:"hp-msg-in 0.3s ease both",animationDelay:Math.min(i*20,200)+"ms"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprime]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoye"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Repondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Repondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()} style={{width:40,height:40,borderRadius:"50%",background:msg.trim()?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
 }
@@ -3678,7 +3735,7 @@ export default function App() {
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
           {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
-          {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV"/>}
+          {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
@@ -3723,7 +3780,7 @@ export default function App() {
         {pTab==="services"     &&<HotelSvc data={proD}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
-        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={true} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]}/>}
+        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={true} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
         {pTab==="profile"      &&<ProProf proType={auth.type} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
