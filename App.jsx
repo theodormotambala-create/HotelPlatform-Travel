@@ -2864,11 +2864,12 @@ function VerifRequestModal(props){
 
 function HotelSvc(props){
   var data=props.data||DataLayer.getHotels()[0];
+  var userId=props.userId||null;
   var color=DS.hotel;
   var s1=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_rooms");return v?JSON.parse(v):(data.rooms||[]);}catch(e){return data.rooms||[];}});var rooms=s1[0];var setRooms=s1[1];
   var s2=useState(null);var editItem=s2[0];var setEditItem=s2[1];
   var s3=useState(false);var showAdd=s3[0];var setShowAdd=s3[1];
-  var s4=useState(data.svcMode||"hotel");var svcMode=s4[0];var setSvcMode=s4[1];
+  var s4=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_svcmode");return v||data.svcMode||"hotel";}catch(e){return data.svcMode||"hotel";}});var svcMode=s4[0];var setSvcMode=s4[1];
   var hasResto=svcMode==="combined";
   var s5=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_dishes");return v?JSON.parse(v):[];}catch(e){return[];}});var menu=s5[0];var setMenu=s5[1];
   var s6=useState(data.svcMode==="restaurant"?"menu":"rooms");var tab=s6[0];var setTab=s6[1];
@@ -2880,6 +2881,10 @@ function HotelSvc(props){
   var se=useState(null);var confirmDeleteDish=se[0];var setConfirmDeleteDish=se[1];
   var sf=useState(null);var confirmDeleteSvc=sf[0];var setConfirmDeleteSvc=sf[1];
   var _hEstabId=data&&data.id?data.id:null;
+  function _saveSvcMode(v){
+    try{localStorage.setItem("hp_hotelsvc_svcmode",v);}catch(e){}
+    if(userId&&DataLayer._client){DataLayer._client.from("profiles").update({svc_mode:v,updated_at:new Date().toISOString()}).eq("user_id",userId).then(function(){});}
+  }
   function _saveRooms(rs){try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}try{DataLayer.saveEstabRooms(_hEstabId,rs);}catch(e){}}
   function _saveDishes(ms){try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ms));}catch(e){}try{DataLayer.saveEstabDishes(_hEstabId,ms);}catch(e){}}
   function _saveAmenities(am){try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}try{DataLayer.saveEstabAmenities(_hEstabId,am);}catch(e){}}
@@ -2915,7 +2920,7 @@ function HotelSvc(props){
             {[["hotel","Hotel uniquement",DS.hotel],["restaurant","Restaurant uniquement",DS.restaurant],["combined","Hotel + Restaurant",DS.primary]].map(function(_i){
               var v=_i[0];var l=_i[1];var col=_i[2];var isSel=svcMode===v;
               return(
-                <button key={v} onClick={function(){setSvcMode(v);if(v==="hotel")setTab("rooms");if(v==="restaurant")setTab("menu");}} style={{flex:1,padding:"8px 6px",borderRadius:10,border:"1.5px solid "+(isSel?col:DS.border),background:isSel?col+"18":"transparent",cursor:"pointer",textAlign:"center"}}>
+                <button key={v} onClick={function(){setSvcMode(v);_saveSvcMode(v);if(v==="hotel")setTab("rooms");if(v==="restaurant")setTab("menu");}} style={{flex:1,padding:"8px 6px",borderRadius:10,border:"1.5px solid "+(isSel?col:DS.border),background:isSel?col+"18":"transparent",cursor:"pointer",textAlign:"center"}}>
                   <div style={{width:14,height:14,borderRadius:"50%",border:"2px solid "+(isSel?col:DS.border),background:isSel?col:"transparent",margin:"0 auto 4px",display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel&&<div style={{width:5,height:5,borderRadius:"50%",background:"#fff"}}/>}</div>
                   <span style={{fontSize:9,fontWeight:700,color:isSel?col:DS.textMuted,lineHeight:1.2,display:"block"}}>{l}</span>
                 </button>
@@ -3870,7 +3875,7 @@ export default function App() {
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
         {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} onAddNotif={addNotif}/></div>}
-        {pTab==="services"     &&<HotelSvc data={proD}/>}
+        {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
         {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={true} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
