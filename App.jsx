@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
@@ -836,7 +837,7 @@ function AuthScreen(props){
     if(pass.length<6){setFormErr("Le mot de passe doit contenir au moins 6 caracteres.");return;}
     if(pass.length>72){setFormErr("Le mot de passe est trop long (maximum 72 caracteres).");return;}
     if(mode==="register"&&pass!==confirmPass){setFormErr("Les mots de passe ne correspondent pas.");return;}
-    if(mode==="register"&&!cgu){setFormErr("Veuillez accepter les conditions d utilisation.");return;}
+    if(mode==="register"&&!cgu){setFormErr("Veuillez accepter les conditions d'utilisation.");return;}
     setLoading(true);
     try{
       var session=mode==="register"
@@ -900,13 +901,13 @@ function AuthScreen(props){
         )}
         <div style={{position:"relative",marginBottom:10}}>
           <Mail size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/> 
-          <input type="email" value={email} onChange={function(ev){setEmail(ev.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Email ou telephone" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          <input type="text" inputMode="email" value={email} onChange={function(ev){setEmail(ev.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Email ou téléphone" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
         </div>
         {mode!=="forgot"&&(
           <div style={{position:"relative",marginBottom:10}}>
             <Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/>
             <input type={showP?"text":"password"} value={pass} onChange={function(ev){setPass(ev.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
-            <button onClick={function(){setShowP(!showP);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",display:"flex"}}><EyeOff size={14} color={DS.textMuted}/></button>
+            <button onClick={function(){setShowP(!showP);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",display:"flex"}}>{showP?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button>
           </div>
         )}
         {mode==="register"&&(
@@ -922,7 +923,7 @@ function AuthScreen(props){
             <div style={{width:20,height:20,borderRadius:6,border:"2px solid "+(cgu?DS.primary:DS.border),background:cgu?DS.primary:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
               {cgu&&<CheckCircle size={12} color="#fff"/>}
             </div>
-            <span style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>J accepte les <span style={{color:DS.primary,fontWeight:700}}>conditions d utilisation</span> et la <span style={{color:DS.primary,fontWeight:700}}>politique de confidentialite</span> de HotelPlatform Travel</span>
+            <span style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>J'accepte les <span style={{color:DS.primary,fontWeight:700}}>conditions d'utilisation</span> et la <span style={{color:DS.primary,fontWeight:700}}>politique de confidentialité</span> de HotelPlatform Travel</span>
           </div>
         )}
         {authErr&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error,textAlign:"center"}}>{authErr}</div>}
@@ -938,11 +939,11 @@ function AuthScreen(props){
         </button>
         <div style={{textAlign:"center",fontSize:13,color:DS.textMuted}}>
           {mode==="login"
-            ? <span>Pas de compte ? <button onClick={function(){setMode("register");}} style={{background:"none",border:"none",color:DS.primary,fontSize:13,cursor:"pointer",fontWeight:700}}>S inscrire</button></span>
-            : <button onClick={function(){setMode("login");}} style={{background:"none",border:"none",color:DS.primary,fontSize:13,cursor:"pointer",fontWeight:700}}>Deja un compte ? Se connecter</button>
+            ? <span>Pas de compte ? <button onClick={function(){setMode("register");}} style={{background:"none",border:"none",color:DS.primary,fontSize:13,cursor:"pointer",fontWeight:700}}>S'inscrire</button></span>
+            : <button onClick={function(){setMode("login");}} style={{background:"none",border:"none",color:DS.primary,fontSize:13,cursor:"pointer",fontWeight:700}}>Déjà un compte ? Se connecter</button>
           }
         </div>
-        {mode==="login"&&<div style={{textAlign:"center",marginTop:8}}><button onClick={function(){setMode("forgot");}} style={{background:"none",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Mot de passe oublie ?</button></div>}
+        {mode==="login"&&<div style={{textAlign:"center",marginTop:8}}><button onClick={function(){setMode("forgot");}} style={{background:"none",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Mot de passe oublié ?</button></div>}
         <div style={{marginTop:20,borderTop:"1px solid "+DS.border,paddingTop:16,textAlign:"center"}}>
           <div style={{fontSize:11,color:DS.textDim,marginBottom:10,fontWeight:600,letterSpacing:0.5}}>TESTER L APPLICATION</div>
           <div style={{display:"flex",gap:8}}>
@@ -1037,7 +1038,7 @@ function NotifP(props){
   var extNotifs=props.notifs||null;var onMarkRead=props.onMarkRead||null;
   var _defaultNotifs=isPro
     ?[{id:"np1",icon:"Calendar",color:DS.primary,title:"Nouvelle reservation",body:"Moussa Konate a effectue une reservation.",time:"5 min",read:false,tab:"reservations"},{id:"np2",icon:"MessageCircle",color:DS.success,title:"Nouveau message client",body:"Aicha Mbaye vous a envoye un message.",time:"30 min",read:false,tab:"chat"},{id:"np3",icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un nouvel utilisateur suit votre etablissement.",time:"2h",read:true,tab:"feed"}]
-    :[{id:"nc1",icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},{id:"nc2",icon:"MessageCircle",color:DS.success,title:"Nouveau message",body:"Le Jardin Gourmand vous a envoye un message.",time:"1h",read:false,tab:"chat"},{id:"nc3",icon:"Star",color:DS.gold,title:"Premium",body:"Votre abonnement Premium expire dans 7 jours.",time:"1j",read:true,tab:"profile"}];
+    :[{id:"nc1",icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},{id:"nc2",icon:"MessageCircle",color:DS.success,title:"Nouveau message",body:"Le Jardin Gourmand vous a envoye un message.",time:"1h",read:false,tab:"chat"},{id:"nc3",icon:"Star",color:DS.gold,title:"Premium",body:"Votre abonnement Premium expire dans 7 jours.",time:"1j",read:true,tab:"profile"}];
   var ns=useState(_defaultNotifs);
   var _localNotifs=ns[0];var setLocalNotifs=ns[1];
   var notifs=extNotifs!==null?extNotifs:_localNotifs;
@@ -1108,7 +1109,7 @@ function PrivacyModal(props){
   function setPseudo(v){onUpdate({pseudo:v});}
   function setVis(v){onUpdate({vis:v});}
   function setMsgPermission(v){onUpdate({msgPermission:v});}
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.28s ease"}}><div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Confidentialite Premium</div><div style={{fontSize:11,color:DS.textMuted}}>Controlez qui voit votre profil</div></div><button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div><div style={{padding:20}}>{isClientAcc&&[["Verrouiller mon profil","Photo floutee, galerie masquee",locked,setLocked],["Mode pseudonyme","Afficher un pseudonyme",pseudo,setPseudo]].map(function(_i,i){var title=_i[0];var desc=_i[1];var val=_i[2];var setter=_i[3];return(<div key={i} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{title}</div><div style={{fontSize:11,color:DS.textMuted}}>{desc}</div></div><div onClick={function(){setter(!val);}} style={{width:44,height:24,borderRadius:12,background:val?color:DS.border,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}><div style={{position:"absolute",top:2,left:val?22:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/></div></div>);})} {isClientAcc&&<div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:8}}>Visibilite du profil</div>{[["public","Tout le monde"],["friends","Amis uniquement"],["private","Profil prive"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=vis===v;return(<button key={v} onClick={function(){setVis(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:5,borderRadius:10,border:"1px solid "+(isAct?color+"66":DS.border),background:isAct?color+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isAct?color:DS.border),background:isAct?color:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isAct?color:DS.textMuted,fontWeight:isAct?700:400}}>{l}</span></button>);})} </div>}{!isClientAcc&&<div style={{background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:DS.textMuted}}>Votre profil etablissement est toujours public et visible par tous les utilisateurs de la plateforme.</div>}<div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:2}}>Qui peut vous envoyer un message</div><div style={{fontSize:11,color:DS.textMuted,marginBottom:8}}>Controlez quels etablissements peuvent vous contacter</div>{[["everyone","Tout le monde"],["booked","Etablissements avec qui vous avez une reservation"],["none","Personne (messages bloques)"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=msgPermission===v;return(<button key={v} onClick={function(){setMsgPermission(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:5,borderRadius:10,border:"1px solid "+(isAct?color+"66":DS.border),background:isAct?color+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isAct?color:DS.border),background:isAct?color:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isAct?color:DS.textMuted,fontWeight:isAct?700:400}}>{l}</span></button>);})} </div><button onClick={handleClose} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div></div></div>);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.28s ease"}}><div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Confidentialite Premium</div><div style={{fontSize:11,color:DS.textMuted}}>Controlez qui voit votre profil</div></div><button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div><div style={{padding:20}}>{isClientAcc&&[["Verrouiller mon profil","Photo floutee, galerie masquee",locked,setLocked],["Mode pseudonyme","Afficher un pseudonyme",pseudo,setPseudo]].map(function(_i,i){var title=_i[0];var desc=_i[1];var val=_i[2];var setter=_i[3];return(<div key={i} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{title}</div><div style={{fontSize:11,color:DS.textMuted}}>{desc}</div></div><div onClick={function(){setter(!val);}} style={{width:44,height:24,borderRadius:12,background:val?color:DS.border,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}><div style={{position:"absolute",top:2,left:val?22:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/></div></div>);})} {isClientAcc&&<div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:8}}>Visibilite du profil</div>{[["public","Tout le monde"],["friends","Amis uniquement"],["private","Profil prive"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=vis===v;return(<button key={v} onClick={function(){setVis(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:5,borderRadius:10,border:"1px solid "+(isAct?color+"66":DS.border),background:isAct?color+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isAct?color:DS.border),background:isAct?color:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isAct?color:DS.textMuted,fontWeight:isAct?700:400}}>{l}</span></button>);})} </div>}{!isClientAcc&&<div style={{background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:DS.textMuted}}>Votre profil'établissement est toujours public et visible par tous les utilisateurs de la plateforme.</div>}<div style={{marginBottom:14}}><div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:2}}>Qui peut vous envoyer un message</div><div style={{fontSize:11,color:DS.textMuted,marginBottom:8}}>Controlez quels etablissements peuvent vous contacter</div>{[["everyone","Tout le monde"],["booked","Etablissements avec qui vous avez une reservation"],["none","Personne (messages bloques)"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=msgPermission===v;return(<button key={v} onClick={function(){setMsgPermission(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:5,borderRadius:10,border:"1px solid "+(isAct?color+"66":DS.border),background:isAct?color+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isAct?color:DS.border),background:isAct?color:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isAct?color:DS.textMuted,fontWeight:isAct?700:400}}>{l}</span></button>);})} </div><button onClick={handleClose} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div></div></div>);
 }
 
 function ChatUI(props){
@@ -1132,7 +1133,7 @@ function ChatUI(props){
   useEffect(function(){if(active!==null)return;var t=setTimeout(function(){setChatSkLoading(false);},280);return function(){clearTimeout(t);};},[active]);
   if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</div></div>{chatSkLoading?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length;return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"..."}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
   var msgs=conv?conv.msgs:[];
-  return(<div style={{display:"flex",flexDirection:"column",height:"100%",background:DS.bg}}><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false} isClient={isClientChat}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.success}}>En ligne</div></div></div><div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",animation:"hp-msg-in 0.3s ease both",animationDelay:Math.min(i*20,200)+"ms"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprime]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoye"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Repondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Repondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()} style={{width:40,height:40,borderRadius:"50%",background:msg.trim()?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
+  return(<div style={{display:"flex",flexDirection:"column",height:"100%",background:DS.bg}}><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false} isClient={isClientChat}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>Membre HotelPlatform</div></div></div><div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",animation:"hp-msg-in 0.3s ease both",animationDelay:Math.min(i*20,200)+"ms"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprime]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoye"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Repondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Repondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()} style={{width:40,height:40,borderRadius:"50%",background:msg.trim()?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
 }
 
 function useLongPress(onTrigger){
@@ -1436,6 +1437,10 @@ function ClientFeed(props){
       try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem("hp_likes",JSON.stringify(lk));}catch(e){}
       return next;
     });
+    try{
+      if(!wasLiked){DataLayer.create("likes",[{post_id:id,user_email:selfEmail,created_at:new Date().toISOString()}]).catch(function(){});}
+      else{if(DataLayer._client)DataLayer._client.from("likes").delete().eq("post_id",id).eq("user_email",selfEmail).then(function(){}).catch(function(){});}
+    }catch(e){}
     if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:selfName+" a aimé la publication de "+post.author+".",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
@@ -1446,10 +1451,12 @@ function ClientFeed(props){
     var cm={id:Date.now(),author:selfName,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
+    try{DataLayer.create("comments",[{id:String(cm.id),post_id:id,author:selfName,text:text,reply_to:cm.replyTo||null,created_at:new Date().toISOString()}]).catch(function(){});}catch(e){}
     toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
+    try{if(DataLayer._client)DataLayer._client.from("comments").delete().eq("id",String(cmId)).then(function(){}).catch(function(){});}catch(e){}
     toast("Commentaire supprimé","neutral");
   }
   var sLoad=useState(true);var loading=sLoad[0];var setLoading=sLoad[1];
@@ -1622,7 +1629,7 @@ function ClientProf(props){
                       <Eye size={13}/>{showQR?"Masquer le ticket":"Voir le ticket QR"}
                     </button>
                   )}
-                  {st==="pending"&&<div style={{fontSize:11,color:DS.warning,textAlign:"center",padding:"6px 0"}}>En attente de confirmation de l etablissement</div>}
+                  {st==="pending"&&<div style={{fontSize:11,color:DS.warning,textAlign:"center",padding:"6px 0"}}>En attente de confirmation de l'établissement</div>}
                   {st==="refused"&&<div style={{fontSize:11,color:DS.error,textAlign:"center",padding:"6px 0"}}>Cette reservation a ete refusee</div>}
                 </div>
                 {showQR&&hasTicket&&(
@@ -1638,25 +1645,21 @@ function ClientProf(props){
                         ["Nuits",r.nights+" nuit"+(r.nights>1?"s":"")],
                         ["Arrivee",r.dateIn],
                         ["Depart",r.dateOut],
-                      ]).concat([["Paiement",r.payMode==="avec"?(r.total.toFixed(0)+" EUR - "+(r.payMethod==="card"?"Carte bancaire":"Mobile Money")):"Sans paiement (a l arrivee)"]]).map(function(_i){var k=_i[0];var v=_i[1];return(
+                      ]).concat([["Paiement",r.payMode==="avec"?(r.total.toFixed(0)+" EUR - "+(r.payMethod==="card"?"Carte bancaire":"Mobile Money")):"Sans paiement (à l'arrivée)"]]).map(function(_i){var k=_i[0];var v=_i[1];return(
                         <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}>
                           <span style={{color:DS.textMuted}}>{k}</span>
                           <span style={{color:DS.text,fontWeight:700}}>{v}</span>
                         </div>
                       );})}
                     </div>
-                    {st==="pending"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:8,padding:"6px 10px",marginBottom:10,fontSize:10,color:DS.warning,fontWeight:700}}>En attente de confirmation - presentez ce code a l etablissement</div>}
-                    <div style={{display:"inline-flex",padding:12,background:"#fff",borderRadius:12,marginBottom:12,opacity:st==="consumed"?0.4:1}}>
-                      <div style={{width:110,height:110,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                        {genQRPixels(r.id||"HP-000000").map(function(px,pi){return <div key={pi} style={{background:px?"#000":"#fff"}}/>;  })}
-                      </div>
-                    </div>
+                    {st==="pending"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:8,padding:"6px 10px",marginBottom:10,fontSize:10,color:DS.warning,fontWeight:700}}>En attente de confirmation - presentez ce code à l'établissement</div>}
+                    <div style={{marginBottom:12,opacity:st==="consumed"?0.4:1}}><QRTicket id={r.id||"HP-000000"} sz={110}/></div>
                     <div style={{fontSize:10,color:DS.textDim,fontFamily:"monospace",letterSpacing:1,marginBottom:4}}>{r.id||"HP-000000"}</div>
                     {st==="consumed"
-                      ? <div style={{fontSize:10,color:DS.textDim,fontWeight:600}}>Reservation consommee - presentee a l etablissement</div>
+                      ? <div style={{fontSize:10,color:DS.textDim,fontWeight:600}}>Reservation consommee - presentee à l'établissement</div>
                       : st==="pending"
                       ? <div style={{fontSize:10,color:DS.warning,fontWeight:600}}>Ce code sera scannable une fois la reservation acceptee</div>
-                      : <div style={{fontSize:10,color:DS.warning,fontWeight:600}}>Presentez ce code a l etablissement le jour de votre arrivee</div>
+                      : <div style={{fontSize:10,color:DS.warning,fontWeight:600}}>Presentez ce code à l'établissement le jour de votre arrivee</div>
                     }
                   </div>
                 )}
@@ -1908,10 +1911,7 @@ function StripePaymentModal(props){
   );
 }
 
-function genQRPixels(id){
-  var s=0;for(var ci=0;ci<id.length;ci++){s=((s*31+id.charCodeAt(ci))&0x7FFFFFFF)>>>0;}
-  return Array.from({length:100},function(_,j){s=((s*1664525+1013904223)&0x7FFFFFFF)>>>0;return (s>>>15)&1;});
-}
+function QRTicket(props){var id=props.id||"HP-000000";var sz=props.sz||110;return(<div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}><QRCodeSVG value={id} size={sz} level="M" includeMargin={false}/></div>);}
 function BookM(props){
   var e=props.e;var onClose=props.onClose;
   if(!e)return null;
@@ -1949,7 +1949,6 @@ function BookM(props){
   var serviceLabel=isCombo?("Sejour combine - "+e.selectedRoom.name):(hasDishes?(e.selectedDishes.length+" plat"+(e.selectedDishes.length>1?"s":"")+" selectionne"+(e.selectedDishes.length>1?"s":"")):(e.selectedRoom?e.selectedRoom.name:(e.type==="hotel"?"Chambre Standard":"Reservation")));
   var guestsLabel=isRestaurantBooking?"NOMBRE DE CONVIVES":"NOMBRE DE VOYAGEURS";
   var dateLabel=isRestaurantBooking?"DATE DE RESERVATION":"DATE D ARRIVEE";
-  var qrPixels=genQRPixels(resaId);
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1100,display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"hp-fade 0.2s ease"}}>
       <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"94vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.3s ease"}}>
@@ -2072,8 +2071,8 @@ function BookM(props){
           {step===2&&(
             <div>
               <div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:6}}>Type de reservation</div>
-              <div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>Choisissez de payer maintenant ou a l arrivee.</div>
-              {[["avec","Reservation avec paiement","Paiement securise maintenant. Confirmation immediate.",DS.success],["sans","Reservation sans paiement","Paiement a l arrivee. Confirmation sous 24h.",DS.warning]].map(function(_i){
+              <div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>Choisissez de payer maintenant ou à l'arrivée.</div>
+              {[["avec","Reservation avec paiement","Paiement securise maintenant. Confirmation immediate.",DS.success],["sans","Reservation sans paiement","Paiement à l'arrivée. Confirmation sous 24h.",DS.warning]].map(function(_i){
                 var v=_i[0];var t=_i[1];var s=_i[2];var col=_i[3];var isSel=payMode===v;
                 return(
                   <button key={v} onClick={function(){setPayMode(v);}} style={{width:"100%",display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px",marginBottom:10,borderRadius:14,border:"2px solid "+(isSel?col+"88":DS.border),background:isSel?col+"0D":DS.card,cursor:"pointer",textAlign:"left"}}>
@@ -2118,7 +2117,7 @@ function BookM(props){
                       var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
                       setPaying(false);
                       setStep(3);
-                      toast(payMode==="avec"?"Paiement Mobile Money confirme !":"Demande envoyee a l etablissement !","success");
+                      toast(payMode==="avec"?"Paiement Mobile Money confirme !":"Demande envoyee à l'établissement !","success");
                       if(props.onBooked)props.onBooked(BookingService.createBooking(resa));
                     },delay);
                     return;
@@ -2157,8 +2156,8 @@ function BookM(props){
             <div>
               <div style={{textAlign:"center",marginBottom:20}}>
                 <div style={{width:64,height:64,borderRadius:"50%",background:payMode==="avec"?DS.successSoft:DS.warningSoft,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",animation:"hp-bounce-in 0.55s cubic-bezier(0.22,1,0.36,1)"}}>{payMode==="avec"?<CheckCircle size={32} color={DS.success}/>:<Clock size={32} color={DS.warning}/>}</div>
-                <div style={{fontSize:17,fontWeight:900,color:payMode==="avec"?DS.success:DS.warning}}>{payMode==="avec"?"Reservation confirmee !":"Demande envoyee !"}</div>
-                <div style={{fontSize:12,color:DS.textMuted,marginTop:4}}>{payMode==="avec"?"Votre ticket numerique est pret":"En attente de confirmation de l etablissement (24h)"}</div>
+                <div style={{fontSize:17,fontWeight:900,color:payMode==="avec"?DS.success:DS.warning}}>{payMode==="avec"?"Réservation confirmée !":"Demande envoyee !"}</div>
+                <div style={{fontSize:12,color:DS.textMuted,marginTop:4}}>{payMode==="avec"?"Votre ticket numérique est prêt":"En attente de confirmation de l'établissement (24h)"}</div>
               </div>
               <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:16,overflow:"hidden",marginBottom:16}}>
                 <div style={{background:color+"18",padding:"14px 16px",borderBottom:"1px solid "+DS.border+"40"}}>
@@ -2190,16 +2189,12 @@ function BookM(props){
                 </div>
                 <div style={{padding:"16px",textAlign:"center",borderTop:"1px solid "+DS.border+"40"}}>
                   <div style={{fontSize:10,color:DS.textMuted,marginBottom:10}}>CODE QR - A PRESENTER A L ETABLISSEMENT</div>
-                  <div style={{display:"inline-flex",padding:12,background:"#fff",borderRadius:12,margin:"0 auto"}}>
-                    <div style={{width:120,height:120,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                      {qrPixels.map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff",borderRadius:1}}/>;  })}
-                    </div>
-                  </div>
+                  <div style={{margin:"0 auto"}}><QRTicket id={resaId} sz={120}/></div>
                   <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace"}}>{resaId}</div>
                 </div>
               </div>
               <div style={{background:DS.successSoft,border:"1px solid "+DS.success+"33",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:DS.success,lineHeight:1.5,display:"flex",alignItems:"center",gap:8}}>
-                <CheckCircle size={13} color={DS.success}/>{isRestaurantBooking?"Ce ticket est valide jusqu a votre arrivee. L etablissement scannera votre QR code.":"Ce ticket est valide jusqu a votre arrivee. L etablissement scannera votre QR code pour confirmer."}
+                <CheckCircle size={13} color={DS.success}/>{isRestaurantBooking?"Ce ticket est valide jusqu'à votre arrivée. L'établissement scannera votre QR code.":"Ce ticket est valide jusqu'à votre arrivée. L'établissement scannera votre QR code pour confirmer."}
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={function(){setStep(4);}} style={{flex:1,padding:"11px",background:DS.primarySoft,border:"1px solid "+DS.primary+"33",borderRadius:12,color:DS.primary,fontSize:12,fontWeight:700,cursor:"pointer"}}>Voir le ticket</button>
@@ -2240,13 +2235,9 @@ function BookM(props){
                   );})}
                 </div>
                 <div style={{textAlign:"center",padding:"16px",borderTop:"1px solid "+DS.border+"30",background:DS.surface}}>
-                  <div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}>
-                    <div style={{width:100,height:100,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                      {qrPixels.map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
-                    </div>
-                  </div>
+                  <QRTicket id={resaId} sz={100}/>
                   <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace",letterSpacing:1}}>{resaId}</div>
-                  <div style={{fontSize:10,color:DS.textDim,marginTop:4}}>Valide jusqu au scannage de l etablissement</div>
+                  <div style={{fontSize:10,color:DS.textDim,marginTop:4}}>Valide jusqu'au scannage de l'établissement</div>
                 </div>
               </div>
               <div style={{display:"flex",gap:8}}>
@@ -2283,11 +2274,13 @@ function ProFeed(props){
     var cm={id:Date.now(),author:data.name,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
+    try{DataLayer.create("comments",[{id:String(cm.id),post_id:id,author:data.name,text:text,reply_to:cm.replyTo||null,created_at:new Date().toISOString()}]).catch(function(){});}catch(e){}
     toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
-    toast("Commentaire supprime","neutral");
+    try{if(DataLayer._client)DataLayer._client.from("comments").delete().eq("id",String(cmId)).then(function(){}).catch(function(){});}catch(e){}
+    toast("Commentaire supprimé","neutral");
   }
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
   var sf=useState(_initFavsPro);var favPosts=sf[0];var setFavPosts=sf[1];
@@ -2307,42 +2300,61 @@ function ProFeed(props){
   useEffect(function(){var t=setTimeout(function(){setLoadingPro(false);},350);return function(){clearTimeout(t);};},[]);
   var sHeartPro=useState(null);var heartAnimPro=sHeartPro[0];var setHeartAnimPro=sHeartPro[1];
   function triggerHeartPro(id){setHeartAnimPro(id);setTimeout(function(){setHeartAnimPro(null);},500);}
-  // Fix #6 : persistance likes Pro
   function toggleLikePro(id){
     var post=posts.find(function(p){return p.id===id;});var wasLiked=post?post.liked:false;
     setPosts(function(ps){
       var next=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});
       try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem("hp_pro_likes",JSON.stringify(lk));}catch(e){}
       if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:"Quelqu'un a aimé votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
-
       return next;
     });
+    try{
+      if(!wasLiked){DataLayer.create("likes",[{post_id:id,user_email:selfEmail||"pro",created_at:new Date().toISOString()}]).catch(function(){});}
+      else{if(DataLayer._client)DataLayer._client.from("likes").delete().eq("post_id",id).then(function(){}).catch(function(){});}
+    }catch(e){}
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
   function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partage avec succes","success");}
   var smedia=useState(null);var mediaPreview=smedia[0];var setMediaPreview=smedia[1];
   var smtype=useState(null);var mediaType=smtype[0];var setMediaType=smtype[1];
+  var smfile=useState(null);var mediaFile=smfile[0];var setMediaFile=smfile[1];
   var sgate=useState(false);var showVideoGate=sgate[0];var setShowVideoGate=sgate[1];
   function pickMedia(ev){
     var file=ev.target.files&&ev.target.files[0];if(!file)return;
     var isVideo=file.type.indexOf("video")===0;
     if(isVideo&&!isPremium){setShowVideoGate(true);ev.target.value="";return;}
     var url=URL.createObjectURL(file);
-    setMediaPreview(url);setMediaType(isVideo?"video":"image");
+    setMediaPreview(url);setMediaType(isVideo?"video":"image");setMediaFile(file);
     ev.target.value="";
   }
-  function removeMedia(){setMediaPreview(null);setMediaType(null);}
+  function removeMedia(){setMediaPreview(null);setMediaType(null);setMediaFile(null);}
   function publish(){
     if(!newPost.trim()&&!mediaPreview)return;
     var newId="post-"+Date.now();
-    var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:newPost,img:mediaType==="image"?mediaPreview:null,video:mediaType==="video"?mediaPreview:null,likes:0,comments:[],showCmt:false,verified:data.verified};
-    setPosts(function(ps){return [newObj].concat(ps);});
-    try{var _pp=JSON.parse(localStorage.getItem("hp_pro_posts")||"[]");localStorage.setItem("hp_pro_posts",JSON.stringify([newObj].concat(_pp).slice(0,30)));}catch(_e){}
-    // Fix #5 : sauvegarde dans Supabase si disponible
-    try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,data:newObj}]).catch(function(){});}catch(e){}
-    setNewPost("");setShowNew(false);setMediaPreview(null);setMediaType(null);
-    toast("Publication publiee avec succes","success");
+    var _doPublish=function(mediaUrl){
+      var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:newPost,img:mediaType==="image"?mediaUrl:null,video:mediaType==="video"?mediaUrl:null,likes:0,comments:[],showCmt:false,verified:data.verified};
+      setPosts(function(ps){return [newObj].concat(ps);});
+      try{var _pp=JSON.parse(localStorage.getItem("hp_pro_posts")||"[]");localStorage.setItem("hp_pro_posts",JSON.stringify([newObj].concat(_pp).slice(0,30)));}catch(_e){}
+      try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,data:newObj}]).catch(function(){});}catch(e){}
+      setNewPost("");setShowNew(false);setMediaPreview(null);setMediaType(null);setMediaFile(null);
+      toast("Publication publiée avec succès","success");
+    };
+    if(mediaFile&&DataLayer._client){
+      var ext=mediaFile.name.split(".").pop()||"jpg";
+      var path="posts/"+newId+"."+ext;
+      DataLayer._client.storage.from("media").upload(path,mediaFile,{contentType:mediaFile.type,upsert:false})
+        .then(function(res){
+          if(res.data){
+            var pub=DataLayer._client.storage.from("media").getPublicUrl(path);
+            _doPublish(pub.data.publicUrl);
+          } else {
+            _doPublish(mediaPreview);
+          }
+        }).catch(function(){_doPublish(mediaPreview);});
+    } else {
+      _doPublish(mediaPreview);
+    }
   }
   return(
     <div style={{background:DS.bg,paddingBottom:24}}>
@@ -2377,8 +2389,8 @@ function ProFeed(props){
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:10}}>
                 <label style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,cursor:"pointer"}}>
                   <input type="file" accept="image/*,video/*" onChange={pickMedia} style={{display:"none"}}/>
-                  <Eye size={14} color={color}/>
-                  <span style={{fontSize:12,color:DS.textMuted,fontWeight:600}}>Photo / Video</span>
+                  <Camera size={14} color={color}/>
+                  <span style={{fontSize:12,color:DS.textMuted,fontWeight:600}}>Photo / Vidéo</span>
                   {!isPremium&&<span style={{fontSize:9,color:DS.gold,fontWeight:800,marginLeft:2}}>(video = Premium)</span>}
                 </label>
                 <div style={{display:"flex",gap:8}}>
@@ -3097,7 +3109,7 @@ function ProResa(props){
   var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim};
   var sLabels={confirmed:"Confirmee",pending:"En attente",refused:"Refusee",consumed:"Consommee"};
   function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem("hp_resas_all",JSON.stringify(updated));}catch(e){}try{if(patch&&patch.status)DataLayer.updateReservationStatus(id,patch.status);}catch(e2){}}
-  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Reservation confirmee","success");}
+  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Réservation confirmée","success");}
   function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Reservation refusee","info");}
   function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivee confirmee - Client marque present","success");}
   return(
@@ -3257,7 +3269,7 @@ function ProProf(props){
           </div>
         )}
         <div style={{display:"flex",gap:7,marginBottom:12}}>
-          {[[fmtK(data.followers),"Abonnes"],[data.rating+" *","Note"],[fmtK(data.reviewCount),"Avis"],[data.priceFrom+" EUR","Depuis"]].map(function(_i,i){var v=_i[0];var l=_i[1];return <div key={i} style={{flex:1,background:DS.card,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:12,fontWeight:800,color:DS.text}}>{v}</div><div style={{fontSize:9,color:DS.textMuted}}>{l}</div></div>;})}
+          {[[fmtK(data.followers),"Abonnés"],[null,"Note"],[fmtK(data.reviewCount),"Avis"],[data.priceFrom+" EUR","Depuis"]].map(function(_i,i){var v=_i[0];var l=_i[1];return <div key={i} style={{flex:1,background:DS.card,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:12,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>{l==="Note"?<><Stars r={Math.round(data.rating||0)} sz={10}/><span style={{fontSize:10,color:DS.gold,fontWeight:800,marginLeft:2}}>{data.rating||"—"}</span></>:v}</div><div style={{fontSize:9,color:DS.textMuted}}>{l}</div></div>;})}
         </div>
         <div style={{display:"flex",gap:4,marginBottom:14}}>
           {[["about","A propos"],["services","Services"],["stats","Stats"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})}
@@ -3307,7 +3319,7 @@ function ProProf(props){
 // ICON_MAP : cle string → composant React (serialisable en JSON)
 var ICON_MAP={Calendar:Calendar,MessageCircle:MessageCircle,Star:Star,Users:Users,Heart:Heart,Bell:Bell};
 var NC_DATA = [
-  {id:"nc1",icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},
+  {id:"nc1",icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Grand Hotel Royal a confirme votre reservation.",time:"10 min",read:false,tab:"discover"},
   {id:"nc2",icon:"MessageCircle",color:DS.success,title:"Nouveau message",body:"Le Jardin Gourmand vous a envoye un message.",time:"1h",read:false,tab:"chat"},
   {id:"nc3",icon:"Star",color:DS.gold,title:"Premium",body:"Votre abonnement Premium expire dans 7 jours.",time:"1j",read:true,tab:"profile"}
 ];
@@ -3671,7 +3683,7 @@ export default function App() {
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false}/>}
-        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Votre reservation chez "+(resa.estab||"l etablissement")+" est enregistree.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});setBook(null);}}/>}
+        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Votre réservation chez "+(resa.estab||"l'établissement")+" est enregistrée.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});setBook(null);}}/>}
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
         {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setCTab(t);}}/>;}}</Ov>}
@@ -3716,7 +3728,7 @@ export default function App() {
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true}/>}
-      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Reservation confirmee",body:"Votre reservation chez "+(resa.estab||"l etablissement")+" est enregistree.",time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});setBook(null);}}/>}
+      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Votre réservation chez "+(resa.estab||"l'établissement")+" est enregistrée.",time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});setBook(null);}}/>}
       {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
       {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setPTab(t);}}/>;}}</Ov>}
