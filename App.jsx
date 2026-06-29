@@ -3403,43 +3403,69 @@ var NP_DATA = [
   {id:"np3",icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un nouvel utilisateur suit votre etablissement.",time:"2h",read:true,tab:"feed"}
 ];
 
+var COUNTRIES_LIST=["Afghanistan","Afrique du Sud","Albanie","Algerie","Allemagne","Angola","Arabie Saoudite","Argentine","Australie","Autriche","Azerbaidjan","Bahrain","Bangladesh","Belgique","Benin","Bolivie","Botswana","Bresil","Burkina Faso","Burundi","Cambodge","Cameroun","Canada","Cap-Vert","Chili","Chine","Chypre","Colombie","Comores","Congo","Cote d Ivoire","Croatie","Cuba","Danemark","Djibouti","Egypte","Emirats Arabes Unis","Equateur","Erythree","Espagne","Ethiopie","Finlande","France","Gabon","Gambie","Ghana","Grece","Guatemala","Guinee","Guinee-Bissau","Guinee equatoriale","Haiti","Honduras","Hongrie","Inde","Indonesie","Irak","Iran","Irlande","Islande","Israel","Italie","Jamaique","Japon","Jordanie","Kazakhstan","Kenya","Kosovo","Koweit","Lesotho","Liban","Liberia","Libye","Luxembourg","Madagascar","Malawi","Mali","Maroc","Mauritanie","Maurice","Mexique","Moldavie","Mongolie","Montenegro","Mozambique","Namibie","Nepal","Nicaragua","Niger","Nigeria","Norvege","Nouvelle-Zelande","Oman","Ouganda","Pakistan","Palestine","Panama","Paraguay","Pays-Bas","Peru","Philippines","Pologne","Portugal","Qatar","Republique Centrafricaine","Republique Democratique du Congo","Republique Dominicaine","Republique Tcheque","Roumanie","Royaume-Uni","Rwanda","Senegal","Serbie","Sierra Leone","Singapour","Slovaquie","Slovenie","Somalie","Soudan","Soudan du Sud","Sri Lanka","Suede","Suisse","Tanzanie","Tchad","Togo","Tunisie","Turquie","Ukraine","Uruguay","Venezuela","Vietnam","Yemen","Zambie","Zimbabwe"];
 function ProOnboarding(props){
   var auth=props.auth;var onComplete=props.onComplete;var accent=rC(auth.type);
   var s1=useState("");var name=s1[0];var setName=s1[1];
-  var s2=useState("");var loc=s2[0];var setLoc=s2[1];
-  var s3=useState(auth.type==="hotel"?"hotel":"restaurant");var svcMode=s3[0];var setSvcMode=s3[1];
-  var s4=useState(false);var loading=s4[0];var setLoading=s4[1];
-  var s5=useState("");var err=s5[0];var setErr=s5[1];
+  var s2=useState("");var city=s2[0];var setCity=s2[1];
+  var s3=useState("");var country=s3[0];var setCountry=s3[1];
+  var s3b=useState(false);var showCountryDrop=s3b[0];var setShowCountryDrop=s3b[1];
+  var s3c=useState("");var countrySearch=s3c[0];var setCountrySearch=s3c[1];
+  var s4=useState(auth.type==="hotel"?"hotel":"restaurant");var svcMode=s4[0];var setSvcMode=s4[1];
+  var s5=useState(false);var loading=s5[0];var setLoading=s5[1];
+  var s6=useState("");var err=s6[0];var setErr=s6[1];
+  var filteredCountries=COUNTRIES_LIST.filter(function(c){return c.toLowerCase().includes(countrySearch.toLowerCase());});
+  var canSave=!loading&&name.trim().length>0&&city.trim().length>0&&country.length>0;
   async function save(){
     if(!name.trim()){setErr("Veuillez saisir le nom de votre etablissement.");return;}
+    if(!city.trim()){setErr("Veuillez saisir la ville.");return;}
+    if(!country){setErr("Veuillez selectionner le pays.");return;}
     setLoading(true);setErr("");
+    var loc=city.trim()+", "+country;
     var client=DataLayer._client;
     if(client){
-      var r=await client.from("profiles").upsert([{user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:loc.trim()}],{onConflict:"user_id"});
-      if(r.error){setErr("Erreur lors de la sauvegarde. Veuillez reessayer.");setLoading(false);return;}
+      var r=await client.from("profiles").upsert([{user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:loc}],{onConflict:"user_id"});
+      if(r.error){setErr("Erreur de sauvegarde (code: "+r.error.code+"). Verifiez votre connexion.");setLoading(false);return;}
     }
-    onComplete({user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:loc.trim(),description:"",verified:false});
+    onComplete({user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:city.trim()+", "+country,description:"",verified:false});
   }
-  return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:DS.bg,padding:"24px 20px",fontFamily:"'DM Sans','Inter',sans-serif",overflowY:"auto"}}>
+  return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:DS.bg,padding:"24px 20px",fontFamily:"'DM Sans','Inter',sans-serif",overflowY:"auto"}} onClick={function(){if(showCountryDrop)setShowCountryDrop(false);}}>
     <div style={{width:"100%",maxWidth:400}}>
       <div style={{fontSize:22,fontWeight:900,color:DS.text,marginBottom:4}}>Configurer votre etablissement</div>
       <div style={{fontSize:13,color:DS.textMuted,marginBottom:24}}>Ces informations seront visibles par les clients sur la plateforme.</div>
       {auth.type==="hotel"&&<div style={{marginBottom:18}}>
-        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:8}}>Type de service</div>
+        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:8}}>Type de service *</div>
         {[["hotel","Hotel uniquement",DS.hotel],["restaurant","Restaurant uniquement",DS.restaurant],["combined","Hotel + Restaurant",DS.primary]].map(function(_i){var v=_i[0];var l=_i[1];var col=_i[2];var isSel=svcMode===v;return(<button key={v} onClick={function(){setSvcMode(v);}} style={{width:"100%",padding:"9px 12px",marginBottom:6,borderRadius:10,border:"1px solid "+(isSel?col+"66":DS.border),background:isSel?col+"14":DS.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:8,boxSizing:"border-box"}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isSel?col:DS.border),background:isSel?col:"transparent",flexShrink:0}}/><span style={{fontSize:12,color:isSel?col:DS.textMuted,fontWeight:isSel?700:400}}>{l}</span></button>);})}
       </div>}
       <div style={{marginBottom:14}}>
         <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:6}}>Nom de l'etablissement *</div>
-        <input value={name} onChange={function(e){setName(e.target.value);}} placeholder={auth.type==="hotel"?"Ex: Grand Hotel Royal":"Ex: Le Jardin Gourmand"} style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.card,color:DS.text,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+        <input value={name} onChange={function(e){setName(e.target.value);}} placeholder={auth.type==="hotel"?"Ex: Grand Hotel Royal":"Ex: Le Jardin Gourmand"} style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid "+(name.trim()?DS.primary+44:DS.border),background:DS.card,color:DS.text,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
       </div>
-      <div style={{marginBottom:22}}>
-        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:6}}>Ville / Pays</div>
-        <input value={loc} onChange={function(e){setLoc(e.target.value);}} placeholder="Ex: Dakar, Senegal" style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid "+DS.border,background:DS.card,color:DS.text,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:6}}>Ville *</div>
+        <input value={city} onChange={function(e){setCity(e.target.value);}} placeholder="Ex: Brazzaville" style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid "+(city.trim()?DS.primary+44:DS.border),background:DS.card,color:DS.text,fontSize:13,outline:"none",boxSizing:"border-box"}}/>
       </div>
-      {err&&<div style={{color:DS.error,fontSize:12,marginBottom:12,fontWeight:600}}>{err}</div>}
-      <button onClick={save} disabled={loading||!name.trim()} style={{width:"100%",padding:"14px",background:loading||!name.trim()?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:loading||!name.trim()?"default":"pointer",opacity:loading||!name.trim()?0.6:1}}>
+      <div style={{marginBottom:22,position:"relative"}}>
+        <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:6}}>Pays *</div>
+        <button onClick={function(e){e.stopPropagation();setShowCountryDrop(!showCountryDrop);setCountrySearch("");}} style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid "+(country?DS.primary+44:DS.border),background:DS.card,color:country?DS.text:DS.textMuted,fontSize:13,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between",boxSizing:"border-box"}}>
+          <span>{country||"Selectionner un pays"}</span>
+          <ChevronDown size={14} color={DS.textMuted}/>
+        </button>
+        {showCountryDrop&&<div onClick={function(e){e.stopPropagation();}} style={{position:"absolute",top:"100%",left:0,right:0,background:DS.surface,border:"1px solid "+DS.border,borderRadius:12,zIndex:200,boxShadow:"0 8px 24px rgba(0,0,0,.18)",overflow:"hidden",marginTop:4}}>
+          <div style={{padding:"8px 10px",borderBottom:"1px solid "+DS.border}}>
+            <input autoFocus value={countrySearch} onChange={function(e){setCountrySearch(e.target.value);}} placeholder="Rechercher un pays..." style={{width:"100%",padding:"7px 10px",borderRadius:8,border:"1px solid "+DS.border,background:DS.card,color:DS.text,fontSize:12,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+          <div style={{maxHeight:180,overflowY:"auto"}}>
+            {filteredCountries.length===0&&<div style={{padding:"12px 14px",fontSize:12,color:DS.textMuted,textAlign:"center"}}>Aucun pays trouve</div>}
+            {filteredCountries.map(function(c){return(<button key={c} onClick={function(){setCountry(c);setShowCountryDrop(false);setCountrySearch("");}} style={{width:"100%",padding:"10px 14px",background:country===c?accent+"14":"transparent",border:"none",cursor:"pointer",textAlign:"left",fontSize:12,color:country===c?accent:DS.text,fontWeight:country===c?700:400,display:"block",boxSizing:"border-box"}}>{c}</button>);})}
+          </div>
+        </div>}
+      </div>
+      {err&&<div style={{color:DS.error,fontSize:12,marginBottom:12,fontWeight:600,background:DS.error+"12",padding:"8px 12px",borderRadius:8}}>{err}</div>}
+      <button onClick={save} disabled={!canSave} style={{width:"100%",padding:"14px",background:canSave?accent:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:canSave?"pointer":"not-allowed",opacity:canSave?1:0.5,transition:"all .2s"}}>
         {loading?<span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite",verticalAlign:"middle",marginRight:6}}/>:null}Enregistrer et continuer
       </button>
+      <div style={{marginTop:12,fontSize:11,color:DS.textMuted,textAlign:"center"}}>Tous les champs marques * sont obligatoires</div>
     </div>
   </div>);
 }
