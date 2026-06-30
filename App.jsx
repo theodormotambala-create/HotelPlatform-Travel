@@ -1909,14 +1909,14 @@ function ClientProf(props){
               <div style={{width:36,height:36,borderRadius:10,background:DS.client+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Camera size={16} color={DS.client}/></div>
               <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Changer la photo</span>
             </label>
-            {profilePhoto&&<button onClick={function(){_setViewer(profilePhoto);_setCPMenu(false);}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
+            <button onClick={function(){if(profilePhoto){_setViewer(profilePhoto);_setCPMenu(false);}}} disabled={!profilePhoto} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:profilePhoto?"pointer":"default",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30",opacity:profilePhoto?1:0.35}}>
               <div style={{width:36,height:36,borderRadius:10,background:DS.primarySoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={16} color={DS.primary}/></div>
               <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Voir la photo</span>
-            </button>}
-            {profilePhoto&&<button onClick={_deleteClientPhoto} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+            </button>
+            <button onClick={profilePhoto?_deleteClientPhoto:undefined} disabled={!profilePhoto} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:profilePhoto?"pointer":"default",display:"flex",alignItems:"center",gap:14,opacity:profilePhoto?1:0.35}}>
               <div style={{width:36,height:36,borderRadius:10,background:DS.errorSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={16} color={DS.error}/></div>
               <span style={{fontSize:14,color:DS.error,fontWeight:600}}>Supprimer la photo</span>
-            </button>}
+            </button>
           </div>
         )}
       </div>
@@ -3647,14 +3647,14 @@ function ProProf(props){
                 <div style={{width:36,height:36,borderRadius:10,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Camera size={16} color={color}/></div>
                 <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Changer la photo</span>
               </label>
-              {profilePhoto&&<button onClick={function(){if(profilePhoto)_setProViewer(profilePhoto);_setPPMenu(false);}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
+              <button onClick={function(){if(profilePhoto){_setProViewer(profilePhoto);_setPPMenu(false);}}} disabled={!profilePhoto} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:profilePhoto?"pointer":"default",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30",opacity:profilePhoto?1:0.35}}>
                 <div style={{width:36,height:36,borderRadius:10,background:DS.primarySoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={16} color={DS.primary}/></div>
                 <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Voir la photo</span>
-              </button>}
-              {profilePhoto&&<button onClick={_deleteProPhoto} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+              </button>
+              <button onClick={profilePhoto?_deleteProPhoto:undefined} disabled={!profilePhoto} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:profilePhoto?"pointer":"default",display:"flex",alignItems:"center",gap:14,opacity:profilePhoto?1:0.35}}>
                 <div style={{width:36,height:36,borderRadius:10,background:DS.errorSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={16} color={DS.error}/></div>
                 <span style={{fontSize:14,color:DS.error,fontWeight:600}}>Supprimer la photo</span>
-              </button>}
+              </button>
             </div>
           )}
         </div>
