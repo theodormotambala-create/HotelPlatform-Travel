@@ -828,7 +828,7 @@ function AccountTypeScreen(props){
         <div style={{fontSize:13,color:DS.textMuted,marginTop:8}}>Choisissez votre type de compte</div>
       </div>
       <div style={{width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:14}}>
-        {[["client","Client","Voyageur · Réservations · Avis",User,DS.client],["hotel","Hotel","Gérez votre établissement hôtelier",Building2,DS.hotel],["restaurant","Restaurant","Gerez votre restaurant",Utensils,DS.restaurant]].map(function(item){
+        {[["client","Client","Voyageur · Réservations · Avis",User,DS.client],["hotel","Hotel","Gérez votre établissement hôtelier",Building2,DS.hotel],["restaurant","Restaurant","Gérez votre restaurant",Utensils,DS.restaurant]].map(function(item){
           var t=item[0];var l=item[1];var desc=item[2];var Ic=item[3];var col=item[4];
           return(
             <button key={t} onClick={function(){onSelect(t);}} style={{width:"100%",padding:"18px 20px",borderRadius:16,border:"1px solid "+col+"44",background:DS.card,cursor:"pointer",display:"flex",alignItems:"center",gap:16,textAlign:"left"}}>
@@ -1389,7 +1389,7 @@ function ShareSheet(props){
 }
 function CommentsSheet(props){
   var post=props.post;var cmtText=props.cmtText;var setCmtText=props.setCmtText;var addCmt=props.addCmt;var delCmt=props.delCmt;var onClose=props.onClose;var selfLetter=props.selfLetter||"V";
-  var selfName=props.selfName||"Vous";var onAddNotif=props.onAddNotif||null;
+  var selfName=props.selfName||"Vous";var onAddNotif=props.onAddNotif||null;var selfVerified=props.selfVerified||false;
   var sReply=useState(null);var replyTo=sReply[0];var setReplyTo=sReply[1];
   var menuC=useState(null);var menuCm=menuC[0];var setMenuCm=menuC[1];
   var sExp=useState({});var expandedReplies=sExp[0];var setExpandedReplies=sExp[1];
@@ -1534,7 +1534,7 @@ function CommentsSheet(props){
       </div>}
       {/* Input */}
       <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",borderTop:"1px solid "+DS.border+"40",flexShrink:0,background:DS.surface}}>
-        <Av sz={30} letter={selfLetter}/>
+        <Av sz={30} letter={selfLetter} verified={selfVerified} isClient={true}/>
         <div style={{flex:1,position:"relative"}}>
           <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter"){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre à "+replyTo.author+"...":"Ajouter un commentaire..."} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
           <button onClick={function(){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
@@ -1561,6 +1561,7 @@ function ClientFeed(props){
   var onProfile=props.onProfile;var onAddNotif=props.onAddNotif||null;
   var selfEmail=props.selfEmail||"";
   var selfUserId=props.selfUserId||null;
+  var isPremium=props.isPremium||false;
   var selfName=selfEmail?selfEmail.split("@")[0]:"Vous";
   var selfLetter=(selfName[0]||"V").toUpperCase();
   var _init=useRef(null);
@@ -1568,7 +1569,8 @@ function ClientFeed(props){
   var _initLikes=_init.current.likes;var _initFavs=_init.current.favs;
   var s1=useState(function(){
     var base=DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes+(_initLikes[p.id]?1:0),comments:[],showCmt:false});});
-    try{var _pp=JSON.parse(localStorage.getItem("hp_pro_posts")||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:false,comments:p.comments||[],showCmt:false});});return _new.concat(base);}}catch(_e){}
+    try{var _pp=JSON.parse(localStorage.getItem("hp_pro_posts")||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:false,comments:p.comments||[],showCmt:false});});base=_new.concat(base);}}catch(_e){}
+    base.sort(function(a,b){var aB=(a.verified&&a.isPremium)?1:a.verified?1:0;var bB=(b.verified&&b.isPremium)?1:b.verified?1:0;return bB-aB;});
     return base;
   });
   var posts=s1[0];var setPosts=s1[1];
@@ -1663,7 +1665,7 @@ function ClientFeed(props){
                 <div style={{flex:1,minWidth:0}}>
                   <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{fontSize:15,fontWeight:800,color:DS.text,lineHeight:1.3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:"pointer",display:"inline-block",maxWidth:"100%"}}>{post.author}</div>
                   <div style={{display:"flex",flexWrap:"nowrap",alignItems:"center",gap:5,marginTop:2,overflow:"hidden"}}>
-                    <span style={{fontSize:12,color:color,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hotel":"Restaurant"}</span>
+                    <span style={{fontSize:12,color:color,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hôtel":"Restaurant"}</span>
                     {post.combined&&<span style={{fontSize:9,color:DS.primary,fontWeight:800,background:DS.primarySoft,borderRadius:8,padding:"1px 6px",flexShrink:0,whiteSpace:"nowrap"}}>+ Restaurant</span>}
                     <span style={{fontSize:12,color:DS.textMuted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}>{post.followers?"- "+fmtK(post.followers)+" abonnés":""}</span>
                     <span onClick={function(ev){ev.stopPropagation();toggleFollowPost(post.id);}} style={{fontSize:12,fontWeight:800,color:followingPosts.indexOf(post.id)>=0?DS.textMuted:color,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>- {followingPosts.indexOf(post.id)>=0?"Suivi":"Suivre"}</span>
@@ -1691,7 +1693,7 @@ function ClientFeed(props){
             <FeedText text={post.text}/>
             {post.img&&<div style={{position:"relative",overflow:"hidden",background:DS.card}}><img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Crect fill='%2317171F' width='100%25' height='100%25'/%3E%3C/svg%3E";e.target.style.opacity="0.3";}} style={{width:"100%",height:"min(500px,62vh)",objectFit:"cover",display:"block"}}/></div>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"10px 16px 2px",fontSize:12,color:DS.textDim}}>
-              <span>{post.likes} reaction{post.likes!==1?"s":""}</span>
+              <span>{post.likes} réaction{post.likes!==1?"s":""}</span>
               <span style={{cursor:"pointer"}} onClick={function(){openCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
             <div style={{display:"flex",borderTop:"1px solid "+DS.border+"28",marginTop:6}}>
@@ -1705,7 +1707,7 @@ function ClientFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfVerified={isPremium} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -1760,11 +1762,11 @@ function ClientProf(props){
   if(profSkLoading)return <ProfSkeleton/>;
   var _loyaltyPoints=resaHistory.length*150;
   var _loyaltyLevel=_loyaltyPoints>=15000?"plat":_loyaltyPoints>=5000?"gold":_loyaltyPoints>=1000?"silver":"bronze";
-  return(<div style={{paddingBottom:20}}><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/><LoyaltyWidget points={_loyaltyPoints} level={_loyaltyLevel}/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><div style={{filter:_locked?"blur(3px)":"none",transition:"filter .3s",display:"inline-flex",justifyContent:"center"}}><DualAv sz={72} letter={displayLetter} innerImg={profilePhoto} onClickInner={function(){if(profilePhoto){_setViewer(profilePhoto);}else if(_uploadRef.current){_uploadRef.current.click();}}} uploadRef={_uploadRef} verified={isPremium} isClient={true}/></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:10,filter:_locked&&!privacySettings.pseudo?"blur(2px)":"none"}}><span style={{fontSize:18,fontWeight:800,color:DS.text}}>{displayName}</span></div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{(privacySettings.pseudo||_locked)?"":selfEmail||""}</div><div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,padding:"3px 8px",borderRadius:20,border:"1px solid "+(_visColors[privacySettings.vis]||DS.success)+"44",background:(_visColors[privacySettings.vis]||DS.success)+"12"}}><Eye size={10} color={_visColors[privacySettings.vis]||DS.success}/><span style={{fontSize:9,fontWeight:700,color:_visColors[privacySettings.vis]||DS.success}}>{_visLabels[privacySettings.vis]||"Profil public"}</span>{_locked&&<><Lock size={8} color={DS.warning}/><span style={{fontSize:9,fontWeight:700,color:DS.warning}}>Verrouillé</span></>}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu'au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Réservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
+  return(<div style={{paddingBottom:20}}><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/><LoyaltyWidget points={_loyaltyPoints} level={_loyaltyLevel}/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><div style={{filter:_locked?"blur(3px)":"none",transition:"filter .3s",display:"inline-flex",justifyContent:"center"}}><DualAv sz={72} letter={displayLetter} innerImg={profilePhoto} onClickInner={function(){if(profilePhoto){_setViewer(profilePhoto);}else if(_uploadRef.current){_uploadRef.current.click();}}} uploadRef={_uploadRef} verified={isPremium} isClient={true}/></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:10,filter:_locked&&!privacySettings.pseudo?"blur(2px)":"none"}}><span style={{fontSize:18,fontWeight:800,color:DS.text}}>{displayName}</span></div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{(privacySettings.pseudo||_locked)?"":selfEmail||""}</div><div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,padding:"3px 8px",borderRadius:20,border:"1px solid "+(_visColors[privacySettings.vis]||DS.success)+"44",background:(_visColors[privacySettings.vis]||DS.success)+"12"}}><Eye size={10} color={_visColors[privacySettings.vis]||DS.success}/><span style={{fontSize:9,fontWeight:700,color:_visColors[privacySettings.vis]||DS.success}}>{_visLabels[privacySettings.vis]||"Profil public"}</span>{_locked&&<><Lock size={8} color={DS.warning}/><span style={{fontSize:9,fontWeight:700,color:DS.warning}}>Verrouillé</span></>}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu'au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{([["reservations","Réservations"],["favoris","Favoris"]].concat(isPremium&&premiumData&&premiumData.plan==="plus"?[["statistiques","Statistiques"]]:[])). map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})}</div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
           (resaHistory&&resaHistory.length>0)?resaHistory.map(function(r,i){
             var showQR=activeQR===i;
             var st=r.status||"pending";
-            var stLabel={pending:"En attente",refused:"Refusée",confirmed:"Acceptee",consumed:"Consommée"}[st]||"En attente";
+            var stLabel={pending:"En attente",refused:"Refusée",confirmed:"Acceptée",consumed:"Consommée"}[st]||"En attente";
             var stColor={pending:DS.warning,refused:DS.error,confirmed:DS.success,consumed:DS.textDim}[st]||DS.warning;
             var hasTicket=st!=="refused";
             return(
@@ -1809,8 +1811,8 @@ function ClientProf(props){
                       ]:[
                         ["Voyageurs",r.guests+" pers."],
                         ["Nuits",r.nights+" nuit"+(r.nights>1?"s":"")],
-                        ["Arrivee",r.dateIn],
-                        ["Depart",r.dateOut],
+                        ["Arrivée",r.dateIn],
+                        ["Départ",r.dateOut],
                       ]).concat([["Paiement",r.payMode==="avec"?(r.total.toFixed(0)+" EUR - "+(r.payMethod==="card"?"Carte bancaire":"Mobile Money")):"Sans paiement (à l'arrivée)"]]).map(function(_i){var k=_i[0];var v=_i[1];return(
                         <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}>
                           <span style={{color:DS.textMuted}}>{k}</span>
@@ -1834,7 +1836,13 @@ function ClientProf(props){
           })
           : <Emp Icon={Calendar} title="Aucune réservation" sub="Vos réservations apparaîtront ici apres votre premiere reservation"/>
         )}
-        {tab==="favoris"&&(favEstabs.length>0?favEstabs.map(function(est){return(<div key={est.id} style={{background:DS.card,borderRadius:14,marginBottom:10,border:"1px solid "+DS.border,overflow:"hidden"}}><div style={{height:80,position:"relative"}}><img src={est.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{est.verified&&<div style={{position:"absolute",top:6,left:8}}><VBadge sz={16}/></div>}</div><div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:800,color:DS.text}}>{est.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{est.location}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><Stars r={est.rating} sz={10}/><span style={{fontSize:10,color:DS.textMuted}}>({est.reviewCount})</span></div></div><div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{est.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div></div>);}):<Emp Icon={Heart} title="Aucun favori" sub="Appuyez sur le coeur d'un établissement pour l'ajouter"/>)}</div></div>);
+        {tab==="favoris"&&(favEstabs.length>0?favEstabs.map(function(est){return(<div key={est.id} style={{background:DS.card,borderRadius:14,marginBottom:10,border:"1px solid "+DS.border,overflow:"hidden"}}><div style={{height:80,position:"relative"}}><img src={est.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{est.verified&&<div style={{position:"absolute",top:6,left:8}}><VBadge sz={16}/></div>}</div><div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:800,color:DS.text}}>{est.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{est.location}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><Stars r={est.rating} sz={10}/><span style={{fontSize:10,color:DS.textMuted}}>({est.reviewCount})</span></div></div><div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{est.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>à partir de</div></div></div></div>);}):<Emp Icon={Heart} title="Aucun favori" sub="Appuyez sur le cœur d'un établissement pour l'ajouter"/>)}
+        {tab==="statistiques"&&isPremium&&premiumData&&premiumData.plan==="plus"&&(<div>
+          <div style={{background:DS.goldSoft,border:"1px solid "+DS.gold+"44",borderRadius:14,padding:"14px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}><VBadge sz={18}/><div><div style={{fontSize:13,fontWeight:800,color:DS.gold}}>Premium Plus — Statistiques profil</div><div style={{fontSize:11,color:DS.textMuted}}>Actif jusqu'au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</div></div></div>
+          {[[String(resaHistory.length),"Réservations totales",Calendar,DS.client],[String(favEstabs.length),"Établissements favoris",Heart,DS.error],[String(followingCount),"Abonnements actifs",Users,DS.primary],[premiumData.startedAt?new Date(premiumData.startedAt).toLocaleDateString("fr-FR"):"—","Membre Premium depuis",Star,DS.gold]].map(function(_i,idx){var val=_i[0];var lbl=_i[1];var Icon=_i[2];var col=_i[3];return(<div key={idx} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:14}}><div style={{width:40,height:40,borderRadius:12,background:col+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={col}/></div><div style={{flex:1}}><div style={{fontSize:11,color:DS.textMuted,fontWeight:600}}>{lbl}</div><div style={{fontSize:22,fontWeight:900,color:DS.text,marginTop:2}}>{val}</div></div></div>);})}
+          <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:14,padding:"14px 16px",marginBottom:10}}><div style={{fontSize:12,fontWeight:800,color:DS.text,marginBottom:10}}>Activité des réservations</div>{resaHistory.length===0?<div style={{fontSize:12,color:DS.textMuted,textAlign:"center",padding:"12px 0"}}>Aucune réservation enregistrée</div>:[["Confirmées",resaHistory.filter(function(r){return r.status==="confirmed";}).length,DS.success],["En attente",resaHistory.filter(function(r){return r.status==="pending";}).length,DS.warning],["Consommées",resaHistory.filter(function(r){return r.status==="consumed";}).length,DS.primary],["Refusées",resaHistory.filter(function(r){return r.status==="refused";}).length,DS.error]].map(function(_i,i){var lbl=_i[0];var cnt=_i[1];var col=_i[2];return(<div key={i} style={{display:"flex",alignItems:"center",gap:10,marginBottom:i<3?8:0}}><div style={{width:8,height:8,borderRadius:"50%",background:col,flexShrink:0}}/><div style={{flex:1,fontSize:12,color:DS.textMuted}}>{lbl}</div><div style={{fontSize:13,fontWeight:800,color:DS.text}}>{cnt}</div></div>);})}</div>
+        </div>)}
+        </div></div>);
 }
 
 function ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro){
@@ -2601,7 +2609,7 @@ function ProFeed(props){
                 <div style={{flex:1,minWidth:0}}>
                   <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{fontSize:15,fontWeight:800,color:DS.text,lineHeight:1.3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:onProfile?"pointer":"default",display:"inline-block",maxWidth:"100%"}}>{post.author}</div>
                   <div style={{display:"flex",flexWrap:"nowrap",alignItems:"center",gap:5,marginTop:2,overflow:"hidden"}}>
-                    <span style={{fontSize:12,color:pc,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hotel":"Restaurant"}</span>
+                    <span style={{fontSize:12,color:pc,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hôtel":"Restaurant"}</span>
                     {post.combined&&<span style={{fontSize:9,color:DS.primary,fontWeight:800,background:DS.primarySoft,borderRadius:8,padding:"1px 6px",flexShrink:0,whiteSpace:"nowrap"}}>+ Restaurant</span>}
                     <span style={{fontSize:12,color:DS.textMuted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}>{post.followers?"- "+fmtK(post.followers)+" abonnés":""}</span>
                     <span onClick={function(ev){ev.stopPropagation();toggleFollowPost(post.id);}} style={{fontSize:12,fontWeight:800,color:followingPosts.indexOf(post.id)>=0?DS.textMuted:pc,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>- {followingPosts.indexOf(post.id)>=0?"Suivi":"Suivre"}</span>
@@ -2627,7 +2635,7 @@ function ProFeed(props){
             <div style={{padding:"0 16px 16px",fontSize:15,color:DS.text,lineHeight:1.7}}>{post.text}</div>
             {post.img&&<img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.style.display="none";}} style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}{post.video&&<video src={post.video} controls style={{width:"100%",maxHeight:620,display:"block",background:"#000"}}/>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px 2px",fontSize:12,color:DS.textDim}}>
-              <span>{post.likes} reaction{post.likes!==1?"s":""}</span>
+              <span>{post.likes} réaction{post.likes!==1?"s":""}</span>
               <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
             <div style={{display:"flex",borderTop:"1px solid "+DS.border+"30",marginTop:8}}>
@@ -4017,7 +4025,7 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
+          {cTab==="feed"     &&<div><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif} isPremium={isPremium}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
@@ -4028,7 +4036,7 @@ export default function App() {
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
         {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setCTab(t);}}/>;}}</Ov>}
-        {showSplashAd&&<SplashAd onClose={closeSplashAd}/>}
+        {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}
         <Toast/>
       </div>
     );
@@ -4074,7 +4082,7 @@ export default function App() {
       {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
       {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setPTab(t);}}/>;}}</Ov>}
-      {showSplashAd&&<SplashAd onClose={closeSplashAd}/>}
+      {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}
       <Toast/>
     </div>
   );
