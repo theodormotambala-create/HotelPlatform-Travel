@@ -1864,11 +1864,45 @@ function ClientProf(props){
   var _locked=privacySettings.locked||false;
   var _uploadRef=useRef(null);
   var _sViewer=useState(null);var _viewer=_sViewer[0];var _setViewer=_sViewer[1];
-  function _handlePhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){if(onPhotoChange)onPhotoChange(ev.target.result);};r.readAsDataURL(f);}
+  var _sCPMenu=useState(false);var _cpMenu=_sCPMenu[0];var _setCPMenu=_sCPMenu[1];
+  var _sCPPend=useState(null);var _cpPend=_sCPPend[0];var _setCPPend=_sCPPend[1];
+  function _handlePhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){_setCPPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
+  function _saveClientPhoto(){if(!_cpPend)return;if(onPhotoChange)onPhotoChange(_cpPend);_setCPPend(null);_setCPMenu(false);}
+  function _deleteClientPhoto(){if(onPhotoChange)onPhotoChange(null);_setCPMenu(false);}
   if(profSkLoading)return <ProfSkeleton/>;
   var _loyaltyPoints=resaHistory.length*150;
   var _loyaltyLevel=_loyaltyPoints>=15000?"plat":_loyaltyPoints>=5000?"gold":_loyaltyPoints>=1000?"silver":"bronze";
-  return(<div style={{paddingBottom:20}}><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/><LoyaltyWidget points={_loyaltyPoints} level={_loyaltyLevel}/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><div style={{filter:_locked?"blur(3px)":"none",transition:"filter .3s",display:"inline-flex",justifyContent:"center"}}><DualAv sz={72} letter={displayLetter} innerImg={profilePhoto} onClickInner={function(){if(profilePhoto){_setViewer(profilePhoto);}else if(_uploadRef.current){_uploadRef.current.click();}}} uploadRef={_uploadRef} verified={isPremium} isClient={true}/></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:10,filter:_locked&&!privacySettings.pseudo?"blur(2px)":"none"}}><span style={{fontSize:18,fontWeight:800,color:DS.text}}>{displayName}</span></div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{(privacySettings.pseudo||_locked)?"":selfEmail||""}</div><div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,padding:"3px 8px",borderRadius:20,border:"1px solid "+(_visColors[privacySettings.vis]||DS.success)+"44",background:(_visColors[privacySettings.vis]||DS.success)+"12"}}><Eye size={10} color={_visColors[privacySettings.vis]||DS.success}/><span style={{fontSize:9,fontWeight:700,color:_visColors[privacySettings.vis]||DS.success}}>{_visLabels[privacySettings.vis]||"Profil public"}</span>{_locked&&<><Lock size={8} color={DS.warning}/><span style={{fontSize:9,fontWeight:700,color:DS.warning}}>Verrouillé</span></>}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu'au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{([["reservations","Réservations"],["favoris","Favoris"]].concat(isPremium&&premiumData&&premiumData.plan==="plus"?[["statistiques","Statistiques"]]:[])). map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})}</div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
+  return(<div style={{paddingBottom:20}}><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/>
+    {_cpMenu&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){_setCPMenu(false);_setCPPend(null);}}>
+      <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:"20px 16px 32px",animation:"hp-slide-up 0.28s ease"}}>
+        {_cpPend?(
+          <div>
+            <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:DS.text,marginBottom:14}}>Aperçu de la photo</div>
+            <img src={_cpPend} alt="" style={{width:96,height:96,borderRadius:"50%",objectFit:"cover",display:"block",margin:"0 auto 16px",border:"3px solid "+DS.client}}/>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={function(){_setCPPend(null);}} style={{flex:1,padding:"13px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+              <button onClick={_saveClientPhoto} style={{flex:1,padding:"13px",background:DS.client,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Enregistrer</button>
+            </div>
+          </div>
+        ):(
+          <div>
+            <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:DS.text,marginBottom:20}}>Photo de profil</div>
+            <button onClick={function(){if(_uploadRef.current)_uploadRef.current.click();}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
+              <div style={{width:36,height:36,borderRadius:10,background:DS.client+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Camera size={16} color={DS.client}/></div>
+              <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Changer la photo</span>
+            </button>
+            {profilePhoto&&<button onClick={function(){_setViewer(profilePhoto);_setCPMenu(false);}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
+              <div style={{width:36,height:36,borderRadius:10,background:DS.primarySoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={16} color={DS.primary}/></div>
+              <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Voir la photo</span>
+            </button>}
+            {profilePhoto&&<button onClick={_deleteClientPhoto} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+              <div style={{width:36,height:36,borderRadius:10,background:DS.errorSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={16} color={DS.error}/></div>
+              <span style={{fontSize:14,color:DS.error,fontWeight:600}}>Supprimer la photo</span>
+            </button>}
+          </div>
+        )}
+      </div>
+    </div>)}<LoyaltyWidget points={_loyaltyPoints} level={_loyaltyLevel}/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><div style={{filter:_locked?"blur(3px)":"none",transition:"filter .3s",display:"inline-flex",justifyContent:"center"}}><DualAv sz={72} letter={displayLetter} innerImg={profilePhoto} onClickInner={function(){_setCPMenu(true);}} uploadRef={_uploadRef} verified={isPremium} isClient={true}/></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:10,filter:_locked&&!privacySettings.pseudo?"blur(2px)":"none"}}><span style={{fontSize:18,fontWeight:800,color:DS.text}}>{displayName}</span></div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{(privacySettings.pseudo||_locked)?"":selfEmail||""}</div><div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,padding:"3px 8px",borderRadius:20,border:"1px solid "+(_visColors[privacySettings.vis]||DS.success)+"44",background:(_visColors[privacySettings.vis]||DS.success)+"12"}}><Eye size={10} color={_visColors[privacySettings.vis]||DS.success}/><span style={{fontSize:9,fontWeight:700,color:_visColors[privacySettings.vis]||DS.success}}>{_visLabels[privacySettings.vis]||"Profil public"}</span>{_locked&&<><Lock size={8} color={DS.warning}/><span style={{fontSize:9,fontWeight:700,color:DS.warning}}>Verrouillé</span></>}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu'au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{([["reservations","Réservations"],["favoris","Favoris"]].concat(isPremium&&premiumData&&premiumData.plan==="plus"?[["statistiques","Statistiques"]]:[])). map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})}</div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
           (resaHistory&&resaHistory.length>0)?resaHistory.map(function(r,i){
             var showQR=activeQR===i;
             var st=r.status||"pending";
@@ -3513,8 +3547,32 @@ function ProProf(props){
   var _proUploadRef=useRef(null);
   var _proCoverUploadRef=useRef(null);
   var _sProViewer=useState(null);var _proViewer=_sProViewer[0];var _setProViewer=_sProViewer[1];
-  function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){if(onPhotoChange)onPhotoChange(ev.target.result);};r.readAsDataURL(f);}
-  function _handleProCoverFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){if(onCoverChange)onCoverChange(ev.target.result);};r.readAsDataURL(f);}
+  var _sPPMenu=useState(false);var _ppMenu=_sPPMenu[0];var _setPPMenu=_sPPMenu[1];
+  var _sPPPend=useState(null);var _ppPend=_sPPPend[0];var _setPPPend=_sPPPend[1];
+  var _sPCMenu=useState(false);var _pcMenu=_sPCMenu[0];var _setPCMenu=_sPCMenu[1];
+  var _sPCPend=useState(null);var _pcPend=_sPCPend[0];var _setPCPend=_sPCPend[1];
+  var _sShowEditProf=useState(false);var _showEditProf=_sShowEditProf[0];var _setShowEditProf=_sShowEditProf[1];
+  var _sDraftName=useState(data.name||"");var _draftName=_sDraftName[0];var _setDraftName=_sDraftName[1];
+  var _sDraftLoc=useState(data.location||"");var _draftLoc=_sDraftLoc[0];var _setDraftLoc=_sDraftLoc[1];
+  var _sProSaving=useState(false);var _proSaving=_sProSaving[0];var _setProSaving=_sProSaving[1];
+  function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){_setPPPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
+  function _handleProCoverFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){_setPCPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
+  function _saveProPhoto(){if(!_ppPend)return;if(onPhotoChange)onPhotoChange(_ppPend);_setPPPend(null);_setPPMenu(false);toastP("Photo de profil mise à jour","success");}
+  function _saveProCover(){if(!_pcPend)return;if(onCoverChange)onCoverChange(_pcPend);_setPCPend(null);_setPCMenu(false);toastP("Photo de couverture mise à jour","success");}
+  function _deleteProPhoto(){if(onPhotoChange)onPhotoChange(null);_setPPMenu(false);toastP("Photo supprimée","success");}
+  function _saveProProfile(){
+    var nm=_draftName.trim();var lc=_draftLoc.trim();if(!nm)return;
+    _setProSaving(true);
+    var _uid=props.authUserId;
+    var _done=function(){
+      _setProSaving(false);_setShowEditProf(false);
+      try{if(proType==="hotel"){DataLayer._cache.hotels=DataLayer._cache.hotels.map(function(h){return(h.userId===_uid||(h.id===data.id&&!_uid))?Object.assign({},h,{name:nm,author:nm,location:lc}):h;});}
+      else{DataLayer._cache.restaurants=DataLayer._cache.restaurants.map(function(r){return(r.userId===_uid||(r.id===data.id&&!_uid))?Object.assign({},r,{name:nm,author:nm,location:lc}):r;});}}catch(ex){}
+      toastP("Profil mis à jour","success");
+    };
+    if(DataLayer._client&&_uid){DataLayer._client.from("profiles").update({display_name:nm,location:lc}).eq("user_id",_uid).then(_done).catch(_done);}
+    else{_done();}
+  }
   function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}setEditingAbout(false);toastP("À propos mis à jour","success");}
   var premiumActive=isPremium||data.isPremium;
   // Periode de grace : badge reste visible 7 jours apres expiration de l abonnement
@@ -3534,19 +3592,92 @@ function ProProf(props){
       <input ref={_proCoverUploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handleProCoverFile}/>
       <ToastP/>
       {showVerif&&<VerifRequestModal isPremium={premiumActive} accType={proType} verifyStatus={verifStatus} initialStep={3} prefillName={data.name} prefillCountry={data.location} onClose={function(){setShowVerif(false);}} onSubmit={function(){setVerifStatus("pending");toastP("Demande de verification soumise - Examen sous 48-72h","success");}}/>}
+      {_ppMenu&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){_setPPMenu(false);_setPPPend(null);}}>
+        <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:"20px 16px 32px",animation:"hp-slide-up 0.28s ease"}}>
+          {_ppPend?(
+            <div>
+              <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:DS.text,marginBottom:14}}>Aperçu de la photo</div>
+              <img src={_ppPend} alt="" style={{width:96,height:96,borderRadius:"50%",objectFit:"cover",display:"block",margin:"0 auto 16px",border:"3px solid "+color}}/>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={function(){_setPPPend(null);}} style={{flex:1,padding:"13px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+                <button onClick={_saveProPhoto} style={{flex:1,padding:"13px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Enregistrer</button>
+              </div>
+            </div>
+          ):(
+            <div>
+              <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:DS.text,marginBottom:20}}>Photo de profil</div>
+              <button onClick={function(){if(_proUploadRef.current)_proUploadRef.current.click();}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
+                <div style={{width:36,height:36,borderRadius:10,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Camera size={16} color={color}/></div>
+                <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Changer la photo</span>
+              </button>
+              {profilePhoto&&<button onClick={function(){if(profilePhoto)_setProViewer(profilePhoto);_setPPMenu(false);}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
+                <div style={{width:36,height:36,borderRadius:10,background:DS.primarySoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={16} color={DS.primary}/></div>
+                <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Voir la photo</span>
+              </button>}
+              {profilePhoto&&<button onClick={_deleteProPhoto} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+                <div style={{width:36,height:36,borderRadius:10,background:DS.errorSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={16} color={DS.error}/></div>
+                <span style={{fontSize:14,color:DS.error,fontWeight:600}}>Supprimer la photo</span>
+              </button>}
+            </div>
+          )}
+        </div>
+      </div>)}
+      {_pcMenu&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){_setPCMenu(false);_setPCPend(null);}}>
+        <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:"20px 16px 32px",animation:"hp-slide-up 0.28s ease"}}>
+          {_pcPend?(
+            <div>
+              <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:DS.text,marginBottom:14}}>Aperçu de la couverture</div>
+              <img src={_pcPend} alt="" style={{width:"100%",height:120,objectFit:"cover",display:"block",borderRadius:12,marginBottom:16}}/>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={function(){_setPCPend(null);}} style={{flex:1,padding:"13px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+                <button onClick={_saveProCover} style={{flex:1,padding:"13px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Enregistrer</button>
+              </div>
+            </div>
+          ):(
+            <div>
+              <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:DS.text,marginBottom:20}}>Photo de couverture</div>
+              <button onClick={function(){if(_proCoverUploadRef.current)_proCoverUploadRef.current.click();}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
+                <div style={{width:36,height:36,borderRadius:10,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Camera size={16} color={color}/></div>
+                <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Changer la couverture</span>
+              </button>
+              {coverPhoto&&<button onClick={function(){_setProViewer(coverPhoto);_setPCMenu(false);}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
+                <div style={{width:36,height:36,borderRadius:10,background:DS.primarySoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={16} color={DS.primary}/></div>
+                <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Voir la couverture</span>
+              </button>}
+            </div>
+          )}
+        </div>
+      </div>)}
+      {_showEditProf&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){_setShowEditProf(false);}}>
+        <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:"20px 16px 32px",animation:"hp-slide-up 0.28s ease"}}>
+          <div style={{textAlign:"center",fontSize:15,fontWeight:800,color:DS.text,marginBottom:20}}>Modifier le profil</div>
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:11,fontWeight:700,color:DS.textDim,marginBottom:5}}>NOM DE L'ÉTABLISSEMENT</div>
+            <input value={_draftName} onChange={function(e){_setDraftName(e.target.value);}} placeholder="Nom de l'établissement" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:11,fontWeight:700,color:DS.textDim,marginBottom:5}}>LOCALISATION</div>
+            <input value={_draftLoc} onChange={function(e){_setDraftLoc(e.target.value);}} placeholder="Ville, Pays" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={function(){_setShowEditProf(false);}} style={{flex:1,padding:"13px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+            <button onClick={_saveProProfile} disabled={_proSaving} style={{flex:1,padding:"13px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",opacity:_proSaving?0.7:1}}>
+              {_proSaving?<span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite",verticalAlign:"middle"}}/>:"Enregistrer"}
+            </button>
+          </div>
+        </div>
+      </div>)}
       <div style={{position:"relative",height:120,flexShrink:0}}>
         <img src={coverPhoto||data.img} alt="" onClick={function(){var src=coverPhoto||data.img;if(src)_setProViewer(src);}} style={{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}/>
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.6))",pointerEvents:"none"}}/>
         <div style={{position:"absolute",bottom:-44,left:14,zIndex:3}}>
-          <DualAv sz={72} letter={(data.name[0]||"H").toUpperCase()} innerImg={profilePhoto} outerImg={coverPhoto||data.img} verified={isVerified} uploadRef={_proUploadRef} onClickInner={function(){if(profilePhoto){_setProViewer(profilePhoto);}else if(_proUploadRef.current){_proUploadRef.current.click();}}} onClickOuter={function(){var src=coverPhoto||data.img;if(src)_setProViewer(src);}}/>
-        </div>
-        <div style={{position:"absolute",bottom:8,left:8}}>
-          <button onClick={function(){if(_proCoverUploadRef.current)_proCoverUploadRef.current.click();}} style={{background:"rgba(0,0,0,.55)",border:"none",borderRadius:20,padding:"5px 10px",display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}>
-            <Camera size={12} color="#fff"/><span style={{fontSize:10,color:"#fff",fontWeight:700}}>Modifier la couverture</span>
-          </button>
+          <DualAv sz={72} letter={(data.name[0]||"H").toUpperCase()} innerImg={profilePhoto} outerImg={coverPhoto||data.img} verified={isVerified} uploadRef={_proUploadRef} onClickInner={function(){_setPPMenu(true);}} onClickOuter={function(){var src=coverPhoto||data.img;if(src)_setProViewer(src);}}/>
         </div>
         <div style={{position:"absolute",bottom:8,right:14,display:"flex",alignItems:"center",gap:6}}>
           {verifStatus==="pending"&&<div style={{background:DS.warning+"22",border:"1px solid "+DS.warning+"44",borderRadius:20,padding:"2px 8px"}}><span style={{fontSize:10,color:DS.warning,fontWeight:700}}>En attente</span></div>}
+          <button onClick={function(){_setPCMenu(true);}} style={{background:"rgba(0,0,0,.55)",border:"1px solid rgba(255,255,255,.2)",borderRadius:20,padding:"5px 10px",display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}>
+            <Camera size={12} color="#fff"/><span style={{fontSize:10,color:"#fff",fontWeight:700}}>Couverture</span>
+          </button>
         </div>
         <div style={{position:"absolute",top:8,right:8,display:"flex",gap:6}}>
           <button onClick={function(){if(onSettings)onSettings();}} style={{background:"rgba(0,0,0,.5)",border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Settings size={14} color="#fff"/></button>
@@ -3558,7 +3689,10 @@ function ProProf(props){
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={{fontSize:20,fontWeight:900,color:DS.text}}>{data.name}</div></div>
         </div>
-        <div style={{fontSize:12,color:DS.textMuted,marginBottom:10}}>{data.location}</div>
+        <div style={{fontSize:12,color:DS.textMuted,marginBottom:8}}>{_draftLoc||data.location}</div>
+        <button onClick={function(){_setDraftName(data.name||"");_setDraftLoc(data.location||"");_setShowEditProf(true);}} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textMuted,fontSize:12,fontWeight:700,cursor:"pointer",marginBottom:10}}>
+          <Edit2 size={13} color={color}/>Modifier le profil
+        </button>
         {!isVerified&&!verifStatus&&(
           <button onClick={function(){if(premiumActive){setShowVerif(true);}else{if(onPremium)onPremium();}}} style={{width:"100%",padding:"10px 14px",background:premiumActive?"transparent":DS.card,border:"1px solid "+(premiumActive?color+"44":DS.border),borderRadius:12,color:premiumActive?color:DS.textDim,fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}>
             {premiumActive?<ShieldCheck size={14}/>:<Lock size={14}/>} <span style={{color:DS.success}}>Le badge officiel inspire la confiance et attire davantage de clients</span>
@@ -3584,7 +3718,7 @@ function ProProf(props){
           </div>
         )}
         <div style={{display:"flex",gap:7,marginBottom:12}}>
-          {[[fmtK(data.followers),"Abonnés"],[null,"Note"],[fmtK(data.reviewCount),"Avis"],[data.priceFrom+" EUR","Depuis"]].map(function(_i,i){var v=_i[0];var l=_i[1];return <div key={i} style={{flex:1,background:DS.card,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:12,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>{l==="Note"?<><Stars r={Math.round(data.rating||0)} sz={10}/><span style={{fontSize:10,color:DS.gold,fontWeight:800,marginLeft:2}}>{data.rating||"—"}</span></>:v}</div><div style={{fontSize:9,color:DS.textMuted}}>{l}</div></div>;})}
+          {[[fmtK(data.followers),"Abonnés"],[null,"Note"],[fmtK(data.reviewCount),"Avis"],[data.priceFrom?(data.priceFrom+" EUR"):"—","Depuis"]].map(function(_i,i){var v=_i[0];var l=_i[1];return <div key={i} style={{flex:1,background:DS.card,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:12,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>{l==="Note"?<><Stars r={Math.round(data.rating||0)} sz={10}/><span style={{fontSize:10,color:DS.gold,fontWeight:800,marginLeft:2}}>{data.rating||"—"}</span></>:v}</div><div style={{fontSize:9,color:DS.textMuted}}>{l}</div></div>;})}
         </div>
         <div style={{display:"flex",gap:4,marginBottom:14}}>
           {[["about","À propos"],["services","Services"],["stats","Stats"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})}
@@ -4253,7 +4387,7 @@ export default function App() {
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
         {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
-        {pTab==="profile"      &&<ProProf proType={auth.type} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto}/>}
+        {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId}/>}
