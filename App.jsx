@@ -3677,6 +3677,10 @@ export default function App() {
   }
   var s10=useState(function(){try{var v=localStorage.getItem("hp_premium");return v?JSON.parse(v):null;}catch(e){return null;}});var premiumData=s10[0];    var setPremiumData=s10[1];
   var isPremium=premiumData!==null && new Date(premiumData.expiresAt)>new Date();
+  function _savePremiumToDB(pd){
+    var sb=DataLayer._client;var uid=_authForUserData&&_authForUserData.userId;
+    if(sb&&uid){sb.from("profiles").update({premium_data:pd,updated_at:new Date().toISOString()}).eq("user_id",uid).then(function(){});}
+  }
   function subscribePremium(plan,durationMonths){
     var now=new Date();
     var exp=new Date(now);
@@ -3684,6 +3688,7 @@ export default function App() {
     var pd={plan:plan,durationMonths:durationMonths,startedAt:now.toISOString(),expiresAt:exp.toISOString()};
     setPremiumData(pd);
     try{localStorage.setItem("hp_premium",JSON.stringify(pd));}catch(e){}
+    _savePremiumToDB(pd);
     setShowPremium(false);
     tk.show("Premium actif jusqu'au "+exp.toLocaleDateString("fr-FR"),"success");
   }
@@ -3695,12 +3700,14 @@ export default function App() {
     var pd=Object.assign({},premiumData,{expiresAt:exp.toISOString()});
     setPremiumData(pd);
     try{localStorage.setItem("hp_premium",JSON.stringify(pd));}catch(e){}
+    _savePremiumToDB(pd);
     tk.show("Abonnement renouvelé jusqu'au "+exp.toLocaleDateString("fr-FR"),"success");
   }
   function cancelPremium(){
     setPremiumData(null);
     try{localStorage.removeItem("hp_premium");}catch(e){}
-    tk.show("Abonnement Premium annule","success");
+    _savePremiumToDB(null);
+    tk.show("Abonnement Premium annulé","success");
   }
   var s11=useState(function(){try{return JSON.parse(localStorage.getItem("hp_resas")||"[]");}catch(e){return[];}});
   var resaHistory=s11[0];   var setResaHistory=s11[1];
@@ -3726,7 +3733,7 @@ export default function App() {
   var _authForUserData=s0[0];
   useEffect(function(){
     if(!_authForUserData||!_authForUserData.userId||!DataLayer._client)return;
-    DataLayer._client.from("profiles").select("following,fav_estabs,notif_prefs").eq("user_id",_authForUserData.userId).maybeSingle()
+    DataLayer._client.from("profiles").select("following,fav_estabs,notif_prefs,premium_data").eq("user_id",_authForUserData.userId).maybeSingle()
       .then(function(res){
         if(!res||!res.data)return;
         var d=res.data;
@@ -3741,6 +3748,10 @@ export default function App() {
         if(d.notif_prefs&&typeof d.notif_prefs==="object"){
           setNotifPrefs(d.notif_prefs);
           try{localStorage.setItem("hp_notif_prefs",JSON.stringify(d.notif_prefs));}catch(e){}
+        }
+        if(d.premium_data&&typeof d.premium_data==="object"&&d.premium_data.expiresAt){
+          setPremiumData(d.premium_data);
+          try{localStorage.setItem("hp_premium",JSON.stringify(d.premium_data));}catch(e){}
         }
       }).catch(function(){});
   },[_authForUserData&&_authForUserData.userId]);
