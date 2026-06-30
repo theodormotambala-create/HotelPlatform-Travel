@@ -760,9 +760,9 @@ function DualAv(props){
         {outerImg&&<img src={outerImg} alt="" style={{width:"100%",height:"100%",objectFit:"cover",opacity:.75}}/>}
       </div>
       <div style={{position:"absolute",top:ring,left:ring,width:sz,height:sz,borderRadius:"50%",border:"2.5px solid "+DS.bg,overflow:"hidden",boxSizing:"border-box"}}>
-        <div onClick={onClickInner} style={{width:"100%",height:"100%",cursor:"pointer"}}>
-          {innerImg?<img src={innerImg} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<div style={{width:"100%",height:"100%",background:DS.primary+"30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.round(sz*.38),fontWeight:800,color:DS.primary}}>{letter}</div>}
-        </div>
+        <button onClick={onClickInner} style={{width:"100%",height:"100%",cursor:"pointer",background:"none",border:"none",padding:0,display:"block"}}>
+          {innerImg?<img src={innerImg} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>:<div style={{width:"100%",height:"100%",background:DS.primary+"30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.round(sz*.38),fontWeight:800,color:DS.primary}}>{letter}</div>}
+        </button>
       </div>
       {uploadRef&&<div style={{position:"absolute",bottom:ring,right:ring,zIndex:5}}><CamBadge uploadRef={uploadRef} sz={badgeSz}/></div>}
       {verified&&!uploadRef&&<div style={{position:"absolute",bottom:ring-2,right:ring-2,background:DS.bg,borderRadius:"50%",padding:1,zIndex:4}}>{isClient?<CBadge sz={badgeSz}/>:<VBadge sz={badgeSz}/>}</div>}
@@ -1890,7 +1890,7 @@ function ClientProf(props){
   if(profSkLoading)return <ProfSkeleton/>;
   var _loyaltyPoints=resaHistory.length*150;
   var _loyaltyLevel=_loyaltyPoints>=15000?"plat":_loyaltyPoints>=5000?"gold":_loyaltyPoints>=1000?"silver":"bronze";
-  return(<div style={{paddingBottom:20}}><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/>
+  return(<div style={{paddingBottom:20}}><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input id="hp-client-photo-input" ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/>
     {_cpMenu&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){_setCPMenu(false);_setCPPend(null);}}>
       <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:"20px 16px 32px",animation:"hp-slide-up 0.28s ease"}}>
         {_cpPend?(
@@ -1905,10 +1905,10 @@ function ClientProf(props){
         ):(
           <div>
             <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:DS.text,marginBottom:20}}>Photo de profil</div>
-            <button onClick={function(){if(_uploadRef.current)_uploadRef.current.click();}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
+            <label htmlFor="hp-client-photo-input" style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30",boxSizing:"border-box"}}>
               <div style={{width:36,height:36,borderRadius:10,background:DS.client+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Camera size={16} color={DS.client}/></div>
               <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Changer la photo</span>
-            </button>
+            </label>
             {profilePhoto&&<button onClick={function(){_setViewer(profilePhoto);_setCPMenu(false);}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
               <div style={{width:36,height:36,borderRadius:10,background:DS.primarySoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={16} color={DS.primary}/></div>
               <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Voir la photo</span>
@@ -3625,8 +3625,8 @@ function ProProf(props){
   return(
     <div style={{paddingBottom:20}}>
       <ImgViewer src={_proViewer} onClose={function(){_setProViewer(null);}}/>
-      <input ref={_proUploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handleProPhotoFile}/>
-      <input ref={_proCoverUploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handleProCoverFile}/>
+      <input id="hp-pro-photo-input" ref={_proUploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handleProPhotoFile}/>
+      <input id="hp-pro-cover-input" ref={_proCoverUploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handleProCoverFile}/>
       <ToastP/>
       {showVerif&&<VerifRequestModal isPremium={premiumActive} accType={proType} verifyStatus={verifStatus} initialStep={3} prefillName={data.name} prefillCountry={data.location} onClose={function(){setShowVerif(false);}} onSubmit={function(){setVerifStatus("pending");toastP("Demande de verification soumise - Examen sous 48-72h","success");}}/>}
       {_ppMenu&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){_setPPMenu(false);_setPPPend(null);}}>
@@ -3643,10 +3643,10 @@ function ProProf(props){
           ):(
             <div>
               <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:DS.text,marginBottom:20}}>Photo de profil</div>
-              <button onClick={function(){if(_proUploadRef.current)_proUploadRef.current.click();}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
+              <label htmlFor="hp-pro-photo-input" style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30",boxSizing:"border-box"}}>
                 <div style={{width:36,height:36,borderRadius:10,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Camera size={16} color={color}/></div>
                 <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Changer la photo</span>
-              </button>
+              </label>
               {profilePhoto&&<button onClick={function(){if(profilePhoto)_setProViewer(profilePhoto);_setPPMenu(false);}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
                 <div style={{width:36,height:36,borderRadius:10,background:DS.primarySoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={16} color={DS.primary}/></div>
                 <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Voir la photo</span>
@@ -3673,10 +3673,10 @@ function ProProf(props){
           ):(
             <div>
               <div style={{textAlign:"center",fontSize:14,fontWeight:800,color:DS.text,marginBottom:20}}>Photo de couverture</div>
-              <button onClick={function(){if(_proCoverUploadRef.current)_proCoverUploadRef.current.click();}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30"}}>
+              <label htmlFor="hp-pro-cover-input" style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14,borderBottom:"1px solid "+DS.border+"30",boxSizing:"border-box"}}>
                 <div style={{width:36,height:36,borderRadius:10,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Camera size={16} color={color}/></div>
                 <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Changer la couverture</span>
-              </button>
+              </label>
               {coverPhoto&&<button onClick={function(){_setProViewer(coverPhoto);_setPCMenu(false);}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:14}}>
                 <div style={{width:36,height:36,borderRadius:10,background:DS.primarySoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={16} color={DS.primary}/></div>
                 <span style={{fontSize:14,color:DS.text,fontWeight:600}}>Voir la couverture</span>
