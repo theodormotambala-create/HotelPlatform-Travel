@@ -498,6 +498,35 @@ var DataLayer = {
       .then(function(res){
         if(res&&res.data&&res.data.photo_url) onPhotoUrl(res.data.photo_url);
       });
+  },
+
+  uploadCoverPhoto: function(file, userId, accountType, onSuccess){
+    if(!DataLayer._client||!file||!userId){ if(onSuccess)onSuccess(null); return; }
+    var ext = (file.name||"cover").split(".").pop().toLowerCase()||"jpg";
+    var path = userId+"/cover."+ext;
+    DataLayer._client.storage.from("profile-photos")
+      .upload(path, file, { upsert: true, contentType: file.type||"image/jpeg" })
+      .then(function(res){
+        if(res.error){ if(onSuccess)onSuccess(null); return; }
+        var urlRes = DataLayer._client.storage.from("profile-photos").getPublicUrl(path);
+        var publicUrl = urlRes&&urlRes.data&&urlRes.data.publicUrl ? urlRes.data.publicUrl : null;
+        if(publicUrl && userId){
+          DataLayer._client.from("profiles")
+            .upsert([{ user_id: userId, cover_url: publicUrl, account_type: accountType||"hotel" }],
+              { onConflict: "user_id", ignoreDuplicates: false })
+            .then(function(){});
+        }
+        if(onSuccess) onSuccess(publicUrl);
+      });
+  },
+
+  syncCoverPhoto: function(userId, onCoverUrl){
+    if(!DataLayer._client||!userId||!onCoverUrl) return;
+    DataLayer._client.from("profiles")
+      .select("cover_url").eq("user_id", userId).maybeSingle()
+      .then(function(res){
+        if(res&&res.data&&res.data.cover_url) onCoverUrl(res.data.cover_url);
+      });
   }
 };
 
@@ -3384,7 +3413,7 @@ function ProResa(props){
   );
 }
 function ProProf(props){
-  var proType=props.proType;var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var profilePhoto=props.profilePhoto||null;var onPhotoChange=props.onPhotoChange||null;
+  var proType=props.proType;var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var profilePhoto=props.profilePhoto||null;var onPhotoChange=props.onPhotoChange||null;var coverPhoto=props.coverPhoto||null;var onCoverChange=props.onCoverChange||null;
   var data=proType==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];var color=rC(proType);
   var s1=useState("about");var tab=s1[0];var setTab=s1[1];
   var s2=useState(false);var showVerif=s2[0];var setShowVerif=s2[1];
@@ -3397,8 +3426,10 @@ function ProProf(props){
   var sdv=useState(description);var draftDesc=sdv[0];var setDraftDesc=sdv[1];
   var tkp=useToast();var toastP=tkp.show;var ToastP=tkp.Toast;
   var _proUploadRef=useRef(null);
+  var _proCoverUploadRef=useRef(null);
   var _sProViewer=useState(null);var _proViewer=_sProViewer[0];var _setProViewer=_sProViewer[1];
   function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){if(onPhotoChange)onPhotoChange(ev.target.result);};r.readAsDataURL(f);}
+  function _handleProCoverFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){if(onCoverChange)onCoverChange(ev.target.result);};r.readAsDataURL(f);}
   function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}setEditingAbout(false);toastP("À propos mis à jour","success");}
   var premiumActive=isPremium||data.isPremium;
   // Periode de grace : badge reste visible 7 jours apres expiration de l abonnement
@@ -3415,13 +3446,19 @@ function ProProf(props){
     <div style={{paddingBottom:20}}>
       <ImgViewer src={_proViewer} onClose={function(){_setProViewer(null);}}/>
       <input ref={_proUploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handleProPhotoFile}/>
+      <input ref={_proCoverUploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handleProCoverFile}/>
       <ToastP/>
       {showVerif&&<VerifRequestModal isPremium={premiumActive} accType={proType} verifyStatus={verifStatus} initialStep={3} prefillName={data.name} prefillCountry={data.location} onClose={function(){setShowVerif(false);}} onSubmit={function(){setVerifStatus("pending");toastP("Demande de verification soumise - Examen sous 48-72h","success");}}/>}
       <div style={{position:"relative",height:120,flexShrink:0}}>
-        <img src={data.img} alt="" onClick={function(){if(data.img)_setProViewer(data.img);}} style={{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}/>
+        <img src={coverPhoto||data.img} alt="" onClick={function(){var src=coverPhoto||data.img;if(src)_setProViewer(src);}} style={{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}/>
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.6))",pointerEvents:"none"}}/>
         <div style={{position:"absolute",bottom:-44,left:14,zIndex:3}}>
-          <DualAv sz={72} letter={(data.name[0]||"H").toUpperCase()} innerImg={profilePhoto} outerImg={data.img} verified={isVerified} uploadRef={_proUploadRef} onClickInner={function(){if(profilePhoto){_setProViewer(profilePhoto);}else if(_proUploadRef.current){_proUploadRef.current.click();}}} onClickOuter={data.img?function(){_setProViewer(data.img);}:null}/>
+          <DualAv sz={72} letter={(data.name[0]||"H").toUpperCase()} innerImg={profilePhoto} outerImg={coverPhoto||data.img} verified={isVerified} uploadRef={_proUploadRef} onClickInner={function(){if(profilePhoto){_setProViewer(profilePhoto);}else if(_proUploadRef.current){_proUploadRef.current.click();}}} onClickOuter={function(){var src=coverPhoto||data.img;if(src)_setProViewer(src);}}/>
+        </div>
+        <div style={{position:"absolute",bottom:8,left:8}}>
+          <button onClick={function(){if(_proCoverUploadRef.current)_proCoverUploadRef.current.click();}} style={{background:"rgba(0,0,0,.55)",border:"none",borderRadius:20,padding:"5px 10px",display:"flex",alignItems:"center",gap:5,cursor:"pointer"}}>
+            <Camera size={12} color="#fff"/><span style={{fontSize:10,color:"#fff",fontWeight:700}}>Modifier la couverture</span>
+          </button>
         </div>
         <div style={{position:"absolute",bottom:8,right:14,display:"flex",alignItems:"center",gap:6}}>
           {verifStatus==="pending"&&<div style={{background:DS.warning+"22",border:"1px solid "+DS.warning+"44",borderRadius:20,padding:"2px 8px"}}><span style={{fontSize:10,color:DS.warning,fontWeight:700}}>En attente</span></div>}
@@ -3621,6 +3658,11 @@ export default function App() {
               if(url){setProfilePhotoRaw(url);try{localStorage.setItem("hp_profile_photo",url);}catch(e){}}
             });
           }
+          if(!localStorage.getItem("hp_cover_photo")){
+            DataLayer.syncCoverPhoto(session.user.id, function(url){
+              if(url){setCoverPhotoRaw(url);try{localStorage.setItem("hp_cover_photo",url);}catch(e){}}
+            });
+          }
         }catch(e){}
       }
     }).catch(function(){});
@@ -3638,6 +3680,11 @@ export default function App() {
             if(!localStorage.getItem("hp_profile_photo")){
               DataLayer.syncProfilePhoto(session.user.id, function(url){
                 if(url){setProfilePhotoRaw(url);try{localStorage.setItem("hp_profile_photo",url);}catch(e){}}
+              });
+            }
+            if(!localStorage.getItem("hp_cover_photo")){
+              DataLayer.syncCoverPhoto(session.user.id, function(url){
+                if(url){setCoverPhotoRaw(url);try{localStorage.setItem("hp_cover_photo",url);}catch(e){}}
               });
             }
           }catch(e){}
@@ -3788,6 +3835,33 @@ export default function App() {
       }catch(ex){ console.warn("[Photo] Erreur conversion base64:", ex); }
     }
   }
+  var sCoverPhoto=useState(function(){try{return localStorage.getItem("hp_cover_photo")||null;}catch(e){return null;}});var coverPhoto=sCoverPhoto[0];var setCoverPhotoRaw=sCoverPhoto[1];
+  function setCoverPhoto(v){
+    setCoverPhotoRaw(v);
+    try{if(v)localStorage.setItem("hp_cover_photo",v);else localStorage.removeItem("hp_cover_photo");}catch(e){}
+    if(v&&v.startsWith("data:")&&DataLayer._client&&auth&&auth.userId){
+      try{
+        var _ca=v.split(",");
+        var _cm=_ca[0].match(/:(image\/(jpeg|jpg|png|webp|gif));/);
+        if(!_cm){ console.warn("[Cover] Type MIME non autorise"); return; }
+        var _cmime=_cm[1];var _cext=_cm[2]==="jpg"?"jpg":_cm[2];
+        var _cb=atob(_ca[1]);
+        if(_cb.length>8*1024*1024){ console.warn("[Cover] Fichier trop volumineux (max 8 MB)"); return; }
+        var _cu8=new Uint8Array(_cb.length);
+        for(var _ci=0;_ci<_cb.length;_ci++){_cu8[_ci]=_cb.charCodeAt(_ci);}
+        var _cblob=new Blob([_cu8],{type:_cmime});
+        var _ctoken=Date.now();
+        setCoverPhotoRaw._lastToken=_ctoken;
+        var _cfile=new File([_cblob],"cover."+_cext,{type:_cmime});
+        DataLayer.uploadCoverPhoto(_cfile, auth.userId, auth.type||"hotel", function(url){
+          if(url&&setCoverPhotoRaw._lastToken===_ctoken){
+            setCoverPhotoRaw(url);
+            try{localStorage.setItem("hp_cover_photo",url);}catch(e){}
+          }
+        });
+      }catch(ex){ console.warn("[Cover] Erreur conversion base64:", ex); }
+    }
+  }
   var sCEmail=useState(false);var showChangeEmail=sCEmail[0];var setShowChangeEmail=sCEmail[1];
   var sCPwd=useState(false);var showChangePwd=sCPwd[0];var setShowChangePwd=sCPwd[1];
   var tk=useToast(); var Toast=tk.Toast; var toastApp=tk.show;
@@ -3866,6 +3940,7 @@ export default function App() {
     setSett(false);setNotifs(false);
     setCTab("feed");setPTab("feed");
     setNeedsOnboarding(true);
+    setCoverPhotoRaw(null);try{localStorage.removeItem("hp_cover_photo");}catch(e){}
   }
   // Suppression de compte RGPD Art. 17 : efface toutes les donnees locales + Supabase + Storage
   async function deleteAccount(){
@@ -4093,7 +4168,7 @@ export default function App() {
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
         {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={true} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
-        {pTab==="profile"      &&<ProProf proType={auth.type} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
+        {pTab==="profile"      &&<ProProf proType={auth.type} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId}/>}
