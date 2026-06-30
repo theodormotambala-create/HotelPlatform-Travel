@@ -4040,7 +4040,7 @@ export default function App() {
   var _authForUserData=s0[0];
   useEffect(function(){
     if(!_authForUserData||!_authForUserData.userId||!DataLayer._client)return;
-    DataLayer._client.from("profiles").select("following,fav_estabs,notif_prefs,premium_data").eq("user_id",_authForUserData.userId).maybeSingle()
+    DataLayer._client.from("profiles").select("following,fav_estabs,notif_prefs,premium_data,privacy_settings,display_name").eq("user_id",_authForUserData.userId).maybeSingle()
       .then(function(res){
         if(!res||!res.data)return;
         var d=res.data;
@@ -4059,6 +4059,13 @@ export default function App() {
         if(d.premium_data&&typeof d.premium_data==="object"&&d.premium_data.expiresAt){
           setPremiumData(d.premium_data);
           try{localStorage.setItem("hp_premium",JSON.stringify(d.premium_data));}catch(e){}
+        }
+        if(d.privacy_settings&&typeof d.privacy_settings==="object"){
+          setPrivacySettings(d.privacy_settings);
+          try{localStorage.setItem("hp_privacy",JSON.stringify(d.privacy_settings));}catch(e){}
+        }
+        if(d.display_name&&typeof d.display_name==="string"&&d.display_name.trim()){
+          _onClientNameChange(d.display_name.trim());
         }
       }).catch(function(){});
   },[_authForUserData&&_authForUserData.userId]);
