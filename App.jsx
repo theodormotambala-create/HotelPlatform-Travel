@@ -98,7 +98,7 @@ var DataLayer = {
     feed: FEED,
     clientChats: CC,
     proChats: CP,
-    ad: AD
+    ad: ADS_POOL[0]
   },
   _onUpdate: null, // callback optionnel pour rafraichir l'UI apres sync
 
