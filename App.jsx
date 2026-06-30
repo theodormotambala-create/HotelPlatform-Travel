@@ -760,7 +760,7 @@ function DualAv(props){
         {outerImg&&<img src={outerImg} alt="" style={{width:"100%",height:"100%",objectFit:"cover",opacity:.75}}/>}
       </div>
       <div style={{position:"absolute",top:ring,left:ring,width:sz,height:sz,borderRadius:"50%",border:"2.5px solid "+DS.bg,overflow:"hidden",boxSizing:"border-box"}}>
-        <button onClick={onClickInner} style={{width:"100%",height:"100%",cursor:"pointer",background:"none",border:"none",padding:0,display:"block"}}>
+        <button type="button" onClick={onClickInner} style={{width:"100%",height:"100%",cursor:"pointer",background:"none",border:"none",padding:0,display:"block"}}>
           {innerImg?<img src={innerImg} alt="" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>:<div style={{width:"100%",height:"100%",background:DS.primary+"30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.round(sz*.38),fontWeight:800,color:DS.primary}}>{letter}</div>}
         </button>
       </div>
