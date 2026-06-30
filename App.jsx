@@ -58,9 +58,9 @@ const CC=[
 const CP=[];
 const FEED=[
   {id:"h1",author:"Grand Hotel Royal",type:"hotel",time:"2h",img:"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70",text:"Découvrez notre nouvelle suite présidentielle rénovée ! Vue mer panoramique.",likes:284,comments:12,shares:18,followers:2341,verified:true,combined:true},
-  {id:"res1",author:"Le Jardin Gourmand",type:"restaurant",time:"4h",img:"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70",text:"Menu special ce soir : Homard grille aux epices africaines. Reservation recommandee !",likes:512,comments:34,shares:47,followers:3210,verified:true},
+  {id:"res1",author:"Le Jardin Gourmand",type:"restaurant",time:"4h",img:"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70",text:"Menu spécial ce soir : Homard grillé aux épices africaines. Réservation recommandée !",likes:512,comments:34,shares:47,followers:3210,verified:true},
   {id:"h2",author:"Savane Lodge",type:"hotel",time:"6h",img:"https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&q=70",text:"Safari au lever du soleil - des moments inoubliables.",likes:156,comments:8,shares:9,followers:876,verified:true},
-  {id:"res2",author:"Chez Mamie Fatou",type:"restaurant",time:"8h",img:"https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=70",text:"Aujourd'hui : Thieboudienne special avec poissons du jour.",likes:89,comments:5,shares:4,followers:1540,verified:false},
+  {id:"res2",author:"Chez Mamie Fatou",type:"restaurant",time:"8h",img:"https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=70",text:"Aujourd'hui : Thiéboudienne spéciale avec poissons du jour.",likes:89,comments:5,shares:4,followers:1540,verified:false},
 ];
 // Publicités bandeau — sponsorisées par les établissements (configurables par l'Admin)
 const ADS_POOL=[
@@ -863,11 +863,11 @@ function AuthScreen(props){
     } else if(msg.includes("Invalid login")||msg.includes("invalid_credentials")){
       setAuthErr("Email ou mot de passe incorrect.");
     } else if(msg.includes("already registered")||msg.includes("User already registered")){
-      setAuthErr("Cet email est deja utilise. Essayez de vous connecter.");
+      setAuthErr("Cet email est déjà utilisé. Essayez de vous connecter.");
     } else if(msg.includes("longer than 72")||msg.includes("72 characters")){
-      setAuthErr("Mot de passe trop long. Maximum 72 caracteres.");
+      setAuthErr("Mot de passe trop long. Maximum 72 caractères.");
     } else if(msg.includes("Password should be")||msg.includes("password")){
-      setAuthErr("Le mot de passe doit contenir entre 6 et 72 caracteres.");
+      setAuthErr("Le mot de passe doit contenir entre 6 et 72 caractères.");
     } else if(msg.includes("Email not confirmed")){
       setAuthErr("Confirmez votre email avant de vous connecter. Vérifiez vos spams.");
     } else if(msg.includes("rate limit")||msg.includes("too many")){
@@ -892,7 +892,7 @@ function AuthScreen(props){
     if(!email.trim()){setFormErr("Veuillez saisir votre email.");return;}
     var emailRe=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if(!emailRe.test(email.trim())){setFormErr("Adresse email invalide.");return;}
-    if(pass.length<6){setFormErr("Le mot de passe doit contenir au moins 6 caracteres.");return;}
+    if(pass.length<6){setFormErr("Le mot de passe doit contenir au moins 6 caractères.");return;}
     if(pass.length>72){setFormErr("Le mot de passe est trop long (maximum 72 caracteres).");return;}
     if(mode==="register"&&pass!==confirmPass){setFormErr("Les mots de passe ne correspondent pas.");return;}
     if(mode==="register"&&!cgu){setFormErr("Veuillez accepter les conditions d'utilisation.");return;}
@@ -926,7 +926,7 @@ function AuthScreen(props){
         <div style={{width:"100%",maxWidth:360,textAlign:"center"}}>
           <div style={{width:72,height:72,borderRadius:"50%",background:DS.primarySoft,border:"2px solid "+DS.primary,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px"}}><Mail size={32} color={DS.primary}/></div>
           <div style={{fontSize:22,fontWeight:900,color:DS.text,marginBottom:10}}>Confirmez votre email</div>
-          <div style={{fontSize:14,color:DS.textMuted,lineHeight:1.7,marginBottom:24}}>Un lien de confirmation a ete envoye a <span style={{color:DS.primary,fontWeight:700}}>{email}</span>.<br/>Cliquez sur le lien pour activer votre compte.</div>
+          <div style={{fontSize:14,color:DS.textMuted,lineHeight:1.7,marginBottom:24}}>Un lien de confirmation a été envoyé à <span style={{color:DS.primary,fontWeight:700}}>{email}</span>.<br/>Cliquez sur le lien pour activer votre compte.</div>
           <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 16px",marginBottom:20,fontSize:12,color:DS.textMuted,textAlign:"left"}}>
             <div style={{fontWeight:700,color:DS.text,marginBottom:4}}>Vous ne trouvez pas l'email ?</div>
             <div>Vérifiez vos spams ou dossier promotions. Le lien expire dans 24h.</div>
@@ -1011,9 +1011,9 @@ function AccountStatusScreen(props){
   var icon=null;var title="";var msg="";
   if(auth.accountStatus==="pending"){icon=<AlertTriangle size={48} color={DS.warning} style={{margin:"0 auto 16px",display:"block"}}/>;title="Validation en attente";msg="Votre compte est en cours de validation (48-72h).";}
   if(auth.accountStatus==="suspended"){icon=<Lock size={48} color={DS.error} style={{margin:"0 auto 16px",display:"block"}}/>;title="Compte suspendu";msg=auth.suspendReason||"Contactez le support.";}
-  if(auth.accountStatus==="banned"){icon=<Shield size={48} color={DS.error} style={{margin:"0 auto 16px",display:"block"}}/>;title="Compte banni";msg=auth.banReason||"Banni definitivement.";}
+  if(auth.accountStatus==="banned"){icon=<Shield size={48} color={DS.error} style={{margin:"0 auto 16px",display:"block"}}/>;title="Compte banni";msg=auth.banReason||"Banni définitivement.";}
   if(auth.accountStatus==="refused"){icon=<XCircle size={48} color={DS.error} style={{margin:"0 auto 16px",display:"block"}}/>;title="Demande refusee";msg="Votre demande a ete refusee.";}
-  return(<div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}><div style={{width:"100%",maxWidth:360,textAlign:"center"}}>{icon}<div style={{fontSize:20,fontWeight:800,color:DS.text,marginBottom:8}}>{title}</div><div style={{fontSize:14,color:DS.textMuted,lineHeight:1.6,marginBottom:24}}>{msg}</div><a href="mailto:support@hotelplatform.com" style={{display:"block",padding:"12px",background:DS.primarySoft,border:"1px solid "+DS.primary+"33",borderRadius:12,color:DS.primary,fontSize:13,fontWeight:700,textDecoration:"none",textAlign:"center",marginBottom:12}}>Contacter le support</a><button onClick={onLogout} style={{padding:"12px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer",width:"100%"}}>Se deconnecter</button></div></div>);
+  return(<div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}><div style={{width:"100%",maxWidth:360,textAlign:"center"}}>{icon}<div style={{fontSize:20,fontWeight:800,color:DS.text,marginBottom:8}}>{title}</div><div style={{fontSize:14,color:DS.textMuted,lineHeight:1.6,marginBottom:24}}>{msg}</div><a href="mailto:support@hotelplatform.com" style={{display:"block",padding:"12px",background:DS.primarySoft,border:"1px solid "+DS.primary+"33",borderRadius:12,color:DS.primary,fontSize:13,fontWeight:700,textDecoration:"none",textAlign:"center",marginBottom:12}}>Contacter le support</a><button onClick={onLogout} style={{padding:"12px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer",width:"100%"}}>Se déconnecter</button></div></div>);
 }
 
 function ChangeEmailModal(props){
@@ -1032,7 +1032,7 @@ function ChangeEmailModal(props){
     }catch(e){setErr("Erreur de connexion.");}
     setLoading(false);
   }
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:20,animation:"hp-slide-up 0.28s ease"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Changer d'email</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div>{ok?(<div style={{textAlign:"center",padding:"20px 0"}}><CheckCircle size={40} color={DS.success} style={{margin:"0 auto 12px",display:"block"}}/><div style={{fontSize:14,color:DS.text,fontWeight:700,marginBottom:6}}>Email mis a jour</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:16}}>Un lien de confirmation a ete envoye a {email}.</div><button onClick={onClose} style={{width:"100%",padding:"11px",background:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div>):(<div><div style={{marginBottom:10,position:"relative"}}><Mail size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type="email" value={email} onChange={function(ev){setEmail(ev.target.value);}} placeholder="Nouvel'email" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/></div>{err&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error}}>{err}</div>}<div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button><button onClick={submit} disabled={loading||!email.trim()} style={{flex:2,padding:"11px",background:loading||!email.trim()?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:loading||!email.trim()?"not-allowed":"pointer",opacity:loading||!email.trim()?.6:1}}>{loading?"Mise a jour...":"Confirmer"}</button></div></div>)}</div></div>);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:20,animation:"hp-slide-up 0.28s ease"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Changer d'email</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div>{ok?(<div style={{textAlign:"center",padding:"20px 0"}}><CheckCircle size={40} color={DS.success} style={{margin:"0 auto 12px",display:"block"}}/><div style={{fontSize:14,color:DS.text,fontWeight:700,marginBottom:6}}>Email mis à jour</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:16}}>Un lien de confirmation a été envoyé à {email}.</div><button onClick={onClose} style={{width:"100%",padding:"11px",background:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div>):(<div><div style={{marginBottom:10,position:"relative"}}><Mail size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type="email" value={email} onChange={function(ev){setEmail(ev.target.value);}} placeholder="Nouvel'email" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/></div>{err&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error}}>{err}</div>}<div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button><button onClick={submit} disabled={loading||!email.trim()} style={{flex:2,padding:"11px",background:loading||!email.trim()?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:loading||!email.trim()?"not-allowed":"pointer",opacity:loading||!email.trim()?.6:1}}>{loading?"Mise à jour...":"Confirmer"}</button></div></div>)}</div></div>);
 }
 
 function ChangePwdModal(props){
@@ -1048,7 +1048,7 @@ function ChangePwdModal(props){
   var canSubmit=curPwd.length>=1&&pwd.length>=6&&pwd===pwd2;
   async function submit(){
     if(!curPwd){setErr("Veuillez saisir votre mot de passe actuel.");return;}
-    if(pwd.length<6){setErr("Le nouveau mot de passe doit contenir au moins 6 caracteres.");return;}
+    if(pwd.length<6){setErr("Le nouveau mot de passe doit contenir au moins 6 caractères.");return;}
     if(pwd!==pwd2){setErr("Les nouveaux mots de passe ne correspondent pas.");return;}
     setLoading(true);setErr("");
     try{
@@ -1068,7 +1068,7 @@ function ChangePwdModal(props){
     }catch(e){setErr("Erreur de connexion.");}
     setLoading(false);
   }
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:20,animation:"hp-slide-up 0.28s ease"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Changer de mot de passe</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div>{ok?(<div style={{textAlign:"center",padding:"20px 0"}}><CheckCircle size={40} color={DS.success} style={{margin:"0 auto 12px",display:"block"}}/><div style={{fontSize:14,color:DS.text,fontWeight:700,marginBottom:6}}>Mot de passe mis a jour</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:16}}>Votre mot de passe a ete modifie avec succes.</div><button onClick={onClose} style={{width:"100%",padding:"11px",background:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div>):(<div><div style={{marginBottom:6,fontSize:11,color:DS.textMuted,paddingLeft:2}}>Mot de passe actuel</div><div style={{marginBottom:14,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={showCur?"text":"password"} value={curPwd} onChange={function(ev){setCurPwd(ev.target.value);}} placeholder="Saisissez votre mot de passe actuel" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/><button onClick={function(){setShowCur(!showCur);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer"}}>{showCur?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button></div><div style={{height:1,background:DS.border,marginBottom:14}}/><div style={{marginBottom:6,fontSize:11,color:DS.textMuted,paddingLeft:2}}>Nouveau mot de passe</div><div style={{marginBottom:10,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={show?"text":"password"} value={pwd} onChange={function(ev){setPwd(ev.target.value);}} placeholder="Au moins 6 caracteres" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/><button onClick={function(){setShow(!show);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer"}}>{show?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button></div><div style={{marginBottom:14,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={show?"text":"password"} value={pwd2} onChange={function(ev){setPwd2(ev.target.value);}} placeholder="Confirmer le nouveau mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+(pwd2&&pwd2!==pwd?DS.error:DS.border),borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/></div>{err&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error}}>{err}</div>}<div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button><button onClick={submit} disabled={loading||!canSubmit} style={{flex:2,padding:"11px",background:loading||!canSubmit?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:loading||!canSubmit?"not-allowed":"pointer",opacity:loading||!canSubmit?.6:1}}>{loading?"Verification...":"Confirmer"}</button></div></div>)}</div></div>);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:20,animation:"hp-slide-up 0.28s ease"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Changer de mot de passe</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div>{ok?(<div style={{textAlign:"center",padding:"20px 0"}}><CheckCircle size={40} color={DS.success} style={{margin:"0 auto 12px",display:"block"}}/><div style={{fontSize:14,color:DS.text,fontWeight:700,marginBottom:6}}>Mot de passe mis à jour</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:16}}>Votre mot de passe a été modifié avec succès.</div><button onClick={onClose} style={{width:"100%",padding:"11px",background:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div>):(<div><div style={{marginBottom:6,fontSize:11,color:DS.textMuted,paddingLeft:2}}>Mot de passe actuel</div><div style={{marginBottom:14,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={showCur?"text":"password"} value={curPwd} onChange={function(ev){setCurPwd(ev.target.value);}} placeholder="Saisissez votre mot de passe actuel" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/><button onClick={function(){setShowCur(!showCur);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer"}}>{showCur?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button></div><div style={{height:1,background:DS.border,marginBottom:14}}/><div style={{marginBottom:6,fontSize:11,color:DS.textMuted,paddingLeft:2}}>Nouveau mot de passe</div><div style={{marginBottom:10,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={show?"text":"password"} value={pwd} onChange={function(ev){setPwd(ev.target.value);}} placeholder="Au moins 6 caractères" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/><button onClick={function(){setShow(!show);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer"}}>{show?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button></div><div style={{marginBottom:14,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={show?"text":"password"} value={pwd2} onChange={function(ev){setPwd2(ev.target.value);}} placeholder="Confirmer le nouveau mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+(pwd2&&pwd2!==pwd?DS.error:DS.border),borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/></div>{err&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error}}>{err}</div>}<div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button><button onClick={submit} disabled={loading||!canSubmit} style={{flex:2,padding:"11px",background:loading||!canSubmit?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:loading||!canSubmit?"not-allowed":"pointer",opacity:loading||!canSubmit?.6:1}}>{loading?"Vérification...":"Confirmer"}</button></div></div>)}</div></div>);
 }
 
 function NotifP(props){
@@ -1087,7 +1087,7 @@ function NotifP(props){
   var title=isPro?"Notifications Pro":"Notifications";
   var snSk=useState(true);var notifSkLoading=snSk[0];var setNotifSkLoading=snSk[1];
   useEffect(function(){var t=setTimeout(function(){setNotifSkLoading(false);},300);return function(){clearTimeout(t);};},[]);
-  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>{title}</div>} right={null}/>{notifSkLoading?<NotifSkeleton/>:<>{notifs.length===0&&<Emp Icon={Bell} title="Aucune notification" sub="Vos notifications apparaitront ici"/>}{notifs.map(function(n,_ni){var Icon=ICON_MAP[n.icon]||ICON_MAP[n.Icon&&n.Icon.displayName]||Bell;return(<div key={n.id} onClick={function(){handleMarkRead(n.id);if(onNavigate)onNavigate(n.tab);}} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",background:n.read?"transparent":n.color+"08",animation:"hp-item-in 0.3s ease both",animationDelay:(_ni*50)+"ms"}}><div style={{width:40,height:40,borderRadius:"50%",background:n.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={n.color}/></div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?600:800,color:DS.text,marginBottom:2}}>{n.title}</div><div style={{fontSize:12,color:DS.textMuted}}>{n.body}</div><div style={{fontSize:10,color:DS.textDim,marginTop:4}}>{n.time}</div></div>{!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:accent,marginTop:6,flexShrink:0}}/>}</div>);})}</>}</div>);
+  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>{title}</div>} right={null}/>{notifSkLoading?<NotifSkeleton/>:<>{notifs.length===0&&<Emp Icon={Bell} title="Aucune notification" sub="Vos notifications apparaîtront ici"/>}{notifs.map(function(n,_ni){var Icon=ICON_MAP[n.icon]||ICON_MAP[n.Icon&&n.Icon.displayName]||Bell;return(<div key={n.id} onClick={function(){handleMarkRead(n.id);if(onNavigate)onNavigate(n.tab);}} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",background:n.read?"transparent":n.color+"08",animation:"hp-item-in 0.3s ease both",animationDelay:(_ni*50)+"ms"}}><div style={{width:40,height:40,borderRadius:"50%",background:n.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={n.color}/></div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?600:800,color:DS.text,marginBottom:2}}>{n.title}</div><div style={{fontSize:12,color:DS.textMuted}}>{n.body}</div><div style={{fontSize:10,color:DS.textDim,marginTop:4}}>{n.time}</div></div>{!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:accent,marginTop:6,flexShrink:0}}/>}</div>);})}</>}</div>);
 }
 
 function SettingsS(props){
@@ -1104,7 +1104,7 @@ function SettingsS(props){
     if(label==="Changer de mot de passe"&&onChangePwd)return onChangePwd();
   }
   var NOTIF_TOGGLES=[["reservation","Réservations","Confirmations et mises à jour"],["message","Messages","Nouveaux messages reçus"],["promo","Promotions","Offres et événements"],["follow","Abonnés","Nouveaux abonnés"]];
-  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>Parametres</div>} right={null}/><div style={{padding:"8px 0 40px"}}><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>ABONNEMENT</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{isPremium?(<div style={{padding:"12px 16px"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontSize:12,fontWeight:800,color:DS.gold}}>Premium actif</div><div style={{fontSize:10,color:DS.textMuted}}>Expire le {premiumExpStr}</div></div><div style={{display:"flex",gap:6}}><VBadge sz={20}/><button onClick={onPremium} style={{padding:"5px 10px",background:DS.gold+"22",border:"1px solid "+DS.gold+"44",borderRadius:16,color:DS.gold,fontSize:10,fontWeight:800,cursor:"pointer"}}>Gerer</button></div></div></div>):(<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px"}}><div><div style={{fontSize:12,fontWeight:700,color:DS.gold}}>Passer Premium</div><div style={{fontSize:10,color:DS.textMuted}}>{accType==="client"?"Sans pub - Confidentialite - Badge eligible":"Video - Badge - Avis clients"}</div></div><button onClick={onPremium} style={{padding:"6px 14px",background:DS.gold,border:"none",borderRadius:20,color:"#000",fontSize:11,fontWeight:800,cursor:"pointer"}}>Voir</button></div>)}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>COMPTE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{[["Changer d'email",Mail],["Changer de mot de passe",Lock]].map(function(_i){var label=_i[0];var Ic=_i[1];return(<div key={label} onClick={function(){accountActions(label);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>{label}</span><ChevronRight size={14} color={DS.textDim}/></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>NOTIFICATIONS</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{NOTIF_TOGGLES.map(function(_i,idx){var key=_i[0];var title=_i[1];var desc=_i[2];var val=notifPrefs[key]!==false;return(<div key={key} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:idx<NOTIF_TOGGLES.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{flex:1}}><div style={{fontSize:13,color:DS.text,fontWeight:600}}>{title}</div><div style={{fontSize:10,color:DS.textMuted}}>{desc}</div></div><div onClick={function(){var patch={};patch[key]=!val;onUpdateNotifPrefs(patch);}} style={{width:40,height:22,borderRadius:11,background:val?color:DS.border,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}><div style={{position:"absolute",top:2,left:val?20:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/></div></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>CONFIDENTIALITE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onPrivacy} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>Parametres de confidentialite</span><ChevronRight size={14} color={DS.textDim}/></div></div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>ZONE SENSIBLE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.error+"33"}}><div onClick={function(){setShowDelConf(true);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:DS.errorSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={15} color={DS.error}/></div><span style={{flex:1,fontSize:13,color:DS.error}}>Supprimer mon compte</span><ChevronRight size={14} color={DS.error+"88"}/></div></div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onLogout} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:DS.error+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><LogOut size={15} color={DS.error}/></div><span style={{flex:1,fontSize:13,color:DS.error}}>Se deconnecter</span></div></div></div>{showDelConf&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1600,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){setShowDelConf(false);}}><div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:24,animation:"hp-slide-up 0.28s ease"}}><div style={{textAlign:"center",marginBottom:20}}><div style={{width:56,height:56,borderRadius:"50%",background:DS.errorSoft,border:"1px solid "+DS.error+"44",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}><Trash2 size={26} color={DS.error}/></div><div style={{fontSize:16,fontWeight:900,color:DS.text,marginBottom:8}}>Supprimer mon compte</div><div style={{fontSize:12,color:DS.textMuted,lineHeight:1.7}}>Cette action est <span style={{color:DS.error,fontWeight:700}}>irreversible</span>. Toutes vos donnees personnelles seront supprimees conformement au RGPD dans un delai de 30 jours.</div></div><div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"10px 14px",marginBottom:20,fontSize:11,color:DS.warning}}>Vos reservations en cours, messages et historique seront definitivement supprimes.</div><div style={{display:"flex",gap:10}}><button onClick={function(){setShowDelConf(false);}} style={{flex:1,padding:"13px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer"}}>Annuler</button><button onClick={function(){setShowDelConf(false);if(onDeleteAccount)onDeleteAccount();}} style={{flex:1,padding:"13px",background:DS.error,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Confirmer</button></div></div></div>)}</div>);
+  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>Paramètres</div>} right={null}/><div style={{padding:"8px 0 40px"}}><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>ABONNEMENT</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{isPremium?(<div style={{padding:"12px 16px"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontSize:12,fontWeight:800,color:DS.gold}}>Premium actif</div><div style={{fontSize:10,color:DS.textMuted}}>Expire le {premiumExpStr}</div></div><div style={{display:"flex",gap:6}}><VBadge sz={20}/><button onClick={onPremium} style={{padding:"5px 10px",background:DS.gold+"22",border:"1px solid "+DS.gold+"44",borderRadius:16,color:DS.gold,fontSize:10,fontWeight:800,cursor:"pointer"}}>Gerer</button></div></div></div>):(<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px"}}><div><div style={{fontSize:12,fontWeight:700,color:DS.gold}}>Passer Premium</div><div style={{fontSize:10,color:DS.textMuted}}>{accType==="client"?"Sans pub · Confidentialité · Badge éligible":"Vidéo · Badge · Avis clients"}</div></div><button onClick={onPremium} style={{padding:"6px 14px",background:DS.gold,border:"none",borderRadius:20,color:"#000",fontSize:11,fontWeight:800,cursor:"pointer"}}>Voir</button></div>)}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>COMPTE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{[["Changer d'email",Mail],["Changer de mot de passe",Lock]].map(function(_i){var label=_i[0];var Ic=_i[1];return(<div key={label} onClick={function(){accountActions(label);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>{label}</span><ChevronRight size={14} color={DS.textDim}/></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>NOTIFICATIONS</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{NOTIF_TOGGLES.map(function(_i,idx){var key=_i[0];var title=_i[1];var desc=_i[2];var val=notifPrefs[key]!==false;return(<div key={key} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:idx<NOTIF_TOGGLES.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{flex:1}}><div style={{fontSize:13,color:DS.text,fontWeight:600}}>{title}</div><div style={{fontSize:10,color:DS.textMuted}}>{desc}</div></div><div onClick={function(){var patch={};patch[key]=!val;onUpdateNotifPrefs(patch);}} style={{width:40,height:22,borderRadius:11,background:val?color:DS.border,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}><div style={{position:"absolute",top:2,left:val?20:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/></div></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>CONFIDENTIALITE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onPrivacy} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>Paramètres de confidentialité</span><ChevronRight size={14} color={DS.textDim}/></div></div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>ZONE SENSIBLE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.error+"33"}}><div onClick={function(){setShowDelConf(true);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:DS.errorSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={15} color={DS.error}/></div><span style={{flex:1,fontSize:13,color:DS.error}}>Supprimer mon compte</span><ChevronRight size={14} color={DS.error+"88"}/></div></div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onLogout} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:DS.error+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><LogOut size={15} color={DS.error}/></div><span style={{flex:1,fontSize:13,color:DS.error}}>Se déconnecter</span></div></div></div>{showDelConf&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1600,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){setShowDelConf(false);}}><div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:24,animation:"hp-slide-up 0.28s ease"}}><div style={{textAlign:"center",marginBottom:20}}><div style={{width:56,height:56,borderRadius:"50%",background:DS.errorSoft,border:"1px solid "+DS.error+"44",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}><Trash2 size={26} color={DS.error}/></div><div style={{fontSize:16,fontWeight:900,color:DS.text,marginBottom:8}}>Supprimer mon compte</div><div style={{fontSize:12,color:DS.textMuted,lineHeight:1.7}}>Cette action est <span style={{color:DS.error,fontWeight:700}}>irréversible</span>. Toutes vos données personnelles seront supprimées conformément au RGPD dans un délai de 30 jours.</div></div><div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"10px 14px",marginBottom:20,fontSize:11,color:DS.warning}}>Vos réservations en cours, messages et historique seront définitivement supprimés.</div><div style={{display:"flex",gap:10}}><button onClick={function(){setShowDelConf(false);}} style={{flex:1,padding:"13px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer"}}>Annuler</button><button onClick={function(){setShowDelConf(false);if(onDeleteAccount)onDeleteAccount();}} style={{flex:1,padding:"13px",background:DS.error,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Confirmer</button></div></div></div>)}</div>);
 }
 
 function PremiumModal(props){
@@ -1118,18 +1118,18 @@ function PremiumModal(props){
   useEffect(function(){return function(){if(cT.current)clearTimeout(cT.current);};},[]);
   var isClient=accType==="client";
   var PLANS=isClient
-    ?[{id:"std",name:"Premium Essentiel",price:9.99,color:DS.client,features:["Sans publicite","Confidentialite avancee","Verrouillage de profil","Support prioritaire"]},
+    ?[{id:"std",name:"Premium Essentiel",price:9.99,color:DS.client,features:["Sans publicité","Confidentialité avancée","Verrouillage de profil","Support prioritaire"]},
       {id:"plus",name:"Premium Plus",price:19.99,color:DS.gold,features:["Tout Essentiel","Badge eligible verification","Mode pseudonyme","Statistiques profil"]}]
-    :[{id:"std",name:"Premium Standard",price:9.99,color:DS.primary,features:["Publications video","Sans publicite","Eligible badge verification","Eligible avis clients"]},
-      {id:"plus",name:"Premium Plus",price:19.99,color:DS.gold,features:["Tout Standard","Mise en avant boostee","Visibilite prioritaire","Statistiques avancees"]},
-      {id:"biz",name:"Premium Boostee Avancee",price:49.99,color:DS.hotel,features:["Tout Plus","Avantages exclusifs","Manager dedie","API access"]}];
+    :[{id:"std",name:"Premium Standard",price:9.99,color:DS.primary,features:["Publications video","Sans publicité","Éligible badge vérification","Éligible aux avis clients"]},
+      {id:"plus",name:"Premium Plus",price:19.99,color:DS.gold,features:["Tout Standard","Mise en avant boostée","Visibilite prioritaire","Statistiques avancées"]},
+      {id:"biz",name:"Premium Boosté Avancé",price:49.99,color:DS.hotel,features:["Tout Plus","Avantages exclusifs","Manager dédié","API access"]}];
   var sel=PLANS.find(function(p){return p.id===plan;})||PLANS[0];
   var DURATIONS=[{months:1,label:"1 mois",discount:0},{months:3,label:"3 mois",discount:0.10},{months:6,label:"6 mois",discount:0.20},{months:12,label:"12 mois",discount:0.30}];
   var selDur=DURATIONS.find(function(d){return d.months===duration;})||DURATIONS[0];
   var rawTotal=sel.price*selDur.months;
   var finalTotal=rawTotal*(1-selDur.discount);
   var savings=rawTotal-finalTotal;
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"92vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.32s ease"}}><div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>HotelPlatform Premium</div><button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div><div style={{padding:"0 20px",display:"flex",gap:4,marginTop:14}}>{[1,2,3].map(function(s){return <div key={s} style={{flex:1,height:3,borderRadius:2,background:s<=step?DS.gold:DS.border}}/>;})}</div><div style={{padding:20}}>{step===1&&<div>{PLANS.map(function(p){var isS=plan===p.id;return(<button key={p.id} onClick={function(){setPlan(p.id);}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?p.color+"88":DS.border),background:isS?p.color+"14":DS.card,cursor:"pointer",textAlign:"left"}}><div><div style={{fontSize:13,fontWeight:800,color:isS?p.color:DS.text}}>{p.name}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{p.features.slice(0,2).join(" - ")}</div></div><div style={{fontSize:16,fontWeight:900,color:p.color}}>{p.price} EUR<span style={{fontSize:9,color:DS.textMuted,fontWeight:600}}>/mois</span></div></button>);})}  <button onClick={function(){setStep(2);}} style={{width:"100%",padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginTop:8}}>Continuer</button></div>}{step===2&&<div><div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:4}}>Choisissez votre duree</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>{sel.name} - plus la duree est longue, plus la reduction est importante</div>{DURATIONS.map(function(d){var isS=duration===d.months;var dTotal=sel.price*d.months*(1-d.discount);return(<button key={d.months} onClick={function(){setDuration(d.months);}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?DS.gold+"88":DS.border),background:isS?DS.gold+"14":DS.card,cursor:"pointer",textAlign:"left"}}><div><div style={{fontSize:13,fontWeight:800,color:isS?DS.gold:DS.text}}>{d.label}</div>{d.discount>0&&<div style={{fontSize:10,color:DS.success,marginTop:2,fontWeight:700}}>Economisez {Math.round(d.discount*100)}%</div>}</div><div style={{textAlign:"right"}}><div style={{fontSize:15,fontWeight:900,color:isS?DS.gold:DS.text}}>{dTotal.toFixed(2)} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>{(dTotal/d.months).toFixed(2)} EUR/mois</div></div></button>);})}<div style={{display:"flex",gap:8,marginTop:8}}><button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button><button onClick={function(){setStep(3);}} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer"}}>Continuer</button></div></div>}{step===3&&<div style={{textAlign:"center",paddingBottom:10}}><div style={{width:72,height:72,borderRadius:"50%",background:DS.goldSoft,border:"2px solid "+DS.gold,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><VBadge sz={40}/></div><div style={{fontSize:18,fontWeight:900,color:DS.gold,marginBottom:6}}>{sel.name}</div><div style={{fontSize:13,color:DS.textMuted,marginBottom:16}}>{selDur.label} - {finalTotal.toFixed(2)} EUR{savings>0&&<span style={{color:DS.success}}> (economie de {savings.toFixed(2)} EUR)</span>}</div><div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:20,textAlign:"left"}}>{sel.features.map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<sel.features.length-1?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}</div><div style={{display:"flex",gap:8}}><button onClick={function(){setStep(2);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button><button onClick={function(){if(onSubscribe)onSubscribe(plan,duration);}} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:13,fontWeight:900,cursor:"pointer"}}>Confirmer l abonnement</button></div></div>}</div></div></div>);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"92vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.32s ease"}}><div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>HotelPlatform Premium</div><button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div><div style={{padding:"0 20px",display:"flex",gap:4,marginTop:14}}>{[1,2,3].map(function(s){return <div key={s} style={{flex:1,height:3,borderRadius:2,background:s<=step?DS.gold:DS.border}}/>;})}</div><div style={{padding:20}}>{step===1&&<div>{PLANS.map(function(p){var isS=plan===p.id;return(<button key={p.id} onClick={function(){setPlan(p.id);}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?p.color+"88":DS.border),background:isS?p.color+"14":DS.card,cursor:"pointer",textAlign:"left"}}><div><div style={{fontSize:13,fontWeight:800,color:isS?p.color:DS.text}}>{p.name}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{p.features.slice(0,2).join(" - ")}</div></div><div style={{fontSize:16,fontWeight:900,color:p.color}}>{p.price} EUR<span style={{fontSize:9,color:DS.textMuted,fontWeight:600}}>/mois</span></div></button>);})}  <button onClick={function(){setStep(2);}} style={{width:"100%",padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginTop:8}}>Continuer</button></div>}{step===2&&<div><div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:4}}>Choisissez votre duree</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>{sel.name} - plus la duree est longue, plus la reduction est importante</div>{DURATIONS.map(function(d){var isS=duration===d.months;var dTotal=sel.price*d.months*(1-d.discount);return(<button key={d.months} onClick={function(){setDuration(d.months);}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?DS.gold+"88":DS.border),background:isS?DS.gold+"14":DS.card,cursor:"pointer",textAlign:"left"}}><div><div style={{fontSize:13,fontWeight:800,color:isS?DS.gold:DS.text}}>{d.label}</div>{d.discount>0&&<div style={{fontSize:10,color:DS.success,marginTop:2,fontWeight:700}}>Économisez {Math.round(d.discount*100)}%</div>}</div><div style={{textAlign:"right"}}><div style={{fontSize:15,fontWeight:900,color:isS?DS.gold:DS.text}}>{dTotal.toFixed(2)} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>{(dTotal/d.months).toFixed(2)} EUR/mois</div></div></button>);})}<div style={{display:"flex",gap:8,marginTop:8}}><button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button><button onClick={function(){setStep(3);}} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer"}}>Continuer</button></div></div>}{step===3&&<div style={{textAlign:"center",paddingBottom:10}}><div style={{width:72,height:72,borderRadius:"50%",background:DS.goldSoft,border:"2px solid "+DS.gold,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><VBadge sz={40}/></div><div style={{fontSize:18,fontWeight:900,color:DS.gold,marginBottom:6}}>{sel.name}</div><div style={{fontSize:13,color:DS.textMuted,marginBottom:16}}>{selDur.label} - {finalTotal.toFixed(2)} EUR{savings>0&&<span style={{color:DS.success}}> (économie de {savings.toFixed(2)} EUR)</span>}</div><div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:20,textAlign:"left"}}>{sel.features.map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<sel.features.length-1?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}</div><div style={{display:"flex",gap:8}}><button onClick={function(){setStep(2);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button><button onClick={function(){if(onSubscribe)onSubscribe(plan,duration);}} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:13,fontWeight:900,cursor:"pointer"}}>Confirmer l'abonnement</button></div></div>}</div></div></div>);
 }
 
 function PrivacyModal(props){
@@ -1369,7 +1369,7 @@ function ShareSheet(props){
       <div style={{padding:"10px 0 6px"}}><div style={{width:40,height:5,borderRadius:3,background:DS.textDim,margin:"0 auto"}}/></div>
       <div style={{padding:"4px 18px 14px",borderBottom:"1px solid "+DS.border+"40"}}>
         <div style={{fontSize:16,fontWeight:800,color:DS.text}}>Partager</div>
-        <div style={{fontSize:11,color:copied?DS.success:DS.textMuted,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:copied?700:400}}>{copied?"Lien copie dans le presse-papier !":shareUrl}</div>
+        <div style={{fontSize:11,color:copied?DS.success:DS.textMuted,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:copied?700:400}}>{copied?"Lien copié dans le presse-papier !":shareUrl}</div>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",padding:"16px 10px 6px"}}>
         {TARGETS.map(function(t){return(
@@ -1587,7 +1587,7 @@ function ClientFeed(props){
       return next;
     });
     setMenuOpen(null);
-    toast(wasFav?"Retire des favoris":"Ajoute aux favoris","success");
+    toast(wasFav?"Retiré des favoris":"Ajouté aux favoris","success");
   }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
@@ -1609,7 +1609,7 @@ function ClientFeed(props){
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
-  function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partage avec succes","success");}
+  function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partagé avec succès","success");}
   function addCmt(id,replyTo){
     var text=(cmtText[id]||"").trim();if(!text)return;
     var cm={id:Date.now(),author:selfName,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
@@ -1648,9 +1648,9 @@ function ClientFeed(props){
     <div style={{background:DS.bg,paddingBottom:24,WebkitOverflowScrolling:"touch"}}>
       <Toast/>
       {loading&&<FeedSkeleton/>}
-      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} reporterId={selfUserId} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
+      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} reporterId={selfUserId} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoyé · Merci pour votre contribution","success");}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
-      {posts.length===0&&<Emp Icon={Home} title="Aucune publication" sub="Les publications des etablissements apparaitront ici"/>}
+      {posts.length===0&&<Emp Icon={Home} title="Aucune publication" sub="Les publications des établissements apparaîtront ici"/>}
       {posts.map(function(post,_pi){
         var color=rC(post.type);
         return(
@@ -1665,7 +1665,7 @@ function ClientFeed(props){
                   <div style={{display:"flex",flexWrap:"nowrap",alignItems:"center",gap:5,marginTop:2,overflow:"hidden"}}>
                     <span style={{fontSize:12,color:color,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hotel":"Restaurant"}</span>
                     {post.combined&&<span style={{fontSize:9,color:DS.primary,fontWeight:800,background:DS.primarySoft,borderRadius:8,padding:"1px 6px",flexShrink:0,whiteSpace:"nowrap"}}>+ Restaurant</span>}
-                    <span style={{fontSize:12,color:DS.textMuted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}>{post.followers?"- "+fmtK(post.followers)+" abonnes":""}</span>
+                    <span style={{fontSize:12,color:DS.textMuted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}>{post.followers?"- "+fmtK(post.followers)+" abonnés":""}</span>
                     <span onClick={function(ev){ev.stopPropagation();toggleFollowPost(post.id);}} style={{fontSize:12,fontWeight:800,color:followingPosts.indexOf(post.id)>=0?DS.textMuted:color,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>- {followingPosts.indexOf(post.id)>=0?"Suivi":"Suivre"}</span>
                   </div>
                   <div style={{fontSize:11,color:DS.textDim,marginTop:3}}>{post.time}</div>
@@ -1733,7 +1733,7 @@ function ClientDisc(props){
   })();
   var filtered=items.filter(function(i){return i.name.toLowerCase().indexOf(search.toLowerCase())>=0||i.location.toLowerCase().indexOf(search.toLowerCase())>=0;});
   var color=tab==="hotels"?DS.hotel:DS.restaurant;
-  return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{padding:"0 14px",paddingBottom:16}}>{discSkLoading?<DiscSkeleton/>:(filtered.length===0?<Emp Icon={Search} title="Aucun resultat"/>:filtered.map(function(item,_idx){return(<div key={item.id} className="hp-card" style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border,animation:"hp-item-in 0.32s ease both",animationDelay:(_idx*60)+"ms"}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{display:"flex",alignItems:"center",gap:5}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div>{item.verified&&<VBadge sz={16}/>}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){if(item.svcMode==="combined"){if(onProfile)onProfile(item.id,item.type);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>{item.svcMode==="combined"?"Voir options":"Reserver"}</button></div></div>);}))}</div></div>);
+  return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{padding:"0 14px",paddingBottom:16}}>{discSkLoading?<DiscSkeleton/>:(filtered.length===0?<Emp Icon={Search} title="Aucun résultat"/>:filtered.map(function(item,_idx){return(<div key={item.id} className="hp-card" style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border,animation:"hp-item-in 0.32s ease both",animationDelay:(_idx*60)+"ms"}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{display:"flex",alignItems:"center",gap:5}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div>{item.verified&&<VBadge sz={16}/>}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){if(item.svcMode==="combined"){if(onProfile)onProfile(item.id,item.type);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>{item.svcMode==="combined"?"Voir options":"Reserver"}</button></div></div>);}))}</div></div>);
 }
 
 function ClientProf(props){
@@ -1796,11 +1796,11 @@ function ClientProf(props){
                     </button>
                   )}
                   {st==="pending"&&<div style={{fontSize:11,color:DS.warning,textAlign:"center",padding:"6px 0"}}>En attente de confirmation de l'établissement</div>}
-                  {st==="refused"&&<div style={{fontSize:11,color:DS.error,textAlign:"center",padding:"6px 0"}}>Cette reservation a ete refusee</div>}
+                  {st==="refused"&&<div style={{fontSize:11,color:DS.error,textAlign:"center",padding:"6px 0"}}>Cette réservation a été refusée</div>}
                 </div>
                 {showQR&&hasTicket&&(
                   <div style={{borderTop:"1px solid "+DS.border,background:DS.surface,padding:"16px",textAlign:"center"}}>
-                    <div style={{fontSize:11,fontWeight:800,color:DS.textDim,letterSpacing:1.5,marginBottom:12}}>TICKET DE RESERVATION - QR CODE</div>
+                    <div style={{fontSize:11,fontWeight:800,color:DS.textDim,letterSpacing:1.5,marginBottom:12}}>TICKET DE RÉSERVATION - QR CODE</div>
                     <div style={{textAlign:"left",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",marginBottom:12}}>
                       {(r.estabType==="restaurant"?[
                         ["Convives",r.guests+" pers."],
@@ -1818,27 +1818,27 @@ function ClientProf(props){
                         </div>
                       );})}
                     </div>
-                    {st==="pending"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:8,padding:"6px 10px",marginBottom:10,fontSize:10,color:DS.warning,fontWeight:700}}>En attente de confirmation - presentez ce code à l'établissement</div>}
+                    {st==="pending"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:8,padding:"6px 10px",marginBottom:10,fontSize:10,color:DS.warning,fontWeight:700}}>En attente de confirmation - présentez ce code à l'établissement</div>}
                     <div style={{marginBottom:12,opacity:st==="consumed"?0.4:1}}><QRTicket id={r.id||"HP-000000"} sz={110}/></div>
                     <div style={{fontSize:10,color:DS.textDim,fontFamily:"monospace",letterSpacing:1,marginBottom:4}}>{r.id||"HP-000000"}</div>
                     {st==="consumed"
-                      ? <div style={{fontSize:10,color:DS.textDim,fontWeight:600}}>Reservation consommee - presentee à l'établissement</div>
+                      ? <div style={{fontSize:10,color:DS.textDim,fontWeight:600}}>Réservation consommée · présentée à l'établissement</div>
                       : st==="pending"
-                      ? <div style={{fontSize:10,color:DS.warning,fontWeight:600}}>Ce code sera scannable une fois la reservation acceptee</div>
-                      : <div style={{fontSize:10,color:DS.warning,fontWeight:600}}>Presentez ce code à l'établissement le jour de votre arrivee</div>
+                      ? <div style={{fontSize:10,color:DS.warning,fontWeight:600}}>Ce code sera scannable une fois la réservation acceptée</div>
+                      : <div style={{fontSize:10,color:DS.warning,fontWeight:600}}>Presentez ce code à l'établissement le jour de votre arrivée</div>
                     }
                   </div>
                 )}
               </div>
             );
           })
-          : <Emp Icon={Calendar} title="Aucune reservation" sub="Vos reservations apparaitront ici apres votre premiere reservation"/>
+          : <Emp Icon={Calendar} title="Aucune réservation" sub="Vos réservations apparaîtront ici apres votre premiere reservation"/>
         )}
-        {tab==="favoris"&&(favEstabs.length>0?favEstabs.map(function(est){return(<div key={est.id} style={{background:DS.card,borderRadius:14,marginBottom:10,border:"1px solid "+DS.border,overflow:"hidden"}}><div style={{height:80,position:"relative"}}><img src={est.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{est.verified&&<div style={{position:"absolute",top:6,left:8}}><VBadge sz={16}/></div>}</div><div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:800,color:DS.text}}>{est.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{est.location}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><Stars r={est.rating} sz={10}/><span style={{fontSize:10,color:DS.textMuted}}>({est.reviewCount})</span></div></div><div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{est.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div></div>);}):<Emp Icon={Heart} title="Aucun favori" sub="Appuyez sur le coeur d un etablissement pour l ajouter"/>)}</div></div>);
+        {tab==="favoris"&&(favEstabs.length>0?favEstabs.map(function(est){return(<div key={est.id} style={{background:DS.card,borderRadius:14,marginBottom:10,border:"1px solid "+DS.border,overflow:"hidden"}}><div style={{height:80,position:"relative"}}><img src={est.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{est.verified&&<div style={{position:"absolute",top:6,left:8}}><VBadge sz={16}/></div>}</div><div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:800,color:DS.text}}>{est.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{est.location}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><Stars r={est.rating} sz={10}/><span style={{fontSize:10,color:DS.textMuted}}>({est.reviewCount})</span></div></div><div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{est.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></div></div></div>);}):<Emp Icon={Heart} title="Aucun favori" sub="Appuyez sur le coeur d'un établissement pour l'ajouter"/>)}</div></div>);
 }
 
 function ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro){
-  var tabs=[["about","A propos"]];
+  var tabs=[["about","À propos"]];
   if(isHotel)tabs.push(["amenities","Equipements"]);
   var isCombinedEstab=isHotel&&e&&e.svcMode==="combined";
   if(isCombinedEstab){
@@ -1848,7 +1848,7 @@ function ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro){
     }
     else if(resaType==="hotel")tabs.push(["rooms","Chambres"]);
     else if(resaType==="restaurant")tabs.push(["menu","Menu"]);
-    else if(resaType==="combined")tabs.push(["combo","Sejour combine"]);
+    else if(resaType==="combined")tabs.push(["combo","Séjour combiné"]);
   } else {
     if(isHotel)tabs.push(["rooms","Chambres"]);
     if(!isHotel)tabs.push(["menu","Menu"]);
@@ -1906,9 +1906,9 @@ function EstabM(props){
   var comboMealsTotal=(e.meals||[]).filter(function(m){return comboMeals.indexOf(m.id)>=0;}).reduce(function(s,m){return s+m.price;},0);
   var comboTotal=(comboRoom?comboRoom.price:0)+comboMealsTotal;
   var _sEV=useState(null);var _eViewer=_sEV[0];var _setEViewer=_sEV[1];
-  return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:900,maxWidth:420,margin:"0 auto",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:(closingE?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}><ImgViewer src={_eViewer} onClose={function(){_setEViewer(null);}}/><Toast/><div style={{position:"relative",height:220,flexShrink:0}}><img src={e.img} alt="" onClick={function(){if(e.img)_setEViewer(e.img);}} style={{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}/><div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.2),rgba(0,0,0,.6))",pointerEvents:"none"}}/><div style={{position:"absolute",top:12,left:12}}><BackBtn onClick={onClose} light={true}/></div><div style={{position:"absolute",bottom:-48,left:16,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}} onClick={function(){if(e.img)_setEViewer(e.img);}}><Av sz={68} letter={(e.name[0]||"H").toUpperCase()} img={e.img} verified={e.verified||false}/>{e.verified&&<div style={{background:"#14532d",borderRadius:6,padding:"1px 6px",marginTop:1}}><span style={{fontSize:9,fontWeight:800,color:"#4ade80",letterSpacing:"0.01em"}}>Vérifié</span></div>}</div></div><div style={{padding:"58px 16px 8px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={{fontSize:20,fontWeight:900,color:DS.text}}>{e.name}</div></div><a href={"https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location)} target="_blank" rel="noopener noreferrer" style={{fontSize:12,color:DS.primary,cursor:"pointer",display:"flex",alignItems:"center",gap:4,textDecoration:"none"}}><MapPin size={11}/>{e.location}</a></div><div style={{textAlign:"right"}}><div style={{fontSize:18,fontWeight:900,color:DS.gold}}>A partir de {e.priceFrom} EUR</div></div></div><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><Stars r={e.rating} sz={15}/><span style={{fontSize:13,fontWeight:800,color:DS.text}}>{e.rating}</span><span style={{fontSize:13,color:DS.textDim}}>-</span><span style={{fontSize:13,fontWeight:700,color:DS.text}}>{fmtK(followersCount)}</span><span style={{fontSize:12,color:DS.textMuted}}>abonnes</span></div><div style={{display:"flex",gap:8,marginBottom:16}}>{viewerIsPro
+  return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:900,maxWidth:420,margin:"0 auto",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:(closingE?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}><ImgViewer src={_eViewer} onClose={function(){_setEViewer(null);}}/><Toast/><div style={{position:"relative",height:220,flexShrink:0}}><img src={e.img} alt="" onClick={function(){if(e.img)_setEViewer(e.img);}} style={{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}/><div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.2),rgba(0,0,0,.6))",pointerEvents:"none"}}/><div style={{position:"absolute",top:12,left:12}}><BackBtn onClick={onClose} light={true}/></div><div style={{position:"absolute",bottom:-48,left:16,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}} onClick={function(){if(e.img)_setEViewer(e.img);}}><Av sz={68} letter={(e.name[0]||"H").toUpperCase()} img={e.img} verified={e.verified||false}/>{e.verified&&<div style={{background:"#14532d",borderRadius:6,padding:"1px 6px",marginTop:1}}><span style={{fontSize:9,fontWeight:800,color:"#4ade80",letterSpacing:"0.01em"}}>Vérifié</span></div>}</div></div><div style={{padding:"58px 16px 8px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={{fontSize:20,fontWeight:900,color:DS.text}}>{e.name}</div></div><a href={"https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location)} target="_blank" rel="noopener noreferrer" style={{fontSize:12,color:DS.primary,cursor:"pointer",display:"flex",alignItems:"center",gap:4,textDecoration:"none"}}><MapPin size={11}/>{e.location}</a></div><div style={{textAlign:"right"}}><div style={{fontSize:18,fontWeight:900,color:DS.gold}}>À partir de {e.priceFrom}€</div></div></div><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><Stars r={e.rating} sz={15}/><span style={{fontSize:13,fontWeight:800,color:DS.text}}>{e.rating}</span><span style={{fontSize:13,color:DS.textDim}}>-</span><span style={{fontSize:13,fontWeight:700,color:DS.text}}>{fmtK(followersCount)}</span><span style={{fontSize:12,color:DS.textMuted}}>abonnes</span></div><div style={{display:"flex",gap:8,marginBottom:16}}>{viewerIsPro
                 ? <div style={{flex:2,padding:"9px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textDim,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:5,minHeight:36}}><Lock size={12}/>Reservation indisponible</div>
-                : <button onClick={function(){if(isCombinedEstab){setTab(resaType==="restaurant"?"menu":resaType==="combined"?"combo":"rooms");}else if(onBook){onBook(e);}}} style={{flex:2,padding:"9px 14px",background:color,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,minHeight:36}}><Calendar size={13}/>Reserver</button>}<button onClick={function(){if(onChat)onChat(e);if(onClose)onClose();}} style={{flex:viewerIsPro?2:1,padding:"9px 8px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textMuted,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}><MessageCircle size={13}/>Chat</button><a href={"https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location)} target="_blank" rel="noopener noreferrer" style={{width:36,height:36,background:DS.card,border:"1px solid "+DS.border,borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",flexShrink:0}} title="Voir sur la carte"><MapPin size={15} color={DS.primary}/></a><button onClick={toggleFollow} style={{flex:1,padding:"9px 8px",background:isFollowing?color+"18":DS.card,border:"1px solid "+(isFollowing?color:DS.border),borderRadius:20,color:isFollowing?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}>{isFollowing?<UserCheck size={14} color={color}/>:<UserPlus size={14} color={DS.textMuted}/>}{isFollowing?"Suivi":"Suivre"}</button><button onClick={toggleFavEstab} style={{width:36,height:36,background:isFavEstab?DS.error+"18":DS.card,border:"1px solid "+(isFavEstab?DS.error+"55":DS.border),borderRadius:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"background .2s,border .2s"}}><Heart size={15} color={DS.error} fill={isFavEstab?DS.error:"none"}/></button></div>{isCombinedEstab&&!viewerIsPro&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:6}}>TYPE DE RESERVATION</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{[["hotel","Hotel uniquement"],["restaurant","Restaurant uniquement"],["combined","Reservation combinee (Hotel + Restaurant)"]].map(function(_i){var v=_i[0];var l=_i[1];var isSel=resaType===v;return(<button key={v} onClick={function(){setResaType(v);setTab(v==="restaurant"?"menu":v==="combined"?"combo":"rooms");}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:"pointer",textAlign:"left"}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isSel?color:DS.border),background:isSel?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel&&<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>}</div><span style={{fontSize:12,color:isSel?color:DS.text,fontWeight:isSel?700:400}}>{l}</span></button>);})}</div></div>}<div style={{display:"flex",gap:4,marginBottom:16}}>{ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro).map(function(_i){var t2=_i[0];var l=_i[1];var isAct=tab===t2;return <button key={t2} onClick={function(){setTab(t2);}} style={{flex:1,padding:"8px 4px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})} </div>{tab==="about"&&<div><div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6}}>{e.description}</div></div>}{tab==="amenities"&&<div>{(e.services||[]).filter(function(s){return typeof s==="string"||s.active!==false;}).map(function(s,i){var nm=typeof s==="string"?s:s.name;var Ic=getIcon(nm);var actSvcs=(e.services||[]).filter(function(x){return typeof x==="string"||x.active!==false;});return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:i<actSvcs.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{width:28,height:28,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><span style={{fontSize:12,color:DS.text}}>{nm}</span></div>);})}</div>}{tab==="rooms"&&isHotel&&(e.rooms||[]).map(function(r){return(<div key={r.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:10,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{r.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{r.capacity} personnes</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{r.price} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>par nuit</div></div></div>{viewerIsPro
+                : <button onClick={function(){if(isCombinedEstab){setTab(resaType==="restaurant"?"menu":resaType==="combined"?"combo":"rooms");}else if(onBook){onBook(e);}}} style={{flex:2,padding:"9px 14px",background:color,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,minHeight:36}}><Calendar size={13}/>Réserver</button>}<button onClick={function(){if(onChat)onChat(e);if(onClose)onClose();}} style={{flex:viewerIsPro?2:1,padding:"9px 8px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textMuted,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}><MessageCircle size={13}/>Chat</button><a href={"https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location)} target="_blank" rel="noopener noreferrer" style={{width:36,height:36,background:DS.card,border:"1px solid "+DS.border,borderRadius:20,display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",flexShrink:0}} title="Voir sur la carte"><MapPin size={15} color={DS.primary}/></a><button onClick={toggleFollow} style={{flex:1,padding:"9px 8px",background:isFollowing?color+"18":DS.card,border:"1px solid "+(isFollowing?color:DS.border),borderRadius:20,color:isFollowing?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,minHeight:36}}>{isFollowing?<UserCheck size={14} color={color}/>:<UserPlus size={14} color={DS.textMuted}/>}{isFollowing?"Suivi":"Suivre"}</button><button onClick={toggleFavEstab} style={{width:36,height:36,background:isFavEstab?DS.error+"18":DS.card,border:"1px solid "+(isFavEstab?DS.error+"55":DS.border),borderRadius:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"background .2s,border .2s"}}><Heart size={15} color={DS.error} fill={isFavEstab?DS.error:"none"}/></button></div>{isCombinedEstab&&!viewerIsPro&&<div style={{marginBottom:14}}><div style={{fontSize:11,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:6}}>TYPE DE RESERVATION</div><div style={{display:"flex",flexDirection:"column",gap:6}}>{[["hotel","Hotel uniquement"],["restaurant","Restaurant uniquement"],["combined","Reservation combinee (Hotel + Restaurant)"]].map(function(_i){var v=_i[0];var l=_i[1];var isSel=resaType===v;return(<button key={v} onClick={function(){setResaType(v);setTab(v==="restaurant"?"menu":v==="combined"?"combo":"rooms");}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:"pointer",textAlign:"left"}}><div style={{width:16,height:16,borderRadius:"50%",border:"2px solid "+(isSel?color:DS.border),background:isSel?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel&&<div style={{width:6,height:6,borderRadius:"50%",background:"#fff"}}/>}</div><span style={{fontSize:12,color:isSel?color:DS.text,fontWeight:isSel?700:400}}>{l}</span></button>);})}</div></div>}<div style={{display:"flex",gap:4,marginBottom:16}}>{ESTAB_TABS_BUILD(isHotel,e,resaType,viewerIsPro).map(function(_i){var t2=_i[0];var l=_i[1];var isAct=tab===t2;return <button key={t2} onClick={function(){setTab(t2);}} style={{flex:1,padding:"8px 4px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})} </div>{tab==="about"&&<div><div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6}}>{e.description}</div></div>}{tab==="amenities"&&<div>{(e.services||[]).filter(function(s){return typeof s==="string"||s.active!==false;}).map(function(s,i){var nm=typeof s==="string"?s:s.name;var Ic=getIcon(nm);var actSvcs=(e.services||[]).filter(function(x){return typeof x==="string"||x.active!==false;});return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:i<actSvcs.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{width:28,height:28,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><span style={{fontSize:12,color:DS.text}}>{nm}</span></div>);})}</div>}{tab==="rooms"&&isHotel&&(e.rooms||[]).map(function(r){return(<div key={r.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:10,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{r.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{r.capacity} personnes</div></div><div style={{textAlign:"right"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{r.price} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>par nuit</div></div></div>{viewerIsPro
                     ? <div style={{width:"100%",padding:"8px",background:"transparent",border:"1px solid "+DS.border,borderRadius:8,color:DS.textDim,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><Lock size={11}/>Reservation indisponible</div>
                     : <button onClick={function(){if(r.available&&onBook)onBook(Object.assign({},e,{selectedRoom:r}));}} style={{width:"100%",padding:"8px",background:r.available?color:"transparent",border:"1px solid "+(r.available?color:DS.textDim),borderRadius:8,color:r.available?"#fff":DS.textDim,fontSize:12,fontWeight:700,cursor:r.available?"pointer":"not-allowed"}}>{r.available?"Reserver":"Non disponible"}</button>}</div>);})}{tab==="combo"&&isCombinedEstab&&(
             <div>
@@ -1944,8 +1944,8 @@ function EstabM(props){
                     <div style={{fontSize:12,color:DS.textMuted}}>{comboRoom?"1 chambre":"Aucune chambre"} + {comboMeals.length} repas{comboTable?" + table":""}</div>
                     <div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{comboTotal.toFixed(0)} EUR / nuit</div>
                   </div>
-                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboTable:comboTable,comboTotal:comboTotal,isCombo:true}));else toast("Selectionnez d abord une chambre","error");}} style={{width:"100%",padding:"11px",background:comboRoom?color:DS.textDim,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:comboRoom?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:comboRoom?1:0.6,transition:"background .2s,opacity .2s"}}>
-                    <Calendar size={14}/>Reserver le sejour combine
+                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboTable:comboTable,comboTotal:comboTotal,isCombo:true}));else toast("Sélectionnez d'abord une chambre","error");}} style={{width:"100%",padding:"11px",background:comboRoom?color:DS.textDim,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:comboRoom?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:comboRoom?1:0.6,transition:"background .2s,opacity .2s"}}>
+                    <Calendar size={14}/>Réserver le séjour combiné
                   </button>
                 </div>
               )}
@@ -1993,7 +1993,7 @@ function EstabM(props){
               {selectedDishes.length>0&&(
                 <div style={{position:"sticky",bottom:0,background:DS.surface,padding:"12px 0 4px",borderTop:"1px solid "+DS.border+"30"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                    <div style={{fontSize:12,color:DS.textMuted}}>{selectedDishes.length} plat{selectedDishes.length>1?"s":""} selectionne{selectedDishes.length>1?"s":""}</div>
+                    <div style={{fontSize:12,color:DS.textMuted}}>{selectedDishes.length} plat{selectedDishes.length>1?"s":""} sélectionné{selectedDishes.length>1?"s":""}</div>
                     <div style={{fontSize:13,fontWeight:900,color:DS.gold}}>{selectedDishesTotal.toFixed(2)} EUR</div>
                   </div>
                   {viewerIsPro
@@ -2004,7 +2004,7 @@ function EstabM(props){
                 </div>
               )}
             </div>
-          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{DataLayer.saveReview(e&&e.id,rv,selfUserId||null);}catch(ex2){}toast("Avis publie","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier a partager votre experience"/>}</div>}</div></div>);
+          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:"Vous"};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{DataLayer.saveReview(e&&e.id,rv,selfUserId||null);}catch(ex2){}toast("Avis publié","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier à partager votre expérience"/>}</div>}</div></div>);
 }
 
 // Formulaire de paiement Stripe — monté dans un Elements provider
@@ -2113,9 +2113,9 @@ function BookM(props){
   var dateOut=isHotelBooking?(dateIn?computeDateOut(dateIn,nightsCount):""):dateIn;
   var basePrice=isCombo?e.comboTotal:(hasDishes?e.dishTotal:(e.selectedRoom?e.selectedRoom.price:e.priceFrom));
   var totalPrice=isCombo?basePrice*nights:(hasDishes?basePrice*tableCount:(isHotelBooking?basePrice*nights*roomCount:basePrice*tableCount));
-  var serviceLabel=isCombo?("Sejour combine - "+e.selectedRoom.name):(hasDishes?(e.selectedDishes.length+" plat"+(e.selectedDishes.length>1?"s":"")+" selectionne"+(e.selectedDishes.length>1?"s":"")):(e.selectedRoom?e.selectedRoom.name:(e.type==="hotel"?"Chambre Standard":"Reservation")));
+  var serviceLabel=isCombo?("Séjour combiné - "+e.selectedRoom.name):(hasDishes?(e.selectedDishes.length+" plat"+(e.selectedDishes.length>1?"s":"")+" sélectionné"+(e.selectedDishes.length>1?"s":"")):(e.selectedRoom?e.selectedRoom.name:(e.type==="hotel"?"Chambre Standard":"Réservation")));
   var guestsLabel=isRestaurantBooking?"NOMBRE DE CONVIVES":"NOMBRE DE VOYAGEURS";
-  var dateLabel=isRestaurantBooking?"DATE DE RESERVATION":"DATE D ARRIVEE";
+  var dateLabel=isRestaurantBooking?"DATE DE RESERVATION":"DATE D'ARRIVÉE";
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1100,display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"hp-fade 0.2s ease"}}>
       <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"94vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.3s ease"}}>
@@ -2134,12 +2134,12 @@ function BookM(props){
               toast("Paiement Stripe confirmé !","success");
               if(props.onBooked)props.onBooked(BookingService.createBooking(resa,selfUserId));
             }}
-            onError={function(msg){toast(msg||"Echec du paiement","error");}}
+            onError={function(msg){toast(msg||"Échec du paiement","error");}}
           />
         )}
         <div style={{padding:"14px 20px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+DS.border}}>
           <div>
-            <div style={{fontSize:15,fontWeight:800,color:DS.text}}>Reserver</div>
+            <div style={{fontSize:15,fontWeight:800,color:DS.text}}>Réserver</div>
             <div style={{fontSize:11,color:DS.textMuted}}>{e.name}</div>
           </div>
           <button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button>
@@ -2176,7 +2176,7 @@ function BookM(props){
                 </div>
               )}
               {isHotelBooking&&dateIn&&dateOut&&(
-                <div style={{fontSize:11,color:DS.textMuted,marginBottom:10,marginTop:-8}}>Depart prevu le <span style={{color:DS.text,fontWeight:700}}>{dateOut}</span></div>
+                <div style={{fontSize:11,color:DS.textMuted,marginBottom:10,marginTop:-8}}>Départ prévu le <span style={{color:DS.text,fontWeight:700}}>{dateOut}</span></div>
               )}
               {isHotelBooking&&dateIn&&dateOut&&(
                 <div style={{background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,padding:"9px 14px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -2230,7 +2230,7 @@ function BookM(props){
                 }</div>
                 <div style={{fontSize:22,fontWeight:900,color:DS.gold}}>{totalPrice.toFixed(0)} EUR</div>
               </div>
-              <button onClick={function(){if(dateIn)setStep(2);else toast("Selectionnez une date","error");}} style={{width:"100%",padding:"12px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>Continuer</button>
+              <button onClick={function(){if(dateIn)setStep(2);else toast("Sélectionnez une date","error");}} style={{width:"100%",padding:"12px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>Continuer</button>
             </div>
           )}
 
@@ -2291,7 +2291,7 @@ function BookM(props){
                   }
                   // Paiement carte → Stripe
                   if(payMode==="avec"&&payMethod==="card"){
-                    if(!_stripePromise){toast("Stripe non configure","error");return;}
+                    if(!_stripePromise){toast("Stripe non configuré","error");return;}
                     setPaying(true);
                     fetch("/api/create-payment-intent",{
                       method:"POST",
@@ -2336,14 +2336,14 @@ function BookM(props){
                     ["Service",serviceLabel],
                     ["Convives",guests+" personne"+(guests>1?"s":"")],
                     ["Tables",tableCount+" table"+(tableCount>1?"s":"")],
-                    ["Date",dateIn||"A confirmer"],
+                    ["Date",dateIn||"À confirmer"],
                     ["Paiement",payMode==="avec"?totalPrice.toFixed(0)+" EUR":"Reservation sans paiement"],
                     ["Reference",resaId],
                   ]:[
                     ["Service",serviceLabel],
                     ["Voyageurs",guests+" personne"+(guests>1?"s":"")],
-                    ["Arrivee",dateIn||"A confirmer"],
-                    ["Depart",dateOut||"A confirmer"],
+                    ["Arrivee",dateIn||"À confirmer"],
+                    ["Depart",dateOut||"À confirmer"],
                     ["Duree",nights+" nuit"+(nights>1?"s":"")],
                     ["Paiement",payMode==="avec"?totalPrice.toFixed(0)+" EUR":"Reservation sans paiement"],
                     ["Reference",resaId],
@@ -2355,7 +2355,7 @@ function BookM(props){
                   );})}
                 </div>
                 <div style={{padding:"16px",textAlign:"center",borderTop:"1px solid "+DS.border+"40"}}>
-                  <div style={{fontSize:10,color:DS.textMuted,marginBottom:10}}>CODE QR - A PRESENTER A L ETABLISSEMENT</div>
+                  <div style={{fontSize:10,color:DS.textMuted,marginBottom:10}}>CODE QR · À PRÉSENTER À L'ÉTABLISSEMENT</div>
                   <div style={{margin:"0 auto"}}><QRTicket id={resaId} sz={120}/></div>
                   <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace"}}>{resaId}</div>
                 </div>
@@ -2373,7 +2373,7 @@ function BookM(props){
           {/* ETAPE 4 : Ticket detail complet */}
           {step===4&&(
             <div>
-              <div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:14}}>Ticket de reservation</div>
+              <div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:14}}>Ticket de réservation</div>
               <div style={{background:DS.card,border:"2px solid "+color+"44",borderRadius:16,overflow:"hidden",marginBottom:16}}>
                 <div style={{background:color,padding:"16px",textAlign:"center"}}>
                   <div style={{fontSize:11,fontWeight:800,color:"rgba(255,255,255,.7)",letterSpacing:2}}>HOTELPLATFORM TRAVEL</div>
@@ -2385,13 +2385,13 @@ function BookM(props){
                     ["Type","service",serviceLabel,DS.text],
                     ["Convives","guests",guests+" pers.",DS.text],
                     ["Tables","tables",tableCount+" table"+(tableCount>1?"s":""),DS.text],
-                    ["Date","date",dateIn||"A confirmer",DS.primary],
+                    ["Date","date",dateIn||"À confirmer",DS.primary],
                     ["Montant","price",payMode==="avec"?totalPrice.toFixed(0)+" EUR":"Reservation sans paiement",payMode==="avec"?DS.gold:DS.success],
                   ]:[
                     ["Type","service",serviceLabel,DS.text],
                     ["Voyageurs","guests",guests+" pers.",DS.text],
-                    ["Arrivee","in",dateIn||"A confirmer",DS.primary],
-                    ["Depart","out",dateOut||"A confirmer",DS.primary],
+                    ["Arrivee","in",dateIn||"À confirmer",DS.primary],
+                    ["Depart","out",dateOut||"À confirmer",DS.primary],
                     ["Nuits","nights",nights+" nuit"+(nights>1?"s":""),DS.text],
                     ["Montant","price",payMode==="avec"?totalPrice.toFixed(0)+" EUR":"Reservation sans paiement",payMode==="avec"?DS.gold:DS.success],
                   ]).map(function(_i){var k=_i[0];var id=_i[1];var v=_i[2];var col=_i[3];return(
@@ -2458,7 +2458,7 @@ function ProFeed(props){
     var wasFav=favPosts.indexOf(id)>=0;
     setFavPosts(function(f){var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem("hp_pro_favs",JSON.stringify(next));}catch(e){}return next;});
     setMenuOpen(null);
-    toast(wasFav?"Retire des favoris":"Ajoute aux favoris","success");
+    toast(wasFav?"Retiré des favoris":"Ajouté aux favoris","success");
   }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   var followingPosts=props.followingIds||[];
@@ -2485,7 +2485,7 @@ function ProFeed(props){
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
-  function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partage avec succes","success");}
+  function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partagé avec succès","success");}
   var smedia=useState(null);var mediaPreview=smedia[0];var setMediaPreview=smedia[1];
   var smtype=useState(null);var mediaType=smtype[0];var setMediaType=smtype[1];
   var smfile=useState(null);var mediaFile=smfile[0];var setMediaFile=smfile[1];
@@ -2529,10 +2529,10 @@ function ProFeed(props){
   return(
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
-      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} reporterId={selfUserId} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoye - Merci pour votre contribution","success");}}/>}
+      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} reporterId={selfUserId} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoyé · Merci pour votre contribution","success");}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",background:DS.surface,borderBottom:"1px solid "+DS.border,marginBottom:10}}>
-        {[[fmtK(data.followers),"Abonnes",color],[data.rating+" ★","Note",DS.gold],[fmtK(data.reviewCount),"Avis",DS.success]].map(function(_i,i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{padding:"14px 4px",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><div style={{fontSize:20,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
+        {[[fmtK(data.followers),"Abonnés",color],[data.rating+" ★","Note",DS.gold],[fmtK(data.reviewCount),"Avis",DS.success]].map(function(_i,i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{padding:"14px 4px",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><div style={{fontSize:20,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
       </div>
       <div style={{background:DS.surface,borderBottom:"1px solid "+DS.border+"40",padding:"14px 16px",marginBottom:10}}>
         {!showNew
@@ -2545,7 +2545,7 @@ function ProFeed(props){
                 <Av sz={46} letter={data.name[0]} verified={data.verified}/>
                 <div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:DS.text}}>{data.name}</div><div style={{fontSize:11,color:DS.textMuted}}>Publier maintenant</div></div>
               </div>
-              <textarea value={newPost} onChange={function(e){setNewPost(e.target.value);}} placeholder="Partagez une actualite, une offre..." rows={4} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:14,padding:"14px 16px",fontSize:15,color:DS.text,outline:"none",resize:"none",lineHeight:1.6,boxSizing:"border-box"}}/>
+              <textarea value={newPost} onChange={function(e){setNewPost(e.target.value);}} placeholder="Partagez une actualité, une offre..." rows={4} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:14,padding:"14px 16px",fontSize:15,color:DS.text,outline:"none",resize:"none",lineHeight:1.6,boxSizing:"border-box"}}/>
               {mediaPreview&&(
                 <div style={{position:"relative",marginTop:10,borderRadius:14,overflow:"hidden",border:"1px solid "+DS.border}}>
                   {mediaType==="video"
@@ -2579,7 +2579,7 @@ function ProFeed(props){
               <div style={{fontSize:17,fontWeight:800,color:DS.text,marginBottom:8}}>Video reservee aux comptes Premium</div>
               <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Les comptes Free peuvent publier du texte et des images. Passez Premium pour publier des videos illimitees.</div>
               <div style={{background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:12,padding:"12px 16px",marginBottom:20,textAlign:"left"}}>
-                {["Publications video illimitees","Sans publicite","Eligible badge verification","Visibilite boostee"].map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<3?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}
+                {["Publications video illimitees","Sans publicité","Éligible badge vérification","Visibilite boostee"].map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<3?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}
               </div>
               <button onClick={function(){setShowVideoGate(false);if(onPremium)onPremium();}} style={{width:"100%",padding:"12px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginBottom:10}}>Passer Premium</button>
               <button onClick={function(){setShowVideoGate(false);}} style={{width:"100%",padding:"10px",background:"transparent",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Annuler</button>
@@ -2588,7 +2588,7 @@ function ProFeed(props){
         </div>
       )}
       {loadingPro&&<FeedSkeleton/>}
-      {posts.length===0&&<Emp Icon={FileText} title="Aucune publication" sub="Vos publications apparaitront ici"/>}
+      {posts.length===0&&<Emp Icon={FileText} title="Aucune publication" sub="Vos publications apparaîtront ici"/>}
       {posts.map(function(post,_pfi){
         var pc=rC(post.type);
         return(
@@ -2603,7 +2603,7 @@ function ProFeed(props){
                   <div style={{display:"flex",flexWrap:"nowrap",alignItems:"center",gap:5,marginTop:2,overflow:"hidden"}}>
                     <span style={{fontSize:12,color:pc,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hotel":"Restaurant"}</span>
                     {post.combined&&<span style={{fontSize:9,color:DS.primary,fontWeight:800,background:DS.primarySoft,borderRadius:8,padding:"1px 6px",flexShrink:0,whiteSpace:"nowrap"}}>+ Restaurant</span>}
-                    <span style={{fontSize:12,color:DS.textMuted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}>{post.followers?"- "+fmtK(post.followers)+" abonnes":""}</span>
+                    <span style={{fontSize:12,color:DS.textMuted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}>{post.followers?"- "+fmtK(post.followers)+" abonnés":""}</span>
                     <span onClick={function(ev){ev.stopPropagation();toggleFollowPost(post.id);}} style={{fontSize:12,fontWeight:800,color:followingPosts.indexOf(post.id)>=0?DS.textMuted:pc,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>- {followingPosts.indexOf(post.id)>=0?"Suivi":"Suivre"}</span>
                   </div>
                   <div style={{fontSize:11,color:DS.textDim,marginTop:3}}>{post.time}</div>
@@ -2660,9 +2660,9 @@ function ReportM(props){
   var s3=useState("");var details=s3[0];var setDetails=s3[1];
   var REASONS=[
     ["spam","Spam ou contenu trompeur"],
-    ["inappropriate","Contenu inapproprie ou choquant"],
+    ["inappropriate","Contenu inapproprié ou choquant"],
     ["fake","Fausse information"],
-    ["abuse","Comportement abusif ou harcelement"],
+    ["abuse","Comportement abusif ou harcèlement"],
     ["scam","Escroquerie ou arnaque"],
     ["other","Autre raison"],
   ];
@@ -2702,9 +2702,9 @@ function ReportM(props){
           )}
           {step===2&&(
             <div>
-              <div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:6}}>Details supplementaires (facultatif)</div>
-              <div style={{fontSize:11,color:DS.textMuted,marginBottom:12}}>Aidez-nous a mieux comprendre le probleme.</div>
-              <textarea value={details} onChange={function(e){setDetails(e.target.value);}} placeholder="Decrivez le probleme..." rows={4} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:16}}/>
+              <div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:6}}>Détails supplémentaires (facultatif)</div>
+              <div style={{fontSize:11,color:DS.textMuted,marginBottom:12}}>Aidez-nous à mieux comprendre le problème.</div>
+              <textarea value={details} onChange={function(e){setDetails(e.target.value);}} placeholder="Décrivez le problème..." rows={4} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:16}}/>
               <div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"10px 14px",marginBottom:18,fontSize:11,color:DS.warning,lineHeight:1.5}}>
                 Les faux signalements répétés peuvent entrainer des restrictions sur votre compte.
               </div>
@@ -2717,8 +2717,8 @@ function ReportM(props){
           {step===3&&(
             <div style={{textAlign:"center",paddingTop:8,paddingBottom:10}}>
               <div style={{width:64,height:64,borderRadius:"50%",background:DS.successSoft,border:"2px solid "+DS.success,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><CheckCircle size={30} color={DS.success}/></div>
-              <div style={{fontSize:16,fontWeight:800,color:DS.success,marginBottom:8}}>Signalement envoye</div>
-              <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Notre equipe de moderation va examiner ce contenu sous 24-48h. Merci de contribuer a la securite de la communaute.</div>
+              <div style={{fontSize:16,fontWeight:800,color:DS.success,marginBottom:8}}>Signalement envoyé</div>
+              <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Notre équipe de modération va examiner ce contenu sous 24-48h. Merci de contribuer à la sécurité de la communauté.</div>
               <button onClick={onClose} style={{width:"100%",padding:"11px",background:DS.primary,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button>
             </div>
           )}
@@ -2820,7 +2820,7 @@ function ServiceConfigModal(props){
           <div style={{display:"flex",gap:10}}>
             <button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button>
             <button onClick={save} disabled={!name.trim()||!price} style={{flex:2,padding:"11px",background:name.trim()&&price?color:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:name.trim()&&price?"pointer":"not-allowed",opacity:name.trim()&&price?1:.6}}>
-              {initial?"Mettre a jour":"Ajouter le service"}
+              {initial?"Mettre à jour":"Ajouter le service"}
             </button>
           </div>
         </div>
@@ -2843,8 +2843,8 @@ function VerifRequestModal(props){
   var s5=useState("");var regNum=s5[0];var setRegNum=s5[1];
   var s6=useState({});var docs=s6[0];var setDocs=s6[1];
   var DOC_LIST=accType==="hotel"
-    ?["Registre de commerce","Patente ou licence hotelier","Document d identite du gerant","Justificatif adresse etablissement"]
-    :["Registre de commerce","Autorisation d ouverture","Document d identite du gerant","Justificatif adresse etablissement"];
+    ?["Registre de commerce","Patente ou licence hotelier","Document d'identité du gérant","Justificatif adresse etablissement"]
+    :["Registre de commerce","Autorisation d'ouverture","Document d'identité du gérant","Justificatif adresse etablissement"];
   function setDocFile(d,fileName){setDocs(function(prev){var next=Object.assign({},prev);next[d]=fileName;return next;});}
   function removeDocFile(d){setDocs(function(prev){var next=Object.assign({},prev);delete next[d];return next;});}
   function docCount(){return Object.keys(docs).length;}
@@ -2869,7 +2869,7 @@ function VerifRequestModal(props){
               <div style={{fontSize:17,fontWeight:800,color:DS.text,marginBottom:8}}>Premium requis</div>
               <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Un abonnement Premium actif est obligatoire pour soumettre une demande de verification officielle.</div>
               <div style={{background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:12,padding:"12px 16px",marginBottom:20,textAlign:"left"}}>
-                {["Publications video","Eligible badge verification","Visibilite boostee","Eligible avis clients"].map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<3?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}
+                {["Publications video","Éligible badge vérification","Visibilite boostee","Éligible aux avis clients"].map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<3?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}
               </div>
               <button onClick={onClose} style={{width:"100%",padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:13,fontWeight:900,cursor:"pointer"}}>Obtenir Premium</button>
             </div>
@@ -2878,10 +2878,10 @@ function VerifRequestModal(props){
             <div>
               <div style={{background:color+"12",border:"1px solid "+color+"33",borderRadius:12,padding:"14px 16px",marginBottom:18}}>
                 <div style={{fontSize:14,fontWeight:800,color:color,marginBottom:8}}>Processus de verification</div>
-                {[["1","Soumission des documents justificatifs","Vous transmettez vos documents officiels"],["2","Controle administratif","Notre equipe verifie vos informations sous 48-72h"],["3","Validation ou refus","Vous etes notifie du resultat par email et dans l app"],["4","Badge public","Le badge s affiche sur votre profil apres validation"]].map(function(_i){var n=_i[0];var t=_i[1];var s=_i[2];return(<div key={n} style={{display:"flex",gap:10,marginBottom:12}}><div style={{width:24,height:24,borderRadius:"50%",background:color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:11,fontWeight:800,color:"#fff"}}>{n}</div><div><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t}</div><div style={{fontSize:11,color:DS.textMuted,marginTop:2}}>{s}</div></div></div>);})}
+                {[["1","Soumission des documents justificatifs","Vous transmettez vos documents officiels"],["2","Contrôle administratif","Notre equipe verifie vos informations sous 48-72h"],["3","Validation ou refus","Vous êtes notifié du résultat par email et dans l app"],["4","Badge public","Le badge s'affiche sur votre profil apres validation"]].map(function(_i){var n=_i[0];var t=_i[1];var s=_i[2];return(<div key={n} style={{display:"flex",gap:10,marginBottom:12}}><div style={{width:24,height:24,borderRadius:"50%",background:color,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:11,fontWeight:800,color:"#fff"}}>{n}</div><div><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t}</div><div style={{fontSize:11,color:DS.textMuted,marginTop:2}}>{s}</div></div></div>);})}
               </div>
               <div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"10px 14px",marginBottom:18,fontSize:12,color:DS.warning}}>
-                Toute fausse declaration entraine le refus definitif et la suspension du compte.
+                Toute fausse déclaration entraîne le refus definitif et la suspension du compte.
               </div>
               <button onClick={function(){setStep(2);}} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Commencer la demande</button>
             </div>
@@ -2890,16 +2890,16 @@ function VerifRequestModal(props){
             <div>
               <div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:14}}>Informations officielles</div>
               <div style={{marginBottom:12}}>
-                <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>NOM OFFICIEL DE L ETABLISSEMENT</div>
+                <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>NOM OFFICIEL DE L'ÉTABLISSEMENT</div>
                 <input value={bizName} onChange={function(e){setBizName(e.target.value);}} placeholder="Nom exact sur les documents officiels" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
               </div>
               <div style={{marginBottom:12}}>
-                <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>NUMERO D ENREGISTREMENT</div>
+                <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>NUMÉRO D'ENREGISTREMENT</div>
                 <input value={regNum} onChange={function(e){setRegNum(e.target.value);}} placeholder="RCCM / Patente / Numero officiel" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
               </div>
               <div style={{marginBottom:12}}>
                 <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>PAYS</div>
-                <input value={country} onChange={function(e){setCountry(e.target.value);}} placeholder="Ex: Senegal, Cote d Ivoire..." style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+                <input value={country} onChange={function(e){setCountry(e.target.value);}} placeholder="Ex: Sénégal, Côte d'Ivoire..." style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
               </div>
               <div style={{marginBottom:20}}>
                 <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>CONTACT OFFICIEL (EMAIL / TEL)</div>
@@ -2914,7 +2914,7 @@ function VerifRequestModal(props){
           {step===3&&(
             <div>
               <div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:6}}>Documents requis</div>
-              <div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>Televersez vos documents officiels (PDF, JPG ou PNG). Ils seront examines par notre equipe.</div>
+              <div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>Téléversez vos documents officiels (PDF, JPG ou PNG). Ils seront examinés par notre équipe.</div>
               {DOC_LIST.map(function(d){var fileName=docs[d];var has=!!fileName;return(
                 <div key={d} style={{marginBottom:8,padding:"12px 14px",background:has?color+"10":DS.card,border:"1px solid "+(has?color+"44":DS.border),borderRadius:12}}>
                   <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -2937,7 +2937,7 @@ function VerifRequestModal(props){
                 </div>
               );})}
               <div style={{background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,padding:"10px 14px",marginBottom:20,marginTop:8,fontSize:11,color:DS.textMuted}}>
-                Apres soumission, notre equipe vous contactera a : {contact||"votre email enregistre"}
+                Apres soumission, notre équipe vous contactera a : {contact||"votre email enregistre"}
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={function(){if((props.initialStep||1)>=3){if(onClose)onClose();}else{setStep(2);}}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>{(props.initialStep||1)>=3?"Annuler":"Retour"}</button>
@@ -2949,9 +2949,9 @@ function VerifRequestModal(props){
             <div style={{textAlign:"center",paddingTop:8,paddingBottom:16}}>
               <div style={{width:72,height:72,borderRadius:"50%",background:DS.successSoft,border:"2px solid "+DS.success,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><CheckCircle size={32} color={DS.success}/></div>
               <div style={{fontSize:18,fontWeight:900,color:DS.success,marginBottom:8}}>Demande soumise !</div>
-              <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.65,marginBottom:20}}>Notre equipe examine votre dossier sous 48-72h. Vous serez notifie par email et dans l application.</div>
+              <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.65,marginBottom:20}}>Notre équipe examine votre dossier sous 48-72h. Vous serez notifié par email et dans l'application.</div>
               <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 16px",marginBottom:20,textAlign:"left"}}>
-                <div style={{fontSize:11,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:8}}>RECAPITULATIF</div>
+                <div style={{fontSize:11,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:8}}>RÉCAPITULATIF</div>
                 <div style={{fontSize:13,color:DS.text,marginBottom:4}}>{bizName}</div>
                 <div style={{fontSize:12,color:DS.textMuted,marginBottom:4}}>{country}</div>
                 <div style={{fontSize:12,color:DS.textMuted}}>{contact}</div>
@@ -2999,16 +2999,16 @@ function HotelSvc(props){
   var tkH=useToast();var toastH=tkH.show;var ToastH=tkH.Toast;
   function saveRoom(item){
     if(editItem){setRooms(function(rs){var next=rs.map(function(r){return r.id===item.id?item:r;});_saveRooms(next);return next;});toastH("Chambre mise à jour","success");}
-    else{setRooms(function(rs){var next=rs.concat([item]);_saveRooms(next);return next;});toastH("Chambre ajoutee","success");}
+    else{setRooms(function(rs){var next=rs.concat([item]);_saveRooms(next);return next;});toastH("Chambre ajoutée","success");}
     setEditItem(null);setShowAdd(false);
   }
   function saveDish(item){
     if(editItem){setMenu(function(ms){var next=ms.map(function(m){return m.id===item.id?item:m;});_saveDishes(next);return next;});toastH("Plat mis a jour","success");}
-    else{setMenu(function(ms){var next=ms.concat([item]);_saveDishes(next);return next;});toastH("Plat ajoute","success");}
+    else{setMenu(function(ms){var next=ms.concat([item]);_saveDishes(next);return next;});toastH("Plat ajouté","success");}
     setEditItem(null);setShowAdd(false);
   }
-  function deleteRoom(id){setRooms(function(rs){var next=rs.filter(function(r){return r.id!==id;});_saveRooms(next);return next;});toastH("Chambre supprimee","info");}
-  function deleteDish(id){setMenu(function(ms){var next=ms.filter(function(m){return m.id!==id;});_saveDishes(next);return next;});toastH("Plat supprime","info");}
+  function deleteRoom(id){setRooms(function(rs){var next=rs.filter(function(r){return r.id!==id;});_saveRooms(next);return next;});toastH("Chambre supprimée","info");}
+  function deleteDish(id){setMenu(function(ms){var next=ms.filter(function(m){return m.id!==id;});_saveDishes(next);return next;});toastH("Plat supprimé","info");}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
       <ToastH/>
@@ -3018,7 +3018,7 @@ function HotelSvc(props){
           <div style={{fontSize:14,fontWeight:800,color:DS.text}}>Gestion des services</div>
         </div>
         <div style={{marginBottom:10}}>
-          <div style={{fontSize:10,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:6}}>TYPE D ETABLISSEMENT</div>
+          <div style={{fontSize:10,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:6}}>TYPE D'ÉTABLISSEMENT</div>
           <div style={{display:"flex",gap:6}}>
             {[["hotel","Hotel uniquement",DS.hotel],["restaurant","Restaurant uniquement",DS.restaurant],["combined","Hotel + Restaurant",DS.primary]].map(function(_i){
               var v=_i[0];var l=_i[1];var col=_i[2];var isSel=svcMode===v;
@@ -3174,15 +3174,15 @@ function RestOff(props){
   var _rEstabId=data&&data.id?data.id:null;
   function _saveOffers(next){try{localStorage.setItem("hp_restoff_offers",JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabOffers(_rEstabId,next);}catch(e){}}
   var tkO=useToast();var toastO=tkO.show;var ToastO=tkO.Toast;
-  function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next);toastO("Offre supprimee","info");}
-  function addOffer(){if(!newOfferName.trim())return;var o={id:"o"+Date.now(),name:newOfferName.trim(),price:newOfferPrice?parseFloat(newOfferPrice):null,available:true};var next=offers.concat([o]);setOffers(next);_saveOffers(next);setNewOfferName("");setNewOfferPrice("");setShowAddOffer(false);toastO("Offre ajoutee","success");}
+  function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next);toastO("Offre supprimée","info");}
+  function addOffer(){if(!newOfferName.trim())return;var o={id:"o"+Date.now(),name:newOfferName.trim(),price:newOfferPrice?parseFloat(newOfferPrice):null,available:true};var next=offers.concat([o]);setOffers(next);_saveOffers(next);setNewOfferName("");setNewOfferPrice("");setShowAddOffer(false);toastO("Offre ajoutée","success");}
   function _saveItems(next){try{localStorage.setItem("hp_restoff_items",JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabDishes(_rEstabId,next);}catch(e){}}
   function saveItem(item){
     if(editItem){setItems(function(is){var next=is.map(function(i){return i.id===item.id?item:i;});_saveItems(next);return next;});toastO("Plat mis a jour","success");}
-    else{setItems(function(is){var next=is.concat([item]);_saveItems(next);return next;});toastO("Plat ajoute","success");}
+    else{setItems(function(is){var next=is.concat([item]);_saveItems(next);return next;});toastO("Plat ajouté","success");}
     setEditItem(null);setShowAdd(false);
   }
-  function deleteItem(id){setItems(function(is){var next=is.filter(function(i){return i.id!==id;});_saveItems(next);return next;});toastO("Plat supprime","info");}
+  function deleteItem(id){setItems(function(is){var next=is.filter(function(i){return i.id!==id;});_saveItems(next);return next;});toastO("Plat supprimé","info");}
   function toggleAvail(id){setItems(function(is){var next=is.map(function(i){return i.id===id?Object.assign({},i,{available:!i.available}):i;});_saveItems(next);return next;});}
   var categories=items.reduce(function(acc,item){if(item.category&&acc.indexOf(item.category)<0)acc.push(item.category);return acc;},[]);
   return(
@@ -3259,7 +3259,7 @@ function RestOff(props){
                 <button onClick={function(){deleteOffer(o.id);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,color:DS.error}}><X size={14} color={DS.error}/></button>
               </div>
             );})}
-            {offers.length===0&&<Emp Icon={Tag} title="Aucune offre" sub="Ajoutez vos offres speciales"/>}
+            {offers.length===0&&<Emp Icon={Tag} title="Aucune offre" sub="Ajoutez vos offres spéciales"/>}
           </div>
         )}
       </div>
@@ -3287,7 +3287,7 @@ function ProResa(props){
   var sLabels={confirmed:"Confirmée",pending:"En attente",refused:"Refusée",consumed:"Consommée"};
   function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem("hp_resas_all",JSON.stringify(updated));}catch(e){}try{if(patch&&patch.status)DataLayer.updateReservationStatus(id,patch.status);}catch(e2){}}
   function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Réservation confirmée","success");}
-  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Reservation refusee","info");}
+  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Réservation refusée","info");}
   function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivée confirmée · Client marqué présent","success");}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
@@ -3362,7 +3362,7 @@ function ProResa(props){
             </div>
           </div>
         );})}
-        {filtered.length===0&&<Emp Icon={Calendar} title="Aucune reservation" sub="Les demandes apparaitront ici"/>}</> }
+        {filtered.length===0&&<Emp Icon={Calendar} title="Aucune réservation" sub="Les demandes de vos clients apparaîtront ici"/>}</> }
       </div>
     </div>
   );
@@ -3383,7 +3383,7 @@ function ProProf(props){
   var _proUploadRef=useRef(null);
   var _sProViewer=useState(null);var _proViewer=_sProViewer[0];var _setProViewer=_sProViewer[1];
   function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){if(onPhotoChange)onPhotoChange(ev.target.result);};r.readAsDataURL(f);}
-  function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}setEditingAbout(false);toastP("A propos mis a jour","success");}
+  function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}setEditingAbout(false);toastP("À propos mis à jour","success");}
   var premiumActive=isPremium||data.isPremium;
   // Periode de grace : badge reste visible 7 jours apres expiration de l abonnement
   var _graceActive=false;
@@ -3449,7 +3449,7 @@ function ProProf(props){
           {[[fmtK(data.followers),"Abonnés"],[null,"Note"],[fmtK(data.reviewCount),"Avis"],[data.priceFrom+" EUR","Depuis"]].map(function(_i,i){var v=_i[0];var l=_i[1];return <div key={i} style={{flex:1,background:DS.card,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:12,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>{l==="Note"?<><Stars r={Math.round(data.rating||0)} sz={10}/><span style={{fontSize:10,color:DS.gold,fontWeight:800,marginLeft:2}}>{data.rating||"—"}</span></>:v}</div><div style={{fontSize:9,color:DS.textMuted}}>{l}</div></div>;})}
         </div>
         <div style={{display:"flex",gap:4,marginBottom:14}}>
-          {[["about","A propos"],["services","Services"],["stats","Stats"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})}
+          {[["about","À propos"],["services","Services"],["stats","Stats"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})}
         </div>
         {tab==="about"&&(
           editingAbout?(
@@ -3512,9 +3512,9 @@ function ProOnboarding(props){
   var filteredCountries=COUNTRIES_LIST.filter(function(c){return c.toLowerCase().includes(countrySearch.toLowerCase());});
   var canSave=!loading&&name.trim().length>0&&city.trim().length>0&&country.length>0;
   async function save(){
-    if(!name.trim()){setErr("Veuillez saisir le nom de votre etablissement.");return;}
+    if(!name.trim()){setErr("Veuillez saisir le nom de votre établissement.");return;}
     if(!city.trim()){setErr("Veuillez saisir la ville.");return;}
-    if(!country){setErr("Veuillez selectionner le pays.");return;}
+    if(!country){setErr("Veuillez sélectionner le pays.");return;}
     setLoading(true);setErr("");
     var loc=city.trim()+", "+country;
     var client=DataLayer._client;
@@ -3526,7 +3526,7 @@ function ProOnboarding(props){
   }
   return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:DS.bg,padding:"24px 20px",fontFamily:"'DM Sans','Inter',sans-serif",overflowY:"auto"}} onClick={function(){if(showCountryDrop)setShowCountryDrop(false);}}>
     <div style={{width:"100%",maxWidth:400}}>
-      <div style={{fontSize:22,fontWeight:900,color:DS.text,marginBottom:4}}>Configurer votre etablissement</div>
+      <div style={{fontSize:22,fontWeight:900,color:DS.text,marginBottom:4}}>Configurer votre établissement</div>
       <div style={{fontSize:13,color:DS.textMuted,marginBottom:24}}>Ces informations seront visibles par les clients sur la plateforme.</div>
       {auth.type==="hotel"&&<div style={{marginBottom:18}}>
         <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:8}}>Type de service *</div>
@@ -3543,7 +3543,7 @@ function ProOnboarding(props){
       <div style={{marginBottom:22,position:"relative"}}>
         <div style={{fontSize:12,fontWeight:700,color:DS.textMuted,marginBottom:6}}>Pays *</div>
         <button onClick={function(e){e.stopPropagation();setShowCountryDrop(!showCountryDrop);setCountrySearch("");}} style={{width:"100%",padding:"12px 14px",borderRadius:12,border:"1px solid "+(country?DS.primary+44:DS.border),background:DS.card,color:country?DS.text:DS.textMuted,fontSize:13,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between",boxSizing:"border-box"}}>
-          <span>{country||"Selectionner un pays"}</span>
+          <span>{country||"Sélectionner un pays"}</span>
           <ChevronDown size={14} color={DS.textMuted}/>
         </button>
         {showCountryDrop&&<div onClick={function(e){e.stopPropagation();}} style={{position:"absolute",top:"100%",left:0,right:0,background:DS.surface,border:"1px solid "+DS.border,borderRadius:12,zIndex:200,boxShadow:"0 8px 24px rgba(0,0,0,.18)",overflow:"hidden",marginTop:4}}>
@@ -3828,7 +3828,7 @@ export default function App() {
       }
       return next;
     });
-    tk.show(wasFav?"Retire des favoris":"Ajoute aux favoris","success");
+    tk.show(wasFav?"Retiré des favoris":"Ajouté aux favoris","success");
   }
 
   // Logout - defini avant le routing pour eviter reference error
@@ -3972,7 +3972,7 @@ export default function App() {
   }
 
   if(showChangeEmail) return <ChangeEmailModal accent={accent} onClose={function(){setShowChangeEmail(false);}}/>;
-  if(showChangePwd)   return <ChangePwdModal accent={accent} onClose={function(){setShowChangePwd(false);}} onSuccess={function(){toastApp("Mot de passe mis a jour avec succes","success");}}/>;
+  if(showChangePwd)   return <ChangePwdModal accent={accent} onClose={function(){setShowChangePwd(false);}} onSuccess={function(){toastApp("Mot de passe mis à jour avec succes","success");}}/>;
   if(sett)       return <Ov onClose={function(){setSett(false);}}>{function(close){return <SettingsS onBack={close} accType={auth.type} onLogout={logout} onDeleteAccount={deleteAccount} onPremium={function(){setSett(false);setShowPremium(true);}} onPrivacy={function(){setSett(false);setShowPrivacy(true);}} isPremium={isPremium} premiumData={premiumData} onChangeEmail={function(){setSett(false);setShowChangeEmail(true);}} onChangePwd={function(){setSett(false);setShowChangePwd(true);}} notifPrefs={notifPrefs} onUpdateNotifPrefs={updateNotifPrefs}/>;}}</Ov>;
   // === BANDEAU DEV (visible uniquement si DEV_BYPASS_AUTH = true) ===
   var devBanner=DEV_BYPASS_AUTH?(
@@ -4015,7 +4015,7 @@ export default function App() {
           right={headerRight}
         />
         {devBanner}
-        {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
+        {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
           {cTab==="feed"     &&<div><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
@@ -4059,7 +4059,7 @@ export default function App() {
         right={headerRight}
       />
       {devBanner}
-      {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
+      {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
         {pTab==="feed"         &&<div><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
