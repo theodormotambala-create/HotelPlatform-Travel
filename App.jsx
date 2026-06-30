@@ -62,12 +62,21 @@ const FEED=[
   {id:"h2",author:"Savane Lodge",type:"hotel",time:"6h",img:"https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&q=70",text:"Safari au lever du soleil - des moments inoubliables.",likes:156,comments:8,shares:9,followers:876,verified:true},
   {id:"res2",author:"Chez Mamie Fatou",type:"restaurant",time:"8h",img:"https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=70",text:"Aujourd'hui : Thieboudienne special avec poissons du jour.",likes:89,comments:5,shares:4,followers:1540,verified:false},
 ];
-const AD={active:true,label:"PUBLICITE",text:"Decouvrez nos etablissements partenaires"};
+// Publicités bandeau — sponsorisées par les établissements (configurables par l'Admin)
 const ADS_POOL=[
-  {active:true,label:"PUBLICITE",text:"Decouvrez nos etablissements partenaires"},
-  {active:true,label:"PROMO",text:"Offre speciale : -20% sur votre premiere reservation Premium"},
-  {active:true,label:"NOUVEAUTE",text:"Nouveaux restaurants africains disponibles sur la plateforme"},
+  {active:true,label:"SPONSORISÉ",estab:"Grand Hotel Royal",text:"Suite Prestige disponible dès 89€/nuit · Dakar, Sénégal"},
+  {active:true,label:"SPONSORISÉ",estab:"Le Jardin Gourmand",text:"Menu découverte africain -15% ce weekend · Abidjan"},
+  {active:true,label:"SPONSORISÉ",estab:"Savane Lodge",text:"Safari au lever du soleil · Expérience unique · Nairobi"},
+  {active:true,label:"SPONSORISÉ",estab:"Chez Mamie Fatou",text:"Thiéboudienne du jour · Cuisine malienne authentique · Bamako"},
 ];
+// Publicité bannière — affichée une seule fois à l'ouverture de l'app
+const SPLASH_AD={
+  estab:"Grand Hotel Royal",
+  img:"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=600&q=80",
+  label:"Établissement Partenaire",
+  text:"Vivez une expérience inoubliable au Grand Hotel Royal. Suite Prestige dès 89€/nuit.",
+  cta:"Découvrir",
+};
 
 // =====================================================================
 // COUCHE DE DONNEES CENTRALISEE (DataLayer)
@@ -731,9 +740,49 @@ function ResaSkeleton(){return(<div style={{padding:"0 14px",animation:"hp-fade 
 
 function AdBanner(){
   var si=useState(0);var adIdx=si[0];var setAdIdx=si[1];
-  useEffect(function(){var t=setInterval(function(){setAdIdx(function(i){return(i+1)%ADS_POOL.length;});},8000);return function(){clearInterval(t);};},[]);
-  var AD=ADS_POOL[adIdx];if(!AD.active)return null;
-  return(<div key={adIdx} style={{margin:"6px 14px",padding:"7px 14px",background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,display:"flex",alignItems:"center",gap:8,animation:"hp-fade 0.4s ease"}}><Tag size={11} color={DS.primary}/><span style={{fontSize:9,fontWeight:800,color:DS.primary,letterSpacing:1}}>{AD.label} </span><span style={{fontSize:11,color:DS.textMuted}}>{AD.text}</span></div>);
+  useEffect(function(){var t=setInterval(function(){setAdIdx(function(i){return(i+1)%ADS_POOL.length;});},6000);return function(){clearInterval(t);};},[]);
+  var AD=ADS_POOL[adIdx];if(!AD||!AD.active)return null;
+  return(
+    <div key={adIdx} style={{margin:"6px 14px",padding:"7px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:10,display:"flex",alignItems:"center",gap:8,animation:"hp-fade 0.4s ease"}}>
+      <Tag size={11} color={DS.gold}/>
+      <div style={{flex:1,minWidth:0}}>
+        <span style={{fontSize:9,fontWeight:800,color:DS.gold,letterSpacing:1}}>{AD.label} · </span>
+        <span style={{fontSize:9,fontWeight:800,color:DS.gold}}>{AD.estab} · </span>
+        <span style={{fontSize:10,color:DS.textMuted}}>{AD.text}</span>
+      </div>
+    </div>
+  );
+}
+
+function SplashAd(props){
+  var onClose=props.onClose;
+  var sC=useState(false);var closing=sC[0];var setClosing=sC[1];
+  function handleClose(){setClosing(true);setTimeout(function(){onClose();},260);}
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"hp-fade 0.3s ease"}}>
+      <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.32s ease",overflow:"hidden"}}>
+        <div style={{position:"relative"}}>
+          <img src={SPLASH_AD.img} alt={SPLASH_AD.estab} style={{width:"100%",height:220,objectFit:"cover",display:"block"}}/>
+          <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.7) 100%)"}}/>
+          <div style={{position:"absolute",top:12,left:14,background:DS.gold,borderRadius:6,padding:"3px 8px",display:"flex",alignItems:"center",gap:4}}>
+            <Tag size={9} color="#000"/>
+            <span style={{fontSize:9,fontWeight:900,color:"#000",letterSpacing:1}}>{SPLASH_AD.label}</span>
+          </div>
+          <button onClick={handleClose} style={{position:"absolute",top:10,right:10,background:"rgba(0,0,0,.5)",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <X size={14} color="#fff"/>
+          </button>
+          <div style={{position:"absolute",bottom:14,left:14,right:14}}>
+            <div style={{fontSize:16,fontWeight:900,color:"#fff",marginBottom:2}}>{SPLASH_AD.estab}</div>
+          </div>
+        </div>
+        <div style={{padding:"16px 20px 24px"}}>
+          <p style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,margin:"0 0 16px"}}>{SPLASH_AD.text}</p>
+          <button onClick={handleClose} style={{width:"100%",padding:"12px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginBottom:10}}>{SPLASH_AD.cta}</button>
+          <button onClick={handleClose} style={{width:"100%",padding:"8px",background:"none",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Ignorer</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function OffB(props){return(<button onClick={props.onPress} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid "+DS.border+"20",background:"none",border:"none",cursor:"pointer",textAlign:"left"}}><span style={{fontSize:14,color:DS.text}}>{props.label}</span><ChevronRight size={16} color={DS.textMuted}/></button>);}
@@ -3610,6 +3659,10 @@ export default function App() {
   var s6=useState(null);  var estab=s6[0];          var setEstab=s6[1];
   var s7=useState(null);  var book=s7[0];           var setBook=s7[1];
   var s8=useState(false); var showPremium=s8[0];    var setShowPremium=s8[1];
+  // Splash pub — une seule fois par session (sessionStorage, pas localStorage)
+  var _splashSeen=(function(){try{return!!sessionStorage.getItem("hp_splash_seen");}catch(e){return false;}})();
+  var sSplash=useState(!_splashSeen);var showSplashAd=sSplash[0];var setShowSplashAd=sSplash[1];
+  function closeSplashAd(){try{sessionStorage.setItem("hp_splash_seen","1");}catch(e){}setShowSplashAd(false);}
   var s9=useState(false); var showPrivacy=s9[0];    var setShowPrivacy=s9[1];
   var s9b=useState(function(){try{var v=localStorage.getItem("hp_privacy");return v?JSON.parse(v):{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};}catch(e){return{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};}});var privacySettings=s9b[0];var setPrivacySettings=s9b[1];
   function updatePrivacy(patch){
@@ -3982,7 +4035,7 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
+          {cTab==="feed"     &&<div><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
@@ -3993,6 +4046,7 @@ export default function App() {
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
         {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setCTab(t);}}/>;}}</Ov>}
+        {showSplashAd&&<SplashAd onClose={closeSplashAd}/>}
         <Toast/>
       </div>
     );
@@ -4025,7 +4079,7 @@ export default function App() {
       {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
+        {pTab==="feed"         &&<div><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
@@ -4038,6 +4092,7 @@ export default function App() {
       {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
       {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setPTab(t);}}/>;}}</Ov>}
+      {showSplashAd&&<SplashAd onClose={closeSplashAd}/>}
       <Toast/>
     </div>
   );
