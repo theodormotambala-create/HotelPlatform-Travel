@@ -44,20 +44,20 @@ const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}
 function useAnimations(){useEffect(function(){if(document.getElementById("hp-a"))return;var s=document.createElement("style");s.id="hp-a";s.textContent=ANIM_CSS;document.head.appendChild(s);},[]);}
 
 const HOTELS=[
-  {id:"h1",name:"Grand Hotel Royal",type:"hotel",location:"Dakar, Senegal",img:"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70",rating:4.9,reviewCount:1284,priceFrom:120,followers:2341,verified:false,isPremium:false,hasRestaurant:true,svcMode:"combined",description:"Hotel 5 etoiles au coeur de Dakar. Vue mer exceptionnelle, spa luxueux.",services:[{id:"svc1",name:"Spa",active:true},{id:"svc2",name:"Restaurant Gastronomique",active:true},{id:"svc3",name:"Piscine Infinity",active:true},{id:"svc4",name:"Salle de conference",active:true},{id:"svc5",name:"Navette aeroport",active:true},{id:"svc6",name:"Room Service 24h",active:true}],rooms:[{id:"r1",name:"Suite Presidentielle",price:450,capacity:2,available:true,stock:3},{id:"r2",name:"Chambre Superieure",price:240,capacity:2,available:true,stock:6},{id:"r3",name:"Chambre Deluxe",price:180,capacity:2,available:false,stock:0}],menu:[{cat:"Entrees",items:[{name:"Salade Cesar",price:14,description:"Poulet grille, parmesan, croutons"},{name:"Soupe du jour",price:9,description:"Selon arrivage du marche"}]},{cat:"Plats",items:[{name:"Thiof grille",price:28,description:"Poisson local, riz, legumes"},{name:"Filet de boeuf",price:34,description:"Sauce au poivre, frites maison"}]}],meals:[{id:"breakfast",name:"Petit-dejeuner",price:12},{id:"lunch",name:"Dejeuner",price:18},{id:"dinner",name:"Diner",price:25}]},
+  {id:"h1",name:"Grand Hotel Royal",type:"hotel",location:"Dakar, Sénégal",img:"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70",rating:4.9,reviewCount:1284,priceFrom:120,followers:2341,verified:false,isPremium:false,hasRestaurant:true,svcMode:"combined",description:"Hôtel 5 étoiles au cœur de Dakar. Vue mer exceptionnelle, spa luxueux.",services:[{id:"svc1",name:"Spa",active:true},{id:"svc2",name:"Restaurant Gastronomique",active:true},{id:"svc3",name:"Piscine Infinity",active:true},{id:"svc4",name:"Salle de conférence",active:true},{id:"svc5",name:"Navette aéroport",active:true},{id:"svc6",name:"Room Service 24h",active:true}],rooms:[{id:"r1",name:"Suite Présidentielle",price:450,capacity:2,available:true,stock:3},{id:"r2",name:"Chambre Supérieure",price:240,capacity:2,available:true,stock:6},{id:"r3",name:"Chambre Deluxe",price:180,capacity:2,available:false,stock:0}],menu:[{cat:"Entrées",items:[{name:"Salade César",price:14,description:"Poulet grillé, parmesan, croutons"},{name:"Soupe du jour",price:9,description:"Selon arrivage du marché"}]},{cat:"Plats",items:[{name:"Thiof grillé",price:28,description:"Poisson local, riz, légumes"},{name:"Filet de boeuf",price:34,description:"Sauce au poivre, frites maison"}]}],meals:[{id:"breakfast",name:"Petit-déjeuner",price:12},{id:"lunch",name:"Déjeuner",price:18},{id:"dinner",name:"Dîner",price:25}]},
   {id:"h2",name:"Savane Lodge",type:"hotel",location:"Nairobi, Kenya",img:"https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&q=70",rating:4.6,reviewCount:643,priceFrom:89,followers:876,verified:true,isPremium:false,description:"Lodge authentique en pleine nature. Safari experience unique.",services:["Safari Guide","Restaurant","Piscine","Connexion WiFi"],rooms:[{id:"r3",name:"Bungalow Safari",price:89,capacity:2,available:true},{id:"r4",name:"Villa Familiale",price:180,capacity:4,available:true}]},
 ];
 const RESTAURANTS=[
-  {id:"res1",name:"Le Jardin Gourmand",type:"restaurant",location:"Abidjan, CI",img:"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70",rating:4.8,reviewCount:2341,priceFrom:15,followers:3210,verified:false,isPremium:false,description:"Cuisine africaine contemporaine. Produits locaux selectionnes.",offers:["Menu Decouverte 35 EUR","Brunch Dominical 28 EUR","Menu Business 22 EUR"],menu:[{cat:"Entrees",items:[{name:"Thieboudienne Royal",price:18},{name:"Yassa Poulet",price:16}]},{cat:"Plats",items:[{name:"Attieke Poisson",price:22},{name:"Kedjenou",price:20}]},{cat:"Desserts",items:[{name:"Thiakry",price:8},{name:"Banane Flambe",price:10}]}]},
+  {id:"res1",name:"Le Jardin Gourmand",type:"restaurant",location:"Abidjan, Côte d'Ivoire",img:"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70",rating:4.8,reviewCount:2341,priceFrom:15,followers:3210,verified:false,isPremium:false,description:"Cuisine africaine contemporaine. Produits locaux sélectionnés.",offers:["Menu Découverte 35€","Brunch Dominical 28€","Menu Business 22€"],menu:[{cat:"Entrées",items:[{name:"Thiéboudienne Royal",price:18},{name:"Yassa Poulet",price:16}]},{cat:"Plats",items:[{name:"Attieke Poisson",price:22},{name:"Kedjenou",price:20}]},{cat:"Desserts",items:[{name:"Thiakry",price:8},{name:"Banane Flambée",price:10}]}]},
   {id:"res2",name:"Chez Mamie Fatou",type:"restaurant",location:"Bamako, Mali",img:"https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=70",rating:4.7,reviewCount:1876,priceFrom:8,followers:1540,verified:false,isPremium:false,description:"Cuisine malienne authentique. Ambiance familiale.",offers:["Plat du Jour 8 EUR","Menu Complet 14 EUR"],menu:[{cat:"Plats",items:[{name:"Riz au Gras",price:8},{name:"To Sauce Arachide",price:10}]},{cat:"Boissons",items:[{name:"Bissap",price:2},{name:"Gingembre",price:2}]}]},
 ];
 const CC=[
-  {pN:"Grand Hotel Royal",pI:"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=60&q=70",pV:true,messages:[{id:1,f:"them",t:"Bonjour, votre reservation est confirmee pour le 24 juillet.",time:"10:30",read:true},{id:2,f:"me",t:"Merci beaucoup !",time:"10:34",read:true},{id:3,f:"them",t:"Avez-vous des preferences alimentaires ?",time:"10:35",read:false}]},
+  {pN:"Grand Hotel Royal",pI:"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=60&q=70",pV:true,messages:[{id:1,f:"them",t:"Bonjour, votre réservation est confirmée pour le 24 juillet.",time:"10:30",read:true},{id:2,f:"me",t:"Merci beaucoup !",time:"10:34",read:true},{id:3,f:"them",t:"Avez-vous des préférences alimentaires ?",time:"10:35",read:false}]},
   {pN:"Le Jardin Gourmand",pI:"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=60&q=70",pV:true,messages:[{id:4,f:"them",t:"Merci pour votre avis ! Nous serons ravis de vous revoir.",time:"09:00",read:true}]},
 ];
 const CP=[];
 const FEED=[
-  {id:"h1",author:"Grand Hotel Royal",type:"hotel",time:"2h",img:"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70",text:"Decouvrez notre nouvelle suite presidentielle renovee ! Vue mer panoramique.",likes:284,comments:12,shares:18,followers:2341,verified:true,combined:true},
+  {id:"h1",author:"Grand Hotel Royal",type:"hotel",time:"2h",img:"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70",text:"Découvrez notre nouvelle suite présidentielle rénovée ! Vue mer panoramique.",likes:284,comments:12,shares:18,followers:2341,verified:true,combined:true},
   {id:"res1",author:"Le Jardin Gourmand",type:"restaurant",time:"4h",img:"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70",text:"Menu special ce soir : Homard grille aux epices africaines. Reservation recommandee !",likes:512,comments:34,shares:47,followers:3210,verified:true},
   {id:"h2",author:"Savane Lodge",type:"hotel",time:"6h",img:"https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&q=70",text:"Safari au lever du soleil - des moments inoubliables.",likes:156,comments:8,shares:9,followers:876,verified:true},
   {id:"res2",author:"Chez Mamie Fatou",type:"restaurant",time:"8h",img:"https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&q=70",text:"Aujourd'hui : Thieboudienne special avec poissons du jour.",likes:89,comments:5,shares:4,followers:1540,verified:false},
@@ -644,7 +644,7 @@ var MessageService = {
   // Marque un message comme supprime (sans le retirer, facon messageries pro)
   markDeleted: function(msg, id){
     return msg.id === id
-      ? Object.assign({}, msg, { deleted: true, t: "[Message supprime]" })
+      ? Object.assign({}, msg, { deleted: true, t: "[Message supprimé]" })
       : msg;
   },
   // Marque un message comme lu
@@ -828,7 +828,7 @@ function AccountTypeScreen(props){
         <div style={{fontSize:13,color:DS.textMuted,marginTop:8}}>Choisissez votre type de compte</div>
       </div>
       <div style={{width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:14}}>
-        {[["client","Client","Voyageur · Reservations · Avis",User,DS.client],["hotel","Hotel","Gerez votre etablissement hotelier",Building2,DS.hotel],["restaurant","Restaurant","Gerez votre restaurant",Utensils,DS.restaurant]].map(function(item){
+        {[["client","Client","Voyageur · Réservations · Avis",User,DS.client],["hotel","Hotel","Gérez votre établissement hôtelier",Building2,DS.hotel],["restaurant","Restaurant","Gerez votre restaurant",Utensils,DS.restaurant]].map(function(item){
           var t=item[0];var l=item[1];var desc=item[2];var Ic=item[3];var col=item[4];
           return(
             <button key={t} onClick={function(){onSelect(t);}} style={{width:"100%",padding:"18px 20px",borderRadius:16,border:"1px solid "+col+"44",background:DS.card,cursor:"pointer",display:"flex",alignItems:"center",gap:16,textAlign:"left"}}>
@@ -859,7 +859,7 @@ function AuthScreen(props){
   function handleAuthError(e){
     var msg=e.message||"";
     if(msg.includes("fetch")||msg.includes("network")||msg.includes("ERR_")||msg.includes("Failed to fetch")){
-      setAuthErr("Connexion impossible. Verifiez votre connexion internet.");
+      setAuthErr("Connexion impossible. Vérifiez votre connexion internet.");
     } else if(msg.includes("Invalid login")||msg.includes("invalid_credentials")){
       setAuthErr("Email ou mot de passe incorrect.");
     } else if(msg.includes("already registered")||msg.includes("User already registered")){
@@ -869,11 +869,11 @@ function AuthScreen(props){
     } else if(msg.includes("Password should be")||msg.includes("password")){
       setAuthErr("Le mot de passe doit contenir entre 6 et 72 caracteres.");
     } else if(msg.includes("Email not confirmed")){
-      setAuthErr("Confirmez votre email avant de vous connecter. Verifiez vos spams.");
+      setAuthErr("Confirmez votre email avant de vous connecter. Vérifiez vos spams.");
     } else if(msg.includes("rate limit")||msg.includes("too many")){
-      setAuthErr("Trop de tentatives. Attendez quelques minutes avant de reessayer.");
+      setAuthErr("Trop de tentatives. Attendez quelques minutes avant de réessayer.");
     } else {
-      setAuthErr(msg||"Erreur de connexion. Veuillez reessayer.");
+      setAuthErr(msg||"Erreur de connexion. Veuillez réessayer.");
     }
   }
   async function submit(){
@@ -917,7 +917,7 @@ function AuthScreen(props){
       var s=await AuthService.loginWithProvider(accType,"google");
       if(s)onAuth(accType,s.accountStatus,s.email,s.userId);
     }catch(e){
-      setAuthErr("Connexion Google impossible. Verifiez que le service est configure.");
+      setAuthErr("Connexion Google impossible. Vérifiez que le service est configuré.");
     }finally{setGLoading(false);}
   }
   if(emailPending){
@@ -929,7 +929,7 @@ function AuthScreen(props){
           <div style={{fontSize:14,color:DS.textMuted,lineHeight:1.7,marginBottom:24}}>Un lien de confirmation a ete envoye a <span style={{color:DS.primary,fontWeight:700}}>{email}</span>.<br/>Cliquez sur le lien pour activer votre compte.</div>
           <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 16px",marginBottom:20,fontSize:12,color:DS.textMuted,textAlign:"left"}}>
             <div style={{fontWeight:700,color:DS.text,marginBottom:4}}>Vous ne trouvez pas l'email ?</div>
-            <div>Verifiez vos spams ou dossier promotions. Le lien expire dans 24h.</div>
+            <div>Vérifiez vos spams ou dossier promotions. Le lien expire dans 24h.</div>
           </div>
           <button onClick={function(){setEmailPending(false);setMode("login");setPass("");setConfirmPass("");}} style={{width:"100%",padding:"13px",background:DS.primary,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Se connecter</button>
         </div>
@@ -943,7 +943,7 @@ function AuthScreen(props){
       </button>}
       <div style={{textAlign:"center",marginBottom:20}}>
         <div style={{fontSize:32,fontWeight:900,color:DS.text,letterSpacing:-1}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>
-        <div style={{fontSize:12,color:DS.textMuted,marginTop:6}}>{mode==="login"?"Connectez-vous":mode==="register"?"Créez votre compte":"Reinitialiser le mot de passe"}</div>
+        <div style={{fontSize:12,color:DS.textMuted,marginTop:6}}>{mode==="login"?"Connectez-vous":mode==="register"?"Créez votre compte":"Réinitialiser le mot de passe"}</div>
       </div>
       <div style={{width:"100%",maxWidth:360}}>
         {mode==="register"&&(
@@ -975,7 +975,7 @@ function AuthScreen(props){
           </div>
         )}
         {formErr&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error,textAlign:"center"}}>{formErr}</div>}
-        {mode==="register"&&accType!=="client"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:11,color:DS.warning}}>Les comptes Hotel et Restaurant sont soumis a validation avant activation.</div>}
+        {mode==="register"&&accType!=="client"&&<div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:11,color:DS.warning}}>Les comptes Hôtel et Restaurant sont soumis à validation avant activation.</div>}
         {mode==="register"&&(
           <div onClick={function(){setCgu(!cgu);}} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 0",cursor:"pointer",marginBottom:10}}>
             <div style={{width:20,height:20,borderRadius:6,border:"2px solid "+(cgu?DS.primary:DS.border),background:cgu?DS.primary:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>
@@ -986,7 +986,7 @@ function AuthScreen(props){
         )}
         {authErr&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error,textAlign:"center"}}>{authErr}</div>}
         <button onClick={submit} disabled={loading||(mode==="register"&&!cgu)} style={{width:"100%",padding:"13px",background:loading||(mode==="register"&&!cgu)?DS.textDim:DS.primary,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",marginBottom:12,opacity:loading||(mode==="register"&&!cgu)?.6:1}}>
-          {loading?<span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite",verticalAlign:"middle",marginRight:6}}/>:null}{mode==="login"?"Se connecter":mode==="register"?"Creer mon compte":"Envoyer le lien"}
+          {loading?<span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite",verticalAlign:"middle",marginRight:6}}/>:null}{mode==="login"?"Se connecter":mode==="register"?"Créer mon compte":"Envoyer le lien"}
         </button>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
           <div style={{flex:1,height:1,background:DS.border}}/><span style={{fontSize:11,color:DS.textDim}}>OU</span><div style={{flex:1,height:1,background:DS.border}}/>
@@ -1258,7 +1258,7 @@ function ChatUI(props){
     client.from("messages").select("*").eq("conversation_id",convId).order("created_at",{ascending:true})
       .then(function(res){
         if(res.error||!res.data)return;
-        var msgs=res.data.map(function(m){var d=new Date(m.created_at);var mn=d.getMinutes();return{id:m.id,f:m.sender_id===myId?"me":"them",t:m.deleted?"[Message supprime]":m.body,time:d.getHours()+":"+(mn<10?"0":"")+mn,read:m.read,deleted:m.deleted,replyTo:m.reply_to_body?{t:m.reply_to_body,f:m.reply_to_sender===myId?"me":"them"}:null};});
+        var msgs=res.data.map(function(m){var d=new Date(m.created_at);var mn=d.getMinutes();return{id:m.id,f:m.sender_id===myId?"me":"them",t:m.deleted?"[Message supprimé]":m.body,time:d.getHours()+":"+(mn<10?"0":"")+mn,read:m.read,deleted:m.deleted,replyTo:m.reply_to_body?{t:m.reply_to_body,f:m.reply_to_sender===myId?"me":"them"}:null};});
         setThr(function(ts){return ts.map(function(c){return c.convId===convId?Object.assign({},c,{msgs:msgs}):c;});});
         client.from("messages").update({read:true}).eq("conversation_id",convId).neq("sender_id",myId).eq("read",false).then(function(){});
       });
@@ -1267,7 +1267,7 @@ function ChatUI(props){
       .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:"conversation_id=eq."+convId},function(payload){
         var m=payload.new;if(m.sender_id===myId)return;
         var d=new Date(m.created_at);var mn2=d.getMinutes();
-        var nm2={id:m.id,f:"them",t:m.deleted?"[Message supprime]":m.body,time:d.getHours()+":"+(mn2<10?"0":"")+mn2,read:false,deleted:m.deleted,replyTo:m.reply_to_body?{t:m.reply_to_body,f:"them"}:null};
+        var nm2={id:m.id,f:"them",t:m.deleted?"[Message supprimé]":m.body,time:d.getHours()+":"+(mn2<10?"0":"")+mn2,read:false,deleted:m.deleted,replyTo:m.reply_to_body?{t:m.reply_to_body,f:"them"}:null};
         setThr(function(ts){return ts.map(function(c){return c.convId===convId?Object.assign({},c,{msgs:c.msgs.concat([nm2])}):c;});});
       }).subscribe();
     rtChan.current=chan;
@@ -1292,9 +1292,9 @@ function ChatUI(props){
   var conv=active!==null?thr[active]:null;
   var sChatSk=useState(true);var chatSkLoading=sChatSk[0];var setChatSkLoading=sChatSk[1];
   useEffect(function(){if(active!==null)return;var t=setTimeout(function(){setChatSkLoading(false);},280);return function(){clearTimeout(t);};},[active]);
-  if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</div></div>{convErr&&<div style={{padding:"10px 16px",background:"#ff4d4d22",color:"#ff4d4d",fontSize:12,textAlign:"center"}}>{convErr}</div>}{(chatSkLoading||convLoading)?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length;return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"Debut de la conversation"}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
+  if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</div></div>{convErr&&<div style={{padding:"10px 16px",background:"#ff4d4d22",color:"#ff4d4d",fontSize:12,textAlign:"center"}}>{convErr}</div>}{(chatSkLoading||convLoading)?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length;return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"Début de la conversation"}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
   var msgs=conv?conv.msgs:[];
-  return(<div style={{display:"flex",flexDirection:"column",height:"100%",background:DS.bg}}><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false} isClient={isClientChat}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>Membre HotelPlatform</div></div></div><div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",animation:"hp-msg-in 0.3s ease both",animationDelay:Math.min(i*20,200)+"ms"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprime]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoye"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Repondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Repondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()} style={{width:40,height:40,borderRadius:"50%",background:msg.trim()?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
+  return(<div style={{display:"flex",flexDirection:"column",height:"100%",background:DS.bg}}><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false} isClient={isClientChat}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>Membre HotelPlatform</div></div></div><div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",animation:"hp-msg-in 0.3s ease both",animationDelay:Math.min(i*20,200)+"ms"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprimé]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoyé"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Répondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()} style={{width:40,height:40,borderRadius:"50%",background:msg.trim()?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
 }
 
 function useLongPress(onTrigger){
@@ -1760,11 +1760,11 @@ function ClientProf(props){
   if(profSkLoading)return <ProfSkeleton/>;
   var _loyaltyPoints=resaHistory.length*150;
   var _loyaltyLevel=_loyaltyPoints>=15000?"plat":_loyaltyPoints>=5000?"gold":_loyaltyPoints>=1000?"silver":"bronze";
-  return(<div style={{paddingBottom:20}}><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/><LoyaltyWidget points={_loyaltyPoints} level={_loyaltyLevel}/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><div style={{filter:_locked?"blur(3px)":"none",transition:"filter .3s",display:"inline-flex",justifyContent:"center"}}><DualAv sz={72} letter={displayLetter} innerImg={profilePhoto} onClickInner={function(){if(profilePhoto){_setViewer(profilePhoto);}else if(_uploadRef.current){_uploadRef.current.click();}}} uploadRef={_uploadRef} verified={isPremium} isClient={true}/></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:10,filter:_locked&&!privacySettings.pseudo?"blur(2px)":"none"}}><span style={{fontSize:18,fontWeight:800,color:DS.text}}>{displayName}</span></div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{(privacySettings.pseudo||_locked)?"":selfEmail||""}</div><div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,padding:"3px 8px",borderRadius:20,border:"1px solid "+(_visColors[privacySettings.vis]||DS.success)+"44",background:(_visColors[privacySettings.vis]||DS.success)+"12"}}><Eye size={10} color={_visColors[privacySettings.vis]||DS.success}/><span style={{fontSize:9,fontWeight:700,color:_visColors[privacySettings.vis]||DS.success}}>{_visLabels[privacySettings.vis]||"Profil public"}</span>{_locked&&<><Lock size={8} color={DS.warning}/><span style={{fontSize:9,fontWeight:700,color:DS.warning}}>Verrouille</span></>}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Reservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
+  return(<div style={{paddingBottom:20}}><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/><LoyaltyWidget points={_loyaltyPoints} level={_loyaltyLevel}/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><div style={{filter:_locked?"blur(3px)":"none",transition:"filter .3s",display:"inline-flex",justifyContent:"center"}}><DualAv sz={72} letter={displayLetter} innerImg={profilePhoto} onClickInner={function(){if(profilePhoto){_setViewer(profilePhoto);}else if(_uploadRef.current){_uploadRef.current.click();}}} uploadRef={_uploadRef} verified={isPremium} isClient={true}/></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:10,filter:_locked&&!privacySettings.pseudo?"blur(2px)":"none"}}><span style={{fontSize:18,fontWeight:800,color:DS.text}}>{displayName}</span></div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{(privacySettings.pseudo||_locked)?"":selfEmail||""}</div><div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,padding:"3px 8px",borderRadius:20,border:"1px solid "+(_visColors[privacySettings.vis]||DS.success)+"44",background:(_visColors[privacySettings.vis]||DS.success)+"12"}}><Eye size={10} color={_visColors[privacySettings.vis]||DS.success}/><span style={{fontSize:9,fontWeight:700,color:_visColors[privacySettings.vis]||DS.success}}>{_visLabels[privacySettings.vis]||"Profil public"}</span>{_locked&&<><Lock size={8} color={DS.warning}/><span style={{fontSize:9,fontWeight:700,color:DS.warning}}>Verrouillé</span></>}</div><div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu'au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{[["reservations","Réservations"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})} </div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
           (resaHistory&&resaHistory.length>0)?resaHistory.map(function(r,i){
             var showQR=activeQR===i;
             var st=r.status||"pending";
-            var stLabel={pending:"En attente",refused:"Refusee",confirmed:"Acceptee",consumed:"Consommee"}[st]||"En attente";
+            var stLabel={pending:"En attente",refused:"Refusée",confirmed:"Acceptee",consumed:"Consommée"}[st]||"En attente";
             var stColor={pending:DS.warning,refused:DS.error,confirmed:DS.success,consumed:DS.textDim}[st]||DS.warning;
             var hasTicket=st!=="refused";
             return(
@@ -2131,7 +2131,7 @@ function BookM(props){
               setShowStripeModal(false);setStripeClientSecret(null);
               var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"confirmed",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
               setStep(3);
-              toast("Paiement Stripe confirme !","success");
+              toast("Paiement Stripe confirmé !","success");
               if(props.onBooked)props.onBooked(BookingService.createBooking(resa,selfUserId));
             }}
             onError={function(msg){toast(msg||"Echec du paiement","error");}}
@@ -2284,7 +2284,7 @@ function BookM(props){
                       var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
                       setPaying(false);
                       setStep(3);
-                      toast(payMode==="avec"?"Paiement Mobile Money confirme !":"Demande envoyee à l'établissement !","success");
+                      toast(payMode==="avec"?"Paiement Mobile Money confirmé !":"Demande envoyée à l'établissement !","success");
                       if(props.onBooked)props.onBooked(BookingService.createBooking(resa,selfUserId));
                     },delay);
                     return;
@@ -2323,7 +2323,7 @@ function BookM(props){
             <div>
               <div style={{textAlign:"center",marginBottom:20}}>
                 <div style={{width:64,height:64,borderRadius:"50%",background:payMode==="avec"?DS.successSoft:DS.warningSoft,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",animation:"hp-bounce-in 0.55s cubic-bezier(0.22,1,0.36,1)"}}>{payMode==="avec"?<CheckCircle size={32} color={DS.success}/>:<Clock size={32} color={DS.warning}/>}</div>
-                <div style={{fontSize:17,fontWeight:900,color:payMode==="avec"?DS.success:DS.warning}}>{payMode==="avec"?"Réservation confirmée !":"Demande envoyee !"}</div>
+                <div style={{fontSize:17,fontWeight:900,color:payMode==="avec"?DS.success:DS.warning}}>{payMode==="avec"?"Réservation confirmée !":"Demande envoyée !"}</div>
                 <div style={{fontSize:12,color:DS.textMuted,marginTop:4}}>{payMode==="avec"?"Votre ticket numérique est prêt":"En attente de confirmation de l'établissement (24h)"}</div>
               </div>
               <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:16,overflow:"hidden",marginBottom:16}}>
@@ -2741,7 +2741,7 @@ function ServiceConfigModal(props){
   var s6=useState(initial?initial.available!==false:true);var avail=s6[0];var setAvail=s6[1];
   var s7=useState(initial?initial.options||"":"");var opts=s7[0];var setOpts=s7[1];
   var s8=useState(initial&&initial.stock?initial.stock:5);var stock=s8[0];var setStock=s8[1];
-  var CAT_ROOM=["Standard","Superieure","Deluxe","Suite","Bungalow"];
+  var CAT_ROOM=["Standard","Supérieure","Deluxe","Suite","Bungalow"];
   var CAT_DISH=["Entree","Plat","Dessert","Boisson","Menu"];
   var cats=isRoom?CAT_ROOM:CAT_DISH;
   function save(){
@@ -2768,7 +2768,7 @@ function ServiceConfigModal(props){
         <div style={{padding:20}}>
           <div style={{marginBottom:12}}>
             <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:5}}>{isRoom?"NOM DE LA CHAMBRE":"NOM DU PLAT"}</div>
-            <input value={name} onChange={function(e){setName(e.target.value);}} placeholder={isRoom?"Ex: Suite Presidentiell":"Ex: Thieboudienne Royal"} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+            <input value={name} onChange={function(e){setName(e.target.value);}} placeholder={isRoom?"Ex: Suite Présidentielle":"Ex: Thiéboudienne Royal"} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
           </div>
           <div style={{display:"flex",gap:10,marginBottom:12}}>
             <div style={{flex:1}}>
@@ -3246,7 +3246,7 @@ function RestOff(props){
           <div>
             <button onClick={function(){setShowAddOffer(!showAddOffer);}} style={{width:"100%",padding:"10px 14px",background:color+"18",border:"1px dashed "+color,borderRadius:12,color:color,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}><Plus size={16}/>Ajouter une offre</button>
             {showAddOffer&&<div style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:12,border:"1px solid "+DS.border}}>
-              <input value={newOfferName} onChange={function(e){setNewOfferName(e.target.value);}} placeholder="Nom de l'offre (ex: Menu Decouverte)" style={{width:"100%",background:DS.bg,border:"1px solid "+DS.border,borderRadius:8,padding:"8px 12px",fontSize:12,color:DS.text,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+              <input value={newOfferName} onChange={function(e){setNewOfferName(e.target.value);}} placeholder="Nom de l'offre (ex: Menu Découverte)" style={{width:"100%",background:DS.bg,border:"1px solid "+DS.border,borderRadius:8,padding:"8px 12px",fontSize:12,color:DS.text,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
               <div style={{display:"flex",gap:8}}>
                 <input value={newOfferPrice} onChange={function(e){setNewOfferPrice(e.target.value);}} placeholder="Prix EUR (optionnel)" type="number" min="0" style={{flex:1,background:DS.bg,border:"1px solid "+DS.border,borderRadius:8,padding:"8px 12px",fontSize:12,color:DS.text,outline:"none"}}/>
                 <button onClick={addOffer} style={{padding:"8px 16px",background:color,border:"none",borderRadius:8,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}>Ajouter</button>
@@ -3284,11 +3284,11 @@ function ProResa(props){
   useEffect(function(){var t=setTimeout(function(){setResaSkLoading(false);},350);return function(){clearTimeout(t);};},[]);
   var filtered=filter==="all"?resas:resas.filter(function(r){return r.status===filter;});
   var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim};
-  var sLabels={confirmed:"Confirmee",pending:"En attente",refused:"Refusee",consumed:"Consommee"};
+  var sLabels={confirmed:"Confirmée",pending:"En attente",refused:"Refusée",consumed:"Consommée"};
   function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem("hp_resas_all",JSON.stringify(updated));}catch(e){}try{if(patch&&patch.status)DataLayer.updateReservationStatus(id,patch.status);}catch(e2){}}
   function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Réservation confirmée","success");}
   function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Reservation refusee","info");}
-  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivee confirmee - Client marque present","success");}
+  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivée confirmée · Client marqué présent","success");}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
       <ToastR/>
@@ -3322,10 +3322,10 @@ function ProResa(props){
         </div>
       )}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,padding:"14px 14px 10px"}}>
-        {[[resas.filter(function(r){return r.status==="pending";}).length,"En attente",DS.warning],[resas.filter(function(r){return r.status==="confirmed";}).length,"Confirmees",DS.success],[resas.reduce(function(a,r){return a+(r.payMode==="avec"?r.total:0);},0)+" EUR","Revenus",DS.gold]].map(function(_i,i){var n=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{background:DS.card,borderRadius:10,padding:"10px 6px",border:"1px solid "+DS.border,textAlign:"center"}}><div style={{fontSize:16,fontWeight:900,color:col}}>{n}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
+        {[[resas.filter(function(r){return r.status==="pending";}).length,"En attente",DS.warning],[resas.filter(function(r){return r.status==="confirmed";}).length,"Confirmées",DS.success],[resas.reduce(function(a,r){return a+(r.payMode==="avec"?r.total:0);},0)+" EUR","Revenus",DS.gold]].map(function(_i,i){var n=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{background:DS.card,borderRadius:10,padding:"10px 6px",border:"1px solid "+DS.border,textAlign:"center"}}><div style={{fontSize:16,fontWeight:900,color:col}}>{n}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
       </div>
       <div style={{display:"flex",gap:5,padding:"0 14px",marginBottom:12,overflowX:"auto"}}>
-        {[["all","Toutes"],["pending","En attente"],["confirmed","Confirmees"],["consumed","Consommees"],["refused","Refusees"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=filter===v;return <button key={v} onClick={function(){setFilter(v);}} style={{padding:"6px 12px",borderRadius:20,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{l}</button>;})}
+        {[["all","Toutes"],["pending","En attente"],["confirmed","Confirmées"],["consumed","Consommées"],["refused","Refusées"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=filter===v;return <button key={v} onClick={function(){setFilter(v);}} style={{padding:"6px 12px",borderRadius:20,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{l}</button>;})}
       </div>
       <div style={{padding:"0 14px"}}>
         {resaSkLoading?<ResaSkeleton/>:<>{filtered.map(function(r,_ri){return(
@@ -3350,7 +3350,7 @@ function ProResa(props){
                 </div>
               </div>
             </div>
-            {r.qrScanned&&<div style={{background:DS.successSoft,border:"1px solid "+DS.success+"33",borderRadius:8,padding:"6px 10px",marginBottom:8,display:"flex",alignItems:"center",gap:6}}><CheckCircle size={12} color={DS.success}/><span style={{fontSize:11,color:DS.success,fontWeight:700}}>Cette reservation est desormais consommee</span></div>}
+            {r.qrScanned&&<div style={{background:DS.successSoft,border:"1px solid "+DS.success+"33",borderRadius:8,padding:"6px 10px",marginBottom:8,display:"flex",alignItems:"center",gap:6}}><CheckCircle size={12} color={DS.success}/><span style={{fontSize:11,color:DS.success,fontWeight:700}}>Cette réservation est désormais consommée</span></div>}
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {r.status==="pending"&&<button onClick={function(){confirmResa(r.id);}} style={{padding:"7px 14px",background:DS.successSoft,border:"1px solid "+DS.success+"33",borderRadius:8,color:DS.success,fontSize:11,fontWeight:700,cursor:"pointer"}}>Confirmer</button>}
               {r.status==="pending"&&<button onClick={function(){refuseResa(r.id);}} style={{padding:"7px 14px",background:DS.errorSoft,border:"1px solid "+DS.error+"33",borderRadius:8,color:DS.error,fontSize:11,fontWeight:700,cursor:"pointer"}}>Refuser</button>}
@@ -3413,7 +3413,7 @@ function ProProf(props){
         <div style={{position:"absolute",top:8,right:8,display:"flex",gap:6}}>
           <button onClick={function(){if(onSettings)onSettings();}} style={{background:"rgba(0,0,0,.5)",border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Settings size={14} color="#fff"/></button>
           {!premiumActive&&<div style={{display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:10,color:DS.gold,fontWeight:700,fontStyle:"italic"}}>Debloquez les avis clients !</span><button onClick={function(){if(onPremium)onPremium();}} style={{background:DS.gold,border:"none",borderRadius:20,padding:"6px 12px",color:"#000",fontSize:11,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>Premium</button></div>}
-        {premiumActive&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{display:"flex",alignItems:"center",gap:5,background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,padding:"6px 12px",color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}><VBadge sz={11}/>Actif jusqu au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}
+        {premiumActive&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{display:"flex",alignItems:"center",gap:5,background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,padding:"6px 12px",color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}><VBadge sz={11}/>Actif jusqu'au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}
         </div>
       </div>
       <div style={{padding:"56px 16px 10px"}}>
@@ -3435,7 +3435,7 @@ function ProProf(props){
         {verifStatus==="approved"&&isVerified&&(
           <div style={{background:DS.successSoft,border:"1px solid "+DS.success+"33",borderRadius:12,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
             <ShieldCheck size={14} color={DS.success}/>
-            <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:DS.success}}>Etablissement verifie</div><div style={{fontSize:11,color:DS.textMuted}}>{_graceActive&&!premiumActive?"Badge actif — "+Math.ceil((_graceEnd-new Date())/(1000*60*60*24))+" jours restants (renouvelez votre abonnement)":"Badge officiel actif"}</div></div>
+            <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:DS.success}}>Établissement vérifié</div><div style={{fontSize:11,color:DS.textMuted}}>{_graceActive&&!premiumActive?"Badge actif — "+Math.ceil((_graceEnd-new Date())/(1000*60*60*24))+" jours restants (renouvelez votre abonnement)":"Badge officiel actif"}</div></div>
           </div>
         )}
         {verifStatus==="approved"&&!isVerified&&!premiumActive&&(
@@ -3486,7 +3486,7 @@ function ProProf(props){
           var _rvKey="hp_reviews_"+(data&&data.id||"x");
           var _nbAvis=0;try{var _rv=JSON.parse(localStorage.getItem(_rvKey)||"[]");_nbAvis=_rv.length;}catch(ex){}
           var _revenue=_resas.filter(function(r){return r.payMode==="avec";}).reduce(function(s,r){return s+(r.total||0);},0);
-          return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{[["Reservations",String(_nbResas),color],[_revenue>0?_revenue.toFixed(0)+" EUR":"—","Revenus",DS.gold],[_conversion+"%","Conversion",DS.success],[String(_nbAvis),"Avis recus",DS.primary]].map(function(_i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={l} style={{background:DS.card,borderRadius:10,padding:"10px",border:"1px solid "+DS.border}}><div style={{fontSize:16,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted}}>{l}</div></div>;})} </div>);
+          return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{[["Réservations",String(_nbResas),color],[_revenue>0?_revenue.toFixed(0)+" EUR":"—","Revenus",DS.gold],[_conversion+"%","Conversion",DS.success],[String(_nbAvis),"Avis reçus",DS.primary]].map(function(_i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={l} style={{background:DS.card,borderRadius:10,padding:"10px",border:"1px solid "+DS.border}}><div style={{fontSize:16,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted}}>{l}</div></div>;})} </div>);
         })()}
       </div>
     </div>
@@ -3520,7 +3520,7 @@ function ProOnboarding(props){
     var client=DataLayer._client;
     if(client){
       var r=await client.from("profiles").upsert([{user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:loc}],{onConflict:"user_id"});
-      if(r.error){setErr("Erreur de sauvegarde (code: "+r.error.code+"). Verifiez votre connexion.");setLoading(false);return;}
+      if(r.error){setErr("Erreur de sauvegarde (code: "+r.error.code+"). Vérifiez votre connexion.");setLoading(false);return;}
     }
     onComplete({user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:city.trim()+", "+country,description:"",verified:false});
   }
@@ -3669,7 +3669,7 @@ export default function App() {
     setPremiumData(pd);
     try{localStorage.setItem("hp_premium",JSON.stringify(pd));}catch(e){}
     setShowPremium(false);
-    tk.show("Premium actif jusqu au "+exp.toLocaleDateString("fr-FR"),"success");
+    tk.show("Premium actif jusqu'au "+exp.toLocaleDateString("fr-FR"),"success");
   }
   function renewPremium(){
     if(!premiumData)return;
@@ -3679,7 +3679,7 @@ export default function App() {
     var pd=Object.assign({},premiumData,{expiresAt:exp.toISOString()});
     setPremiumData(pd);
     try{localStorage.setItem("hp_premium",JSON.stringify(pd));}catch(e){}
-    tk.show("Abonnement renouvele jusqu au "+exp.toLocaleDateString("fr-FR"),"success");
+    tk.show("Abonnement renouvelé jusqu'au "+exp.toLocaleDateString("fr-FR"),"success");
   }
   function cancelPremium(){
     setPremiumData(null);
@@ -4004,7 +4004,7 @@ export default function App() {
   if(!isPro){
     var cTabs=[
       {id:"feed",        icon:Home,          label:"Accueil"},
-      {id:"discover",    icon:Search,        label:"Decouverte"},
+      {id:"discover",    icon:Search,        label:"Découverte"},
       {id:"chat",        icon:MessageCircle, label:"Messages"},
       {id:"profile",     icon:User,          label:"Profil"},
     ];
@@ -4038,12 +4038,12 @@ export default function App() {
   var pTabs = auth.type==="hotel"
     ? [{id:"feed",         icon:Home,          label:"Accueil"},
        {id:"services",     icon:Package,       label:"Services"},
-       {id:"reservations", icon:Calendar,      label:"Reservations"},
+       {id:"reservations", icon:Calendar,      label:"Réservations"},
        {id:"chat",         icon:MessageCircle, label:"Messages"},
        {id:"profile",      icon:User,          label:"Profil"}]
     : [{id:"feed",         icon:Home,          label:"Accueil"},
        {id:"offres",       icon:Tag,           label:"Offres"},
-       {id:"reservations", icon:Calendar,      label:"Reservations"},
+       {id:"reservations", icon:Calendar,      label:"Réservations"},
        {id:"chat",         icon:MessageCircle, label:"Messages"},
        {id:"profile",      icon:User,          label:"Profil"}];
 
