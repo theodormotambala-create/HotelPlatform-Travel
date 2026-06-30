@@ -3982,7 +3982,7 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div><AdBanner/><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
+          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
@@ -4025,7 +4025,7 @@ export default function App() {
       {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous etes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div><AdBanner/><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
+        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
