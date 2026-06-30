@@ -1842,7 +1842,7 @@ function ClientProf(props){
                       {r.isCombo&&<div style={{fontSize:10,color:DS.primary,marginTop:2}}>{(r.comboMeals||[]).length} repas inclus{r.comboTable?" - Table au restaurant":""}</div>}
                     </div>
                     <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
-                      <div style={{fontSize:16,fontWeight:900,color:r.payMode==="avec"?DS.gold:DS.success}}>{r.payMode==="avec"?r.total.toFixed(0)+" EUR":"Sans paiement"}</div>
+                      <div style={{fontSize:16,fontWeight:900,color:r.payMode==="avec"?DS.gold:DS.success}}>{r.payMode==="avec"?(r.total||0).toFixed(0)+" EUR":"Sans paiement"}</div>
                       <div style={{display:"flex",alignItems:"center",gap:4,marginTop:3,justifyContent:"flex-end"}}>
                         <div style={{width:6,height:6,borderRadius:"50%",background:stColor,flexShrink:0}}/>
                         <span style={{fontSize:10,color:stColor,fontWeight:700}}>{stLabel}</span>
@@ -1871,7 +1871,7 @@ function ClientProf(props){
                         ["Nuits",r.nights+" nuit"+(r.nights>1?"s":"")],
                         ["Arrivée",r.dateIn],
                         ["Départ",r.dateOut],
-                      ]).concat([["Paiement",r.payMode==="avec"?(r.total.toFixed(0)+" EUR - "+(r.payMethod==="card"?"Carte bancaire":"Mobile Money")):"Sans paiement (à l'arrivée)"]]).map(function(_i){var k=_i[0];var v=_i[1];return(
+                      ]).concat([["Paiement",r.payMode==="avec"?((r.total||0).toFixed(0)+" EUR - "+(r.payMethod==="card"?"Carte bancaire":"Mobile Money")):"Sans paiement (à l'arrivée)"]]).map(function(_i){var k=_i[0];var v=_i[1];return(
                         <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}>
                           <span style={{color:DS.textMuted}}>{k}</span>
                           <span style={{color:DS.text,fontWeight:700}}>{v}</span>
