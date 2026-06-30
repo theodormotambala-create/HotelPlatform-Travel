@@ -261,8 +261,8 @@ var DataLayer = {
       supabase.from("profiles").select("*").in("account_type",["hotel","restaurant"]).neq("display_name","")
         .then(function(res){
           if(res&&res.data&&res.data.length>0){
-            var newHotels=res.data.filter(function(p){return p.account_type==="hotel";}).map(function(p){return{id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:"hotel",svcMode:p.svc_mode||"hotel",location:p.location||"",description:p.description||"",img:p.cover_url||"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70",verified:p.verified||false,services:[],rooms:[],offers:[]};});
-            var newRestos=res.data.filter(function(p){return p.account_type==="restaurant";}).map(function(p){return{id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:"restaurant",svcMode:"restaurant",location:p.location||"",description:p.description||"",img:p.cover_url||"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70",verified:p.verified||false,services:[],rooms:[],offers:[]};});
+            var newHotels=res.data.filter(function(p){return p.account_type==="hotel";}).map(function(p){return{id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:"hotel",svcMode:p.svc_mode||"hotel",location:p.location||"",description:p.description||"",img:p.cover_url||"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70",verified:p.verified||false,isPremium:p.is_premium||false,services:[],rooms:[],offers:[]};});
+            var newRestos=res.data.filter(function(p){return p.account_type==="restaurant";}).map(function(p){return{id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:"restaurant",svcMode:"restaurant",location:p.location||"",description:p.description||"",img:p.cover_url||"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70",verified:p.verified||false,isPremium:p.is_premium||false,services:[],rooms:[],offers:[]};});
             if(newHotels.length){DataLayer._cache.hotels=DataLayer._cache.hotels.filter(function(h){return!h.userId;}).concat(newHotels);}
             if(newRestos.length){DataLayer._cache.restaurants=DataLayer._cache.restaurants.filter(function(r){return!r.userId;}).concat(newRestos);}
             if(DataLayer._onUpdate)DataLayer._onUpdate();
@@ -3979,8 +3979,9 @@ export default function App() {
   var s10=useState(function(){try{var v=localStorage.getItem("hp_premium");return v?JSON.parse(v):null;}catch(e){return null;}});var premiumData=s10[0];    var setPremiumData=s10[1];
   var isPremium=premiumData!==null && new Date(premiumData.expiresAt)>new Date();
   function _savePremiumToDB(pd){
-    var sb=DataLayer._client;var uid=_authForUserData&&_authForUserData.userId;
-    if(sb&&uid){sb.from("profiles").update({premium_data:pd,updated_at:new Date().toISOString()}).eq("user_id",uid).then(function(){});}
+    var sb=DataLayer._client;var uid=_authForUserData&&_authForUserData.userId;var atype=_authForUserData&&_authForUserData.type;
+    if(sb&&uid){sb.from("profiles").update({premium_data:pd,is_premium:pd!==null,updated_at:new Date().toISOString()}).eq("user_id",uid).then(function(){});}
+    try{var _prem=pd!==null;var _cache=atype==="restaurant"?DataLayer._cache.restaurants:DataLayer._cache.hotels;var _idx=_cache.findIndex(function(h){return h.userId===uid;});if(_idx>=0){_cache[_idx]=Object.assign({},_cache[_idx],{isPremium:_prem});if(DataLayer._onUpdate)DataLayer._onUpdate();}}catch(ex){}
   }
   function subscribePremium(plan,durationMonths){
     var now=new Date();
