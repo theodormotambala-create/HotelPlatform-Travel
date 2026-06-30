@@ -533,7 +533,15 @@ var AuthService = {
     if(sb){
       var r = await sb.auth.signInWithPassword({ email: email, password: password });
       if(r.error) throw r.error;
-      return AuthService.buildSession(accType, "active", r.data.user.email, r.data.user.id);
+      var userId = r.data.user.id;
+      var realType = accType;
+      var realStatus = "active";
+      try{
+        var prof = await sb.from("profiles").select("account_type,status").eq("user_id", userId).single();
+        if(prof.data && prof.data.account_type) realType = prof.data.account_type;
+        if(prof.data && prof.data.status) realStatus = prof.data.status;
+      }catch(_){}
+      return AuthService.buildSession(realType, realStatus, r.data.user.email, userId);
     }
     return AuthService.buildSession(accType, "active", email || "demo@platform.com");
   },
