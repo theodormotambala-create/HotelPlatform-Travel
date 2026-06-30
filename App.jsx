@@ -1036,7 +1036,7 @@ function ChangeEmailModal(props){
 }
 
 function ChangePwdModal(props){
-  var onClose=props.onClose;var accent=props.accent||DS.primary;
+  var onClose=props.onClose;var accent=props.accent||DS.primary;var onSuccess=props.onSuccess||null;
   var sc=useState("");var curPwd=sc[0];var setCurPwd=sc[1];
   var sp=useState("");var pwd=sp[0];var setPwd=sp[1];
   var sp2=useState("");var pwd2=sp2[0];var setPwd2=sp2[1];
