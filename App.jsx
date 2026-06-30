@@ -3566,7 +3566,9 @@ function ProResa(props){
 }
 function ProProf(props){
   var proType=props.proType;var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var profilePhoto=props.profilePhoto||null;var onPhotoChange=props.onPhotoChange||null;var coverPhoto=props.coverPhoto||null;var onCoverChange=props.onCoverChange||null;
-  var data=proType==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];var color=rC(proType);
+  var _allProD=proType==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
+  var data=(props.authUserId&&_allProD.find(function(h){return h.userId===props.authUserId;}))||_allProD[0];
+  var color=rC(proType);
   var s1=useState("about");var tab=s1[0];var setTab=s1[1];
   var s2=useState(false);var showVerif=s2[0];var setShowVerif=s2[1];
   var _vfKey="hp_verif_status_"+(proType||"hotel");
