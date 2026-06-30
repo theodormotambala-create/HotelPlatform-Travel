@@ -3603,7 +3603,8 @@ function ProProf(props){
     var _done=function(){
       _setProSaving(false);_setShowEditProf(false);
       try{if(proType==="hotel"){DataLayer._cache.hotels=DataLayer._cache.hotels.map(function(h){return(h.userId===_uid||(h.id===data.id&&!_uid))?Object.assign({},h,{name:nm,author:nm,location:lc}):h;});}
-      else{DataLayer._cache.restaurants=DataLayer._cache.restaurants.map(function(r){return(r.userId===_uid||(r.id===data.id&&!_uid))?Object.assign({},r,{name:nm,author:nm,location:lc}):r;});}}catch(ex){}
+      else{DataLayer._cache.restaurants=DataLayer._cache.restaurants.map(function(r){return(r.userId===_uid||(r.id===data.id&&!_uid))?Object.assign({},r,{name:nm,author:nm,location:lc}):r;});}
+      if(DataLayer._onUpdate)DataLayer._onUpdate();}catch(ex){}
       toastP("Profil mis à jour","success");
     };
     if(DataLayer._client&&_uid){DataLayer._client.from("profiles").update({display_name:nm,location:lc}).eq("user_id",_uid).then(_done).catch(_done);}
