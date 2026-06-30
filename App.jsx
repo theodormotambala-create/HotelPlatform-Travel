@@ -1668,7 +1668,7 @@ function ClientFeed(props){
   var selfEmail=props.selfEmail||"";
   var selfUserId=props.selfUserId||null;
   var isPremium=props.isPremium||false;
-  var selfName=selfEmail?selfEmail.split("@")[0]:"Vous";
+  var selfName=(function(){try{return localStorage.getItem("hp_client_display_name")||"";}catch(e){return "";}}())||(selfEmail?selfEmail.split("@")[0]:"Vous");
   var selfLetter=(selfName[0]||"V").toUpperCase();
   var _init=useRef(null);
   if(!_init.current){var _lk={};var _fv=[];try{_lk=JSON.parse(localStorage.getItem("hp_likes")||"{}");_fv=JSON.parse(localStorage.getItem("hp_favs")||"[]");}catch(e){}_init.current={likes:_lk,favs:_fv};}
@@ -2285,7 +2285,7 @@ function BookM(props){
   var _today=new Date().toISOString().slice(0,10);
   var selfEmail=props.selfEmail||"";
   var selfUserId=props.selfUserId||null;
-  var clientName=selfEmail.split("@")[0]||"Client";
+  var clientName=(function(){try{return localStorage.getItem("hp_client_display_name")||"";}catch(e){return "";}}())||(selfEmail.split("@")[0]||"Client");
   var isCombo=e.isCombo===true;
   var hasDishes=e.selectedDishes&&e.selectedDishes.length>0;
   var isHotelBooking=e.type==="hotel";
@@ -2608,7 +2608,7 @@ function ProFeed(props){
   var _allData=proType==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
   var selfEmail=props.selfEmail||"";
   var selfUserId=props.selfUserId||null;
-  var data=_allData.length>0?_allData[0]:{name:selfEmail.split("@")[0]||"Pro",verified:false,followers:0,rating:0,reviewCount:0};
+  var data=(selfUserId&&_allData.find(function(h){return h.userId===selfUserId;}))||(_allData.length>0?_allData[0]:{name:selfEmail.split("@")[0]||"Pro",verified:false,followers:0,rating:0,reviewCount:0});
   // Fix #6 : localStorage pour likes et favs
   var _initPro=useRef(null);
   if(!_initPro.current){var _lkP={};var _fvP=[];try{_lkP=JSON.parse(localStorage.getItem("hp_pro_likes")||"{}");_fvP=JSON.parse(localStorage.getItem("hp_pro_favs")||"[]");}catch(e){}_initPro.current={likes:_lkP,favs:_fvP};}
@@ -3470,7 +3470,7 @@ function ProResa(props){
   var proType=props.proType;var onOpenChat=props.onOpenChat;
   var clientPrivacySettings=props.clientPrivacySettings||{locked:false,msgPermission:"everyone"};
   var selfEmail=props.selfEmail||"";
-  var CONNECTED_CLIENT_NAME=selfEmail.split("@")[0]||"Client";
+  var CONNECTED_CLIENT_NAME=(function(){try{return localStorage.getItem("hp_client_display_name")||"";}catch(e){return "";}}())||(selfEmail.split("@")[0]||"Client");
   var color=rC(proType);
   var _liveResas=BookingService.getAll().map(function(r){return {id:r.id,client:r.clientName||CONNECTED_CLIENT_NAME,service:r.service||"Reservation",dateIn:r.dateIn||"",dateOut:r.dateOut||r.dateIn||"",nights:r.nights||1,guests:r.guests||1,total:r.total||0,payMode:r.payMode||"sans",status:r.status||"pending",qrScanned:r.status==="consumed"};});
   var s1=useState(function(){
@@ -3724,7 +3724,8 @@ function ProProf(props){
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={{fontSize:20,fontWeight:900,color:DS.text}}>{data.name}</div></div>
         </div>
-        <div style={{fontSize:12,color:DS.textMuted,marginBottom:8}}>{_draftLoc||data.location}</div>
+        <div style={{fontSize:12,color:DS.textMuted,marginBottom:6}}>{_draftLoc||data.location}</div>
+        {isPremium?((_draftLoc||data.location)?<div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8,padding:"4px 10px",background:"#14532d22",borderRadius:20,width:"fit-content"}}><MapPin size={11} color="#4ade80"/><span style={{fontSize:11,fontWeight:700,color:"#4ade80"}}>GPS actif — visible par les clients</span></div>:<div onClick={function(){_setDraftName(data.name||"");_setDraftLoc(data.location||"");_setShowEditProf(true);}} style={{display:"flex",alignItems:"center",gap:5,marginBottom:8,padding:"4px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,width:"fit-content",cursor:"pointer"}}><MapPin size={11} color={DS.textMuted}/><span style={{fontSize:11,fontWeight:600,color:DS.textMuted}}>Configurer votre position GPS</span></div>):<div style={{display:"flex",alignItems:"center",gap:5,marginBottom:8,padding:"4px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,width:"fit-content",opacity:0.5}}><MapPin size={11} color={DS.textMuted}/><span style={{fontSize:11,color:DS.textMuted}}>GPS</span><span style={{fontSize:9,fontWeight:800,color:DS.gold,background:DS.goldSoft,borderRadius:6,padding:"1px 5px"}}>Premium</span></div>}
         <button onClick={function(){_setDraftName(data.name||"");_setDraftLoc(data.location||"");_setShowEditProf(true);}} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:20,color:DS.textMuted,fontSize:12,fontWeight:700,cursor:"pointer",marginBottom:10}}>
           <Edit2 size={13} color={color}/>Modifier le profil
         </button>
