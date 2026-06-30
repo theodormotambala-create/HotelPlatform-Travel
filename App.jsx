@@ -1668,7 +1668,7 @@ function ClientFeed(props){
   var selfEmail=props.selfEmail||"";
   var selfUserId=props.selfUserId||null;
   var isPremium=props.isPremium||false;
-  var selfName=(function(){try{return localStorage.getItem("hp_client_display_name")||"";}catch(e){return "";}}())||(selfEmail?selfEmail.split("@")[0]:"Vous");
+  var selfName=props.selfName||(function(){try{return localStorage.getItem("hp_client_display_name")||"";}catch(e){return "";}}())||(selfEmail?selfEmail.split("@")[0]:"Vous");
   var selfLetter=(selfName[0]||"V").toUpperCase();
   var _init=useRef(null);
   if(!_init.current){var _lk={};var _fv=[];try{_lk=JSON.parse(localStorage.getItem("hp_likes")||"{}");_fv=JSON.parse(localStorage.getItem("hp_favs")||"[]");}catch(e){}_init.current={likes:_lk,favs:_fv};}
@@ -1845,7 +1845,7 @@ function ClientDisc(props){
 }
 
 function ClientProf(props){
-  var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var followingCount=props.followingCount||0;var profilePhoto=props.profilePhoto||null;var onPhotoChange=props.onPhotoChange||null;
+  var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var followingCount=props.followingCount||0;var profilePhoto=props.profilePhoto||null;var onPhotoChange=props.onPhotoChange||null;var onNameChange=props.onNameChange||null;
   var privacySettings=props.privacySettings||{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};
   var selfEmail=props.selfEmail||"";
   var _authUidC=props.authUserId||null;
@@ -1862,6 +1862,7 @@ function ClientProf(props){
     var _done=function(){
       _setClientDisplayName(nm);
       try{localStorage.setItem("hp_client_display_name",nm);}catch(e){}
+      if(onNameChange)onNameChange(nm);
       _setClientSaving(false);_setShowEditClient(false);
     };
     if(DataLayer._client&&_authUidC){DataLayer._client.from("profiles").update({display_name:nm}).eq("user_id",_authUidC).then(_done).catch(_done);}
@@ -2285,7 +2286,7 @@ function BookM(props){
   var _today=new Date().toISOString().slice(0,10);
   var selfEmail=props.selfEmail||"";
   var selfUserId=props.selfUserId||null;
-  var clientName=(function(){try{return localStorage.getItem("hp_client_display_name")||"";}catch(e){return "";}}())||(selfEmail.split("@")[0]||"Client");
+  var clientName=props.selfName||(function(){try{return localStorage.getItem("hp_client_display_name")||"";}catch(e){return "";}}())||(selfEmail.split("@")[0]||"Client");
   var isCombo=e.isCombo===true;
   var hasDishes=e.selectedDishes&&e.selectedDishes.length>0;
   var isHotelBooking=e.type==="hotel";
@@ -3470,7 +3471,7 @@ function ProResa(props){
   var proType=props.proType;var onOpenChat=props.onOpenChat;
   var clientPrivacySettings=props.clientPrivacySettings||{locked:false,msgPermission:"everyone"};
   var selfEmail=props.selfEmail||"";
-  var CONNECTED_CLIENT_NAME=(function(){try{return localStorage.getItem("hp_client_display_name")||"";}catch(e){return "";}}())||(selfEmail.split("@")[0]||"Client");
+  var CONNECTED_CLIENT_NAME=props.selfName||(function(){try{return localStorage.getItem("hp_client_display_name")||"";}catch(e){return "";}}())||(selfEmail.split("@")[0]||"Client");
   var color=rC(proType);
   var _liveResas=BookingService.getAll().map(function(r){return {id:r.id,client:r.clientName||CONNECTED_CLIENT_NAME,service:r.service||"Reservation",dateIn:r.dateIn||"",dateOut:r.dateOut||r.dateIn||"",nights:r.nights||1,guests:r.guests||1,total:r.total||0,payMode:r.payMode||"sans",status:r.status||"pending",qrScanned:r.status==="consumed"};});
   var s1=useState(function(){
@@ -3978,6 +3979,8 @@ export default function App() {
     toastApp("Paramètres de confidentialité mis à jour","success");
   }
   var s10=useState(function(){try{var v=localStorage.getItem("hp_premium");return v?JSON.parse(v):null;}catch(e){return null;}});var premiumData=s10[0];    var setPremiumData=s10[1];
+  var _sCDN=useState(function(){try{return localStorage.getItem("hp_client_display_name")||"";}catch(e){return "";}});var clientDisplayName=_sCDN[0];var setClientDisplayName=_sCDN[1];
+  function _onClientNameChange(nm){setClientDisplayName(nm);try{localStorage.setItem("hp_client_display_name",nm);}catch(e){}}
   var isPremium=premiumData!==null && new Date(premiumData.expiresAt)>new Date();
   function _savePremiumToDB(pd){
     var sb=DataLayer._client;var uid=_authForUserData&&_authForUserData.userId;var atype=_authForUserData&&_authForUserData.type;
@@ -4318,7 +4321,7 @@ export default function App() {
     // Creer la conversation en base si l'etablissement est un vrai Pro inscrit
     if(e&&e.userId&&auth&&auth.userId&&!isPro&&DataLayer._client){
       var convId=[auth.userId,e.userId].sort().join("_");
-      var clientName=(auth.email||"").split("@")[0];
+      var clientName=clientDisplayName||(auth.email||"").split("@")[0];
       DataLayer._client.from("conversations").upsert([{
         id:convId,client_id:auth.userId,pro_id:e.userId,
         client_name:clientName,pro_name:e.name||e.author||"",
@@ -4375,14 +4378,14 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif} isPremium={isPremium}/></div>}
+          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif} isPremium={isPremium} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
-          {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
-          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
+          {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")}/>}
+          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId}/>}
-        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Votre réservation chez "+(resa.estab||"l'établissement")+" est enregistrée.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});setBook(null);}}/>}
+        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client")} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem("hp_resas",JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Votre réservation chez "+(resa.estab||"l'établissement")+" est enregistrée.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});setBook(null);}}/>}
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
         {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setCTab(t);}}/>;}}</Ov>}
