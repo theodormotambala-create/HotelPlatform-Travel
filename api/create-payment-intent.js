@@ -12,20 +12,24 @@ const ALLOWED_ORIGINS = (process.env.APP_URL || "")
 
 function setCors(req, res) {
   const origin = req.headers.origin || "";
-  const allowed =
-    ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)
-      ? origin || "*"
-      : "";
-  if (allowed) res.setHeader("Access-Control-Allow-Origin", allowed);
+  // Si aucune origine configurée ou si l'origine n'est pas dans la liste → refus CORS
+  const isAllowed = ALLOWED_ORIGINS.length > 0 && ALLOWED_ORIGINS.includes(origin);
+  if (isAllowed) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Vary", "Origin");
+  return isAllowed;
 }
 
 export default async function handler(req, res) {
-  setCors(req, res);
+  const originAllowed = setCors(req, res);
 
-  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method === "OPTIONS") {
+    return originAllowed ? res.status(200).end() : res.status(403).end();
+  }
+  if (!originAllowed) return res.status(403).json({ error: "Origine non autorisée" });
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   if (!process.env.STRIPE_SECRET_KEY) {

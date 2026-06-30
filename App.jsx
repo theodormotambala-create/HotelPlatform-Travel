@@ -33,6 +33,13 @@ const DS = {
   info:"#6366F1", infoSoft:"#6366F112",
 };
 function rC(t){return({hotel:DS.hotel,restaurant:DS.restaurant,client:DS.client})[t]||DS.primary;}
+// Nettoie le texte utilisateur : supprime les balises HTML, limite la longueur
+function sanitizeText(str, maxLen){
+  if(!str) return "";
+  var clean = String(str).replace(/<[^>]*>/g,"").replace(/javascript:/gi,"").trim();
+  var limit = maxLen||1000;
+  return clean.length > limit ? clean.slice(0, limit) : clean;
+}
 function fmtK(n){
   if(n===null||n===undefined)return"0";
   if(n>=1000000){var m=Math.round(n/100000)/10;return(m%1===0?m.toFixed(0):m)+"M";}
@@ -1272,16 +1279,16 @@ function ChatUI(props){
   useEffect(function(){
     var client=DataLayer._client;
     if(!myId||!client)return;
-    var col=isClientChat?"pro_id":"client_id";
+    var col=isClientChat?"client_id":"pro_id";
     client.from("conversations").select("*").eq(col,myId).order("updated_at",{ascending:false})
       .then(function(res){
         setConvLoading(false);
         if(res.error||!res.data||res.data.length===0)return;
         var newThr=res.data.map(function(c){
           var obj={convId:c.id,msgs:[]};
-          obj[nK]=isClientChat?c.client_name:c.pro_name;
-          if(iK)obj[iK]=isClientChat?c.client_img:c.pro_img;
-          obj[vK]=isClientChat?(c.client_verified||false):(c.pro_verified||false);
+          obj[nK]=isClientChat?c.pro_name:c.client_name;
+          if(iK)obj[iK]=isClientChat?c.pro_img:null;
+          obj[vK]=isClientChat?(c.pro_verified||false):false;
           return obj;
         });
         setThr(newThr);
@@ -1311,14 +1318,28 @@ function ChatUI(props){
     return function(){if(rtChan.current&&client){try{client.removeChannel(rtChan.current);}catch(e){}rtChan.current=null;}};
   },[convId,myId]);
   function send(){
-    if(!msg.trim())return;
-    var nm=MessageService.buildMessage(msg,replyTo);
+    var sentMsg=sanitizeText(msg,2000);if(!sentMsg)return;
+    var nm=MessageService.buildMessage(sentMsg,replyTo);
     var curActive=active;var curConv=thr[curActive];
-    var sentMsg=msg.trim();var sentReply=replyTo;
+    var sentReply=replyTo;
     setThr(function(ts){return ts.map(function(c,i){return i===curActive?Object.assign({},c,{msgs:c.msgs.concat([nm])}):c;});});
     setMsg("");setReplyTo(null);
     if(curConv&&curConv.convId&&myId&&DataLayer._client){
-      DataLayer._client.from("messages").insert([{conversation_id:curConv.convId,sender_id:myId,sender_name:myName,body:sentMsg,reply_to_body:sentReply?sentReply.t:null,reply_to_sender:sentReply?(sentReply.f==="me"?myId:null):null,deleted:false,read:false}]).then(function(){});
+      var client=DataLayer._client;
+      var convId=curConv.convId;
+      // S'assurer que la conversation existe en DB avant d'insérer le message
+      var _insertMsg=function(){
+        client.from("messages").insert([{conversation_id:convId,sender_id:myId,sender_name:myName,body:sentMsg,reply_to_body:sentReply?sentReply.t:null,reply_to_sender:sentReply?(sentReply.f==="me"?myId:null):null,deleted:false,read:false}]).then(function(){});
+        client.from("conversations").update({last_message:sentMsg,updated_at:new Date().toISOString()}).eq("id",convId).then(function(){});
+      };
+      // Vérifier si la conversation existe, sinon la créer
+      client.from("conversations").select("id").eq("id",convId).maybeSingle().then(function(res){
+        if(!res||!res.data){
+          var parts=convId.split("_");
+          var clientId=parts[0]||myId;var proId=parts[1]||myId;
+          client.from("conversations").upsert([{id:convId,client_id:clientId,pro_id:proId,client_name:isClientChat?myName:"",pro_name:isClientChat?"":myName}],{onConflict:"id"}).then(function(){_insertMsg();}).catch(function(){_insertMsg();});
+        } else { _insertMsg(); }
+      }).catch(function(){ _insertMsg(); });
     }
   }
   function delMsg(id){
@@ -1650,7 +1671,7 @@ function ClientFeed(props){
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
   function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partagé avec succès","success");}
   function addCmt(id,replyTo){
-    var text=(cmtText[id]||"").trim();if(!text)return;
+    var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
     var cm={id:Date.now(),author:selfName,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
@@ -2337,11 +2358,13 @@ function BookM(props){
                   // Paiement carte → Stripe
                   if(payMode==="avec"&&payMethod==="card"){
                     if(!_stripePromise){toast("Stripe non configuré","error");return;}
+                    var _amtCents=Math.round(totalPrice*100);
+                    if(!_amtCents||_amtCents<50){toast("Montant invalide pour le paiement","error");return;}
                     setPaying(true);
                     fetch("/api/create-payment-intent",{
                       method:"POST",
                       headers:{"Content-Type":"application/json"},
-                      body:JSON.stringify({amount:Math.round(totalPrice*100),currency:"eur",resaId:resaId,estabName:e.name})
+                      body:JSON.stringify({amount:_amtCents,currency:"eur",resaId:resaId,estabName:e.name})
                     })
                     .then(function(r){return r.json();})
                     .then(function(data){
@@ -2483,7 +2506,7 @@ function ProFeed(props){
   var scm2=useState({});var cmtText=scm2[0];var setCmtText=scm2[1];
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
   function addCmt(id,replyTo){
-    var text=(cmtText[id]||"").trim();if(!text)return;
+    var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
     var cm={id:Date.now(),author:data.name,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
@@ -2545,10 +2568,11 @@ function ProFeed(props){
   }
   function removeMedia(){setMediaPreview(null);setMediaType(null);setMediaFile(null);}
   function publish(){
-    if(!newPost.trim()&&!mediaPreview)return;
+    var _cleanPost=sanitizeText(newPost,2000);
+    if(!_cleanPost&&!mediaPreview)return;
     var newId="post-"+Date.now();
     var _doPublish=function(mediaUrl){
-      var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:newPost,img:mediaType==="image"?mediaUrl:null,video:mediaType==="video"?mediaUrl:null,likes:0,comments:[],showCmt:false,verified:data.verified};
+      var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:_cleanPost,img:mediaType==="image"?mediaUrl:null,video:mediaType==="video"?mediaUrl:null,likes:0,comments:[],showCmt:false,verified:data.verified};
       setPosts(function(ps){return [newObj].concat(ps);});
       try{var _pp=JSON.parse(localStorage.getItem("hp_pro_posts")||"[]");localStorage.setItem("hp_pro_posts",JSON.stringify([newObj].concat(_pp).slice(0,30)));}catch(_e){}
       try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,data:newObj}]).catch(function(){});}catch(e){}
@@ -3311,6 +3335,22 @@ function RestOff(props){
     </div>
   );
 }
+function genQRPixels(id){
+  // Génère une grille 10x10 déterministe à partir de l'ID de réservation
+  var str = String(id||"");
+  var pixels = [];
+  var hash = 0;
+  for(var i=0;i<str.length;i++){ hash = ((hash<<5)-hash)+str.charCodeAt(i); hash|=0; }
+  // Force les 3 carrés de position (coins haut-gauche, haut-droit, bas-gauche)
+  var anchors = [0,1,2,10,11,12,20,21,22, 7,8,9,17,18,19,27,28,29, 70,71,72,80,81,82,90,91,92];
+  for(var p=0;p<100;p++){
+    var isAnchor=anchors.indexOf(p)!==-1;
+    if(isAnchor){ pixels.push(true); continue; }
+    var seed=hash^(p*0x9e3779b9);seed=seed^(seed>>>16);seed=Math.imul(seed,0x85ebca6b);seed=seed^(seed>>>13);seed=Math.imul(seed,0xc2b2ae35);seed=seed^(seed>>>16);
+    pixels.push((seed&1)===1);
+  }
+  return pixels;
+}
 function ProResa(props){
   var proType=props.proType;var onOpenChat=props.onOpenChat;
   var clientPrivacySettings=props.clientPrivacySettings||{locked:false,msgPermission:"everyone"};
@@ -3400,10 +3440,7 @@ function ProResa(props){
               {r.status==="pending"&&<button onClick={function(){confirmResa(r.id);}} style={{padding:"7px 14px",background:DS.successSoft,border:"1px solid "+DS.success+"33",borderRadius:8,color:DS.success,fontSize:11,fontWeight:700,cursor:"pointer"}}>Confirmer</button>}
               {r.status==="pending"&&<button onClick={function(){refuseResa(r.id);}} style={{padding:"7px 14px",background:DS.errorSoft,border:"1px solid "+DS.error+"33",borderRadius:8,color:DS.error,fontSize:11,fontWeight:700,cursor:"pointer"}}>Refuser</button>}
               {r.status==="confirmed"&&!r.qrScanned&&<button onClick={function(){setScanTarget(r);}} style={{padding:"7px 14px",background:color+"18",border:"1px solid "+color+"44",borderRadius:8,color:color,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Eye size={12}/>Scanner QR</button>}
-              {(r.client!==CONNECTED_CLIENT_NAME||clientPrivacySettings.msgPermission!=="none")
-                ? <button onClick={onOpenChat} style={{padding:"7px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:8,color:DS.textMuted,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><MessageCircle size={12}/>Chat</button>
-                : <div style={{padding:"7px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:8,color:DS.textDim,fontSize:10,display:"flex",alignItems:"center",gap:5}}><Lock size={11}/>Messages bloques</div>
-              }
+              <button onClick={onOpenChat} style={{padding:"7px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:8,color:DS.textMuted,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><MessageCircle size={12}/>Chat</button>
             </div>
           </div>
         );})}
