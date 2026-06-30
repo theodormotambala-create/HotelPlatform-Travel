@@ -1283,7 +1283,10 @@ function ChatUI(props){
     client.from("conversations").select("*").eq(col,myId).order("updated_at",{ascending:false})
       .then(function(res){
         setConvLoading(false);
-        if(res.error||!res.data||res.data.length===0)return;
+        if(res.error||!res.data||res.data.length===0){
+          if(init&&init.length>0)setThr(init.map(function(c){return Object.assign({},c,{msgs:(c.messages||[]).slice()});}));
+          return;
+        }
         var newThr=res.data.map(function(c){
           var obj={convId:c.id,msgs:[]};
           obj[nK]=isClientChat?c.pro_name:c.client_name;
@@ -4156,7 +4159,7 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div><ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif} isPremium={isPremium}/></div>}
+          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif} isPremium={isPremium}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto}/>}
@@ -4200,7 +4203,7 @@ export default function App() {
       {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div><ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
+        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
