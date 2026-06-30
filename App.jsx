@@ -584,7 +584,7 @@ var AuthService = {
   register: async function(accType, email, password){
     var sb = AuthService._sb();
     if(sb){
-      var r = await sb.auth.signUp({ email: email, password: password, options: { data: { account_type: accType } } });
+      var r = await sb.auth.signUp({ email: email, password: password, options: { data: { account_type: accType }, emailRedirectTo: window.location.origin } });
       if(r.error) throw r.error;
       var status = accType !== "client" ? "pending" : "active";
       var s = AuthService.buildSession(accType, status, (r.data.user&&r.data.user.email)||email, r.data.user&&r.data.user.id);
