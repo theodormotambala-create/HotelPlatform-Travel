@@ -1715,6 +1715,19 @@ function ClientFeed(props){
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
   var sf=useState(_initFavs);var favPosts=sf[0];var setFavPosts=sf[1];
+  var _sbFavsLoaded=useRef(false);
+  useEffect(function(){
+    if(_sbFavsLoaded.current||!selfUserId||!DataLayer._client)return;
+    _sbFavsLoaded.current=true;
+    DataLayer._client.from("post_favorites").select("post_id").eq("user_id",selfUserId)
+      .then(function(res){
+        if(res.error||!res.data)return;
+        var sbFavs=res.data.map(function(r){return r.post_id;});
+        _init.current.favs=sbFavs;
+        try{localStorage.setItem(_lk("hp_favs"),JSON.stringify(sbFavs));}catch(e){}
+        setFavPosts(sbFavs);
+      });
+  },[selfUserId]);
   var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
   var followingPosts=props.followingIds||[];
   function toggleFav(id){
@@ -1724,6 +1737,7 @@ function ClientFeed(props){
       try{localStorage.setItem(_lk("hp_favs"),JSON.stringify(next));}catch(e){}
       return next;
     });
+    try{if(DataLayer._client&&selfUserId){if(!wasFav){DataLayer._client.from("post_favorites").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"user_id,post_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}else{DataLayer._client.from("post_favorites").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}}}catch(e){}
     setMenuOpen(null);
     toast(wasFav?"Retiré des favoris":"Ajouté aux favoris","success");
   }
@@ -2666,11 +2680,25 @@ function ProFeed(props){
   }
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
   var sf=useState(_initFavsPro);var favPosts=sf[0];var setFavPosts=sf[1];
+  var _sbFavsLoadedPro=useRef(false);
+  useEffect(function(){
+    if(_sbFavsLoadedPro.current||!selfUserId||!DataLayer._client)return;
+    _sbFavsLoadedPro.current=true;
+    DataLayer._client.from("post_favorites").select("post_id").eq("user_id",selfUserId)
+      .then(function(res){
+        if(res.error||!res.data)return;
+        var sbFavs=res.data.map(function(r){return r.post_id;});
+        _initPro.current.favs=sbFavs;
+        try{localStorage.setItem(_lk("hp_pro_favs"),JSON.stringify(sbFavs));}catch(e){}
+        setFavPosts(sbFavs);
+      });
+  },[selfUserId]);
   var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
   // Fix #2 : toast favoris dans le bon sens
   function toggleFav(id){
     var wasFav=favPosts.indexOf(id)>=0;
     setFavPosts(function(f){var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem(_lk("hp_pro_favs"),JSON.stringify(next));}catch(e){}return next;});
+    try{if(DataLayer._client&&selfUserId){if(!wasFav){DataLayer._client.from("post_favorites").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"user_id,post_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}else{DataLayer._client.from("post_favorites").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}}}catch(e){}
     setMenuOpen(null);
     toast(wasFav?"Retiré des favoris":"Ajouté aux favoris","success");
   }
