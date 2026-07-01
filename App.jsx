@@ -3249,6 +3249,27 @@ function HotelSvc(props){
   var se=useState(null);var confirmDeleteDish=se[0];var setConfirmDeleteDish=se[1];
   var sf=useState(null);var confirmDeleteSvc=sf[0];var setConfirmDeleteSvc=sf[1];
   var _hEstabId=data&&data.id?data.id:null;
+  useEffect(function(){
+    if(!_hEstabId||!DataLayer._client)return;
+    DataLayer._client.from("establishment_rooms").select("*").eq("establishment_id",_hEstabId)
+      .then(function(res){
+        if(res.error||!res.data||res.data.length===0)return;
+        var rs=res.data.map(function(r){return{id:r.id,name:r.name,price:r.price||0,capacity:r.capacity||2,available:r.available!==false,stock:r.stock||1,description:r.description||null};});
+        setRooms(rs);try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}
+      }).catch(function(){});
+    DataLayer._client.from("establishment_dishes").select("*").eq("establishment_id",_hEstabId)
+      .then(function(res){
+        if(res.error||!res.data||res.data.length===0)return;
+        var ds=res.data.map(function(d){return{id:d.id,name:d.name,price:d.price||0,category:d.category||"Plats",description:d.description||null,available:d.available!==false};});
+        setMenu(ds);try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ds));}catch(e){}
+      }).catch(function(){});
+    DataLayer._client.from("establishment_amenities").select("*").eq("establishment_id",_hEstabId)
+      .then(function(res){
+        if(res.error||!res.data||res.data.length===0)return;
+        var am=res.data.map(function(a){return{id:a.id,name:a.name,active:a.active!==false};});
+        setAmenities(am);try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}
+      }).catch(function(){});
+  },[_hEstabId]);
   function _saveSvcMode(v){
     try{localStorage.setItem("hp_hotelsvc_svcmode",v);}catch(e){}
     if(userId&&DataLayer._client){DataLayer._client.from("profiles").update({svc_mode:v,updated_at:new Date().toISOString()}).eq("user_id",userId).then(function(){});}
@@ -3437,6 +3458,21 @@ function RestOff(props){
   var s4c=useState("");var newOfferPrice=s4c[0];var setNewOfferPrice=s4c[1];
   var s5=useState("menu");var tab=s5[0];var setTab=s5[1];
   var _rEstabId=data&&data.id?data.id:null;
+  useEffect(function(){
+    if(!_rEstabId||!DataLayer._client)return;
+    DataLayer._client.from("establishment_dishes").select("*").eq("establishment_id",_rEstabId)
+      .then(function(res){
+        if(res.error||!res.data||res.data.length===0)return;
+        var ds=res.data.map(function(d){return{id:d.id,name:d.name,price:d.price||0,category:d.category||"Plats",description:d.description||null,available:d.available!==false};});
+        setItems(ds);try{localStorage.setItem("hp_restoff_items",JSON.stringify(ds));}catch(e){}
+      }).catch(function(){});
+    DataLayer._client.from("establishment_offers").select("*").eq("establishment_id",_rEstabId)
+      .then(function(res){
+        if(res.error||!res.data||res.data.length===0)return;
+        var os=res.data.map(function(o){return{id:o.id,name:o.name,price:o.price||null,available:o.available!==false};});
+        setOffers(os);try{localStorage.setItem("hp_restoff_offers",JSON.stringify(os));}catch(e){}
+      }).catch(function(){});
+  },[_rEstabId]);
   function _saveOffers(next){try{localStorage.setItem("hp_restoff_offers",JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabOffers(_rEstabId,next);}catch(e){}}
   var tkO=useToast();var toastO=tkO.show;var ToastO=tkO.Toast;
   function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next);toastO("Offre supprimée","info");}
@@ -3655,6 +3691,14 @@ function ProProf(props){
   var _vfKey="hp_verif_status_"+(proType||"hotel");
   var s3=useState(function(){try{return localStorage.getItem(_vfKey)||null;}catch(e){return null;}});var verifStatus=s3[0];var _setVerifStatusRaw=s3[1];
   function setVerifStatus(v){_setVerifStatusRaw(v);try{if(v)localStorage.setItem(_vfKey,v);else localStorage.removeItem(_vfKey);}catch(e){}}
+  useEffect(function(){
+    if(!props.authUserId||!DataLayer._client)return;
+    DataLayer._client.from("profiles").select("verified").eq("user_id",props.authUserId).maybeSingle()
+      .then(function(res){
+        if(!res||!res.data)return;
+        if(res.data.verified===true){_setVerifStatusRaw("approved");try{localStorage.setItem(_vfKey,"approved");}catch(e){}}
+      }).catch(function(){});
+  },[props.authUserId]);
   var _descKey="hp_pro_desc_"+(proType||"hotel");
   var sd=useState(function(){try{var v=localStorage.getItem(_descKey);return v||data.description;}catch(e){return data.description;}});var description=sd[0];var setDescription=sd[1];
   var se=useState(false);var editingAbout=se[0];var setEditingAbout=se[1];
@@ -3991,14 +4035,14 @@ export default function App() {
         setAuth(AuthService.buildSession(accType, status, session.user.email, session.user.id));
         // Sync photo profil depuis Supabase si localStorage vide
         try{
-          if(!localStorage.getItem(_lk(_lk("hp_profile_photo")))){
+          if(!localStorage.getItem(_lk("hp_profile_photo"))){
             DataLayer.syncProfilePhoto(session.user.id, function(url){
-              if(url){setProfilePhotoRaw(url);try{localStorage.setItem(_lk(_lk("hp_profile_photo")),url);}catch(e){}}
+              if(url){setProfilePhotoRaw(url);try{localStorage.setItem(_lk("hp_profile_photo"),url);}catch(e){}}
             });
           }
-          if(!localStorage.getItem(_lk(_lk("hp_cover_photo")))){
+          if(!localStorage.getItem(_lk("hp_cover_photo"))){
             DataLayer.syncCoverPhoto(session.user.id, function(url){
-              if(url){setCoverPhotoRaw(url);try{localStorage.setItem(_lk(_lk("hp_cover_photo")),url);}catch(e){}}
+              if(url){setCoverPhotoRaw(url);try{localStorage.setItem(_lk("hp_cover_photo"),url);}catch(e){}}
             });
           }
         }catch(e){}
@@ -4017,14 +4061,14 @@ export default function App() {
           if(prev) return prev;
           // Sync photo profil depuis Supabase à la connexion si localStorage vide
           try{
-            if(!localStorage.getItem(_lk(_lk("hp_profile_photo")))){
+            if(!localStorage.getItem(_lk("hp_profile_photo"))){
               DataLayer.syncProfilePhoto(session.user.id, function(url){
-                if(url){setProfilePhotoRaw(url);try{localStorage.setItem(_lk(_lk("hp_profile_photo")),url);}catch(e){}}
+                if(url){setProfilePhotoRaw(url);try{localStorage.setItem(_lk("hp_profile_photo"),url);}catch(e){}}
               });
             }
-            if(!localStorage.getItem(_lk(_lk("hp_cover_photo")))){
+            if(!localStorage.getItem(_lk("hp_cover_photo"))){
               DataLayer.syncCoverPhoto(session.user.id, function(url){
-                if(url){setCoverPhotoRaw(url);try{localStorage.setItem(_lk(_lk("hp_cover_photo")),url);}catch(e){}}
+                if(url){setCoverPhotoRaw(url);try{localStorage.setItem(_lk("hp_cover_photo"),url);}catch(e){}}
               });
             }
           }catch(e){}
