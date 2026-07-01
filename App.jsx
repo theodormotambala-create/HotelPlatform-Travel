@@ -1690,6 +1690,26 @@ function ClientFeed(props){
     try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:(p.likes||0)+(_initLikes[p.id]?1:0),comments:p.comments||[],showCmt:false});});base=_new.concat(base);}}catch(_e){}
     setPosts(function(cur){var curIds=cur.map(function(x){return x.id;});var merged=base.filter(function(p){return curIds.indexOf(p.id)<0;}).concat(cur);return merged;});
   },[props.dataVersion]);
+  var _sbLikesLoaded=useRef(false);
+  useEffect(function(){
+    if(_sbLikesLoaded.current||!selfUserId||!DataLayer._client)return;
+    _sbLikesLoaded.current=true;
+    DataLayer._client.from("post_likes").select("post_id").eq("user_id",selfUserId)
+      .then(function(res){
+        if(res.error||!res.data)return;
+        var sbLikes={};
+        res.data.forEach(function(r){sbLikes[r.post_id]=1;});
+        _init.current.likes=sbLikes;
+        try{localStorage.setItem(_lk("hp_likes"),JSON.stringify(sbLikes));}catch(e){}
+        setPosts(function(ps){
+          return ps.map(function(p){
+            var nowLiked=!!sbLikes[p.id];
+            if(nowLiked===p.liked)return p;
+            return Object.assign({},p,{liked:nowLiked,likes:nowLiked?p.likes+1:p.likes-1});
+          });
+        });
+      });
+  },[selfUserId]);
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState({});var cmtText=s2[0];var setCmtText=s2[1];
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
@@ -1719,7 +1739,7 @@ function ClientFeed(props){
     });
     try{
       if(DataLayer._client&&selfUserId){
-        if(!wasLiked){DataLayer._client.from("post_likes").insert([{user_id:selfUserId,post_id:id}]).then(function(){}).catch(function(){});}
+        if(!wasLiked){DataLayer._client.from("post_likes").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"post_id,user_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}
         else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}
       }
     }catch(e){}
@@ -2660,6 +2680,26 @@ function ProFeed(props){
   function toggleLike(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});});}
   var sLoadPro=useState(true);var loadingPro=sLoadPro[0];var setLoadingPro=sLoadPro[1];
   useEffect(function(){var t=setTimeout(function(){setLoadingPro(false);},350);return function(){clearTimeout(t);};},[]);
+  var _sbLikesLoadedPro=useRef(false);
+  useEffect(function(){
+    if(_sbLikesLoadedPro.current||!selfUserId||!DataLayer._client)return;
+    _sbLikesLoadedPro.current=true;
+    DataLayer._client.from("post_likes").select("post_id").eq("user_id",selfUserId)
+      .then(function(res){
+        if(res.error||!res.data)return;
+        var sbLikes={};
+        res.data.forEach(function(r){sbLikes[r.post_id]=1;});
+        _initPro.current.likes=sbLikes;
+        try{localStorage.setItem(_lk("hp_pro_likes"),JSON.stringify(sbLikes));}catch(e){}
+        setPosts(function(ps){
+          return ps.map(function(p){
+            var nowLiked=!!sbLikes[p.id];
+            if(nowLiked===p.liked)return p;
+            return Object.assign({},p,{liked:nowLiked,likes:nowLiked?p.likes+1:p.likes-1});
+          });
+        });
+      });
+  },[selfUserId]);
   var sHeartPro=useState(null);var heartAnimPro=sHeartPro[0];var setHeartAnimPro=sHeartPro[1];
   function triggerHeartPro(id){setHeartAnimPro(id);setTimeout(function(){setHeartAnimPro(null);},500);}
   function toggleLikePro(id){
@@ -2672,7 +2712,7 @@ function ProFeed(props){
     });
     try{
       if(DataLayer._client&&selfUserId){
-        if(!wasLiked){DataLayer._client.from("post_likes").insert([{user_id:selfUserId,post_id:id}]).then(function(){}).catch(function(){});}
+        if(!wasLiked){DataLayer._client.from("post_likes").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"post_id,user_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}
         else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}
       }
     }catch(e){}
