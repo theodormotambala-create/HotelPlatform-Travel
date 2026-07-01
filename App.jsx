@@ -4202,12 +4202,13 @@ export default function App() {
   // Logout - defini avant le routing pour eviter reference error
   async function logout(){
     await AuthService.logout();
-    try{localStorage.removeItem("hp_acc_type");}catch(e){}
+    try{var keysToRemove=Object.keys(localStorage).filter(function(k){return k.startsWith("hp_");});keysToRemove.forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});}catch(e){}
+    DataLayer._client=null;
     setAuth(null);setEstab(null);setBook(null);
     setSett(false);setNotifs(false);
     setCTab("feed");setPTab("feed");
     setNeedsOnboarding(true);
-    setCoverPhotoRaw(null);try{localStorage.removeItem("hp_cover_photo");}catch(e){}
+    setCoverPhotoRaw(null);
   }
   // Suppression de compte RGPD Art. 17 : efface toutes les donnees locales + Supabase + Storage
   async function deleteAccount(){
