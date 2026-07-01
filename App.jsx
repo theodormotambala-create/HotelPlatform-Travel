@@ -2614,7 +2614,7 @@ function ProFeed(props){
   var _initPro=useRef(null);
   if(!_initPro.current){var _lkP={};var _fvP=[];try{_lkP=JSON.parse(localStorage.getItem("hp_pro_likes")||"{}");_fvP=JSON.parse(localStorage.getItem("hp_pro_favs")||"[]");}catch(e){}_initPro.current={likes:_lkP,favs:_fvP};}
   var _initLikesPro=_initPro.current.likes;var _initFavsPro=_initPro.current.favs;
-  var s1=useState(DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikesPro[p.id],likes:p.likes+(_initLikesPro[p.id]?1:0),comments:[],showCmt:false});}));
+  var s1=useState(function(){var base=DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikesPro[p.id],likes:p.likes+(_initLikesPro[p.id]?1:0),comments:[],showCmt:false});});try{var _pp=JSON.parse(localStorage.getItem("hp_pro_posts")||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:!!_initLikesPro[p.id],likes:(p.likes||0)+(_initLikesPro[p.id]?1:0),comments:p.comments||[],showCmt:false});});base=_new.concat(base);}}catch(_e){}return base;});
   var posts=s1[0];var setPosts=s1[1];
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState("");var newPost=s2[0];var setNewPost=s2[1];
