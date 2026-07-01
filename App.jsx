@@ -4002,7 +4002,7 @@ export default function App() {
             });
           }
         }catch(e){}
-        try{var _sn=localStorage.getItem(_lk(_lk("hp_notifs")));if(_sn){var _pn=JSON.parse(_sn);if(Array.isArray(_pn)&&_pn.length>0&&_pn[0].icon)setNotifStored(_pn);}}catch(e){}
+        try{var _sn=localStorage.getItem(_lk("hp_notifs"));if(_sn){var _pn=JSON.parse(_sn);if(Array.isArray(_pn)&&_pn.length>0&&_pn[0].icon)setNotifStored(_pn);}}catch(e){}
       }
     }).catch(function(){});
     var sub = sb.auth.onAuthStateChange(function(event, session){
@@ -4028,7 +4028,7 @@ export default function App() {
               });
             }
           }catch(e){}
-          try{var _sn=localStorage.getItem(_lk(_lk("hp_notifs")));if(_sn){var _pn=JSON.parse(_sn);if(Array.isArray(_pn)&&_pn.length>0&&_pn[0].icon)setNotifStored(_pn);}}catch(e){}
+          try{var _sn=localStorage.getItem(_lk("hp_notifs"));if(_sn){var _pn=JSON.parse(_sn);if(Array.isArray(_pn)&&_pn.length>0&&_pn[0].icon)setNotifStored(_pn);}}catch(e){}
           return AuthService.buildSession(accType, status, session.user.email, session.user.id);
         });
       } else if(event==="SIGNED_OUT"){
@@ -4120,10 +4120,26 @@ export default function App() {
       return next;
     });
   }
-  // Charge favoris, follows et notif_prefs depuis Supabase au login
+  // Charge favoris, follows, notif_prefs, notifications et réservations depuis Supabase au login
   var _authForUserData=s0[0];
   useEffect(function(){
     if(!_authForUserData||!_authForUserData.userId||!DataLayer._client)return;
+    DataLayer._client.from("notifications").select("id,icon,color,title,body,time,read,tab,pref_key").eq("user_id",_authForUserData.userId).order("created_at",{ascending:false}).limit(50)
+      .then(function(res){
+        if(res.error||!res.data||res.data.length===0)return;
+        var sbNotifs=res.data.map(function(n){return{id:n.id,icon:n.icon,color:n.color,title:n.title,body:n.body,time:n.time,read:n.read,tab:n.tab,prefKey:n.pref_key};});
+        setNotifStored(sbNotifs);
+        try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(sbNotifs));}catch(e){}
+      }).catch(function(){});
+    if(_authForUserData.type==="client"){
+      DataLayer._client.from("reservations").select("*").eq("client_id",_authForUserData.userId).order("created_at",{ascending:false})
+        .then(function(res){
+          if(res.error||!res.data||res.data.length===0)return;
+          var sbResas=res.data.map(function(r){return r.data?Object.assign({},r.data,{status:r.status,id:r.id}):r;});
+          setResaHistory(sbResas);
+          try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(sbResas));}catch(e){}
+        }).catch(function(){});
+    }
     DataLayer._client.from("profiles").select("following,fav_estabs,notif_prefs,premium_data,privacy_settings,display_name").eq("user_id",_authForUserData.userId).maybeSingle()
       .then(function(res){
         if(!res||!res.data)return;
@@ -4398,8 +4414,8 @@ export default function App() {
   }:_fallbackProD;
   var _defaultNotifList = isPro ? NP_DATA : NC_DATA;
   var notifList = _notifStored !== null ? _notifStored : _defaultNotifList;
-  function markNotifRead(id){var next=notifList.map(function(n){return n.id===id?Object.assign({},n,{read:true}):n;});setNotifStored(next);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}}
-  function addNotif(notif){if(!notifPrefs[notif.prefKey!==undefined?notif.prefKey:"reservation"])return;var next=[notif].concat(notifList);setNotifStored(next);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}}
+  function markNotifRead(id){var next=notifList.map(function(n){return n.id===id?Object.assign({},n,{read:true}):n;});setNotifStored(next);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}try{if(DataLayer._client&&auth&&auth.userId){DataLayer._client.from("notifications").update({read:true}).eq("id",id).eq("user_id",auth.userId).then(function(){}).catch(function(){});}}catch(e){}}
+  function addNotif(notif){if(!notifPrefs[notif.prefKey!==undefined?notif.prefKey:"reservation"])return;var next=[notif].concat(notifList);setNotifStored(next);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}try{if(DataLayer._client&&auth&&auth.userId){DataLayer._client.from("notifications").upsert([{id:notif.id,user_id:auth.userId,icon:notif.icon||"Bell",color:notif.color||"#6366f1",title:notif.title,body:notif.body,time:notif.time||"maintenant",read:false,tab:notif.tab||"feed",pref_key:notif.prefKey||"reservation"}],{onConflict:"id,user_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}}catch(e){}}
   var unread = notifList.filter(function(n){return !n.read;}).length;
 
   function openProf(id,type){
