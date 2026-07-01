@@ -3734,7 +3734,7 @@ function ProProf(props){
     if(DataLayer._client&&_uid){DataLayer._client.from("profiles").update({display_name:nm,location:lc}).eq("user_id",_uid).then(_done).catch(_done);}
     else{_done();}
   }
-  function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}setEditingAbout(false);toastP("À propos mis à jour","success");}
+  function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}try{if(DataLayer._client&&props.authUserId){DataLayer._client.from("profiles").update({description:d,updated_at:new Date().toISOString()}).eq("user_id",props.authUserId).then(function(){}).catch(function(){});}}catch(e){}setEditingAbout(false);toastP("À propos mis à jour","success");}
   var premiumActive=isPremium||data.isPremium;
   // Periode de grace : badge reste visible 7 jours apres expiration de l abonnement
   var _graceActive=false;
