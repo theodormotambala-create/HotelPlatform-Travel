@@ -1,0 +1,21 @@
+-- =============================================================================
+-- MIGRATION Phase 1 : Likes — Supabase source unique de vérité
+-- La table post_likes existe déjà (20260630000003_missing_tables.sql).
+-- Cette migration documente les changements applicatifs associés.
+--
+-- Changements App.jsx :
+--   ClientFeed : useEffect charge les likes depuis Supabase au montage.
+--   ProFeed    : idem.
+--   toggleLike / toggleLikePro : INSERT remplacé par UPSERT (ignoreDuplicates).
+--   localStorage hp_likes / hp_pro_likes : devient cache de démarrage uniquement.
+--
+-- Comportement :
+--   1. Affichage immédiat depuis localStorage (zéro délai visuel).
+--   2. Chargement depuis Supabase en arrière-plan à la connexion.
+--   3. État corrigé si différence entre appareils.
+--   4. Chaque like/unlike écrit dans Supabase (source de vérité).
+-- =============================================================================
+
+-- La table post_likes et ses politiques RLS sont déjà en place.
+-- Aucun DDL supplémentaire nécessaire pour cette phase.
+SELECT 1;
