@@ -740,7 +740,7 @@ function BackBtn(props){
 function Av(props){
   var sz=props.sz||40;var letter=props.letter||"?";var img=props.img||null;var verified=props.verified||false;var isClient=props.isClient||false;
   var badge=verified?(<div style={{position:"absolute",bottom:-2,right:-2,background:DS.bg,borderRadius:"50%",padding:1}}>{isClient?<CBadge sz={Math.round(sz*.38)}/>:<VBadge sz={Math.round(sz*.36)}/>}</div>):null;
-  return(<div style={{position:"relative",width:sz,height:sz,flexShrink:0}}>{img?<img src={img} alt="" style={{width:sz,height:sz,borderRadius:"50%",objectFit:"cover"}}/>:<div style={{width:sz,height:sz,borderRadius:"50%",background:DS.primary+"30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.round(sz*.4),fontWeight:800,color:DS.primary}}>{letter}</div>}{badge}</div>);
+  return(<div style={{position:"relative",width:sz,height:sz,flexShrink:0}}><div style={{position:"absolute",inset:0,borderRadius:"50%",background:DS.primary+"30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:Math.round(sz*.4),fontWeight:800,color:DS.primary}}>{letter}</div>{img&&<img src={img} alt="" onError={function(e){e.currentTarget.style.display="none";}} style={{position:"absolute",inset:0,width:sz,height:sz,borderRadius:"50%",objectFit:"cover"}}/>}{badge}</div>);
 }
 function ImgViewer(props){
   var src=props.src;var onClose=props.onClose;
