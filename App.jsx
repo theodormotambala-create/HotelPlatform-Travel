@@ -960,6 +960,7 @@ function AuthScreen(props){
   async function handleGoogle(){
     setGLoading(true);setAuthErr("");
     try{
+      try{localStorage.setItem("hp_acc_type",accType);}catch(e){}
       var s=await AuthService.loginWithProvider(accType,"google");
       if(s)onAuth(accType,s.accountStatus,s.email,s.userId);
     }catch(e){
@@ -4026,13 +4027,24 @@ export default function App() {
       var session = res.data && res.data.session;
       if(session && session.user){
         var meta = session.user.user_metadata || {};
-        var accType = meta.account_type || "client";
+        var _storedType;try{_storedType=localStorage.getItem("hp_acc_type");}catch(e){}
+        var accType = meta.account_type || _storedType || "client";
         var status = accType !== "client" ? "pending" : "active";
-        // Sync hp_acc_type with Supabase metadata to avoid onboarding flash
         try{localStorage.setItem("hp_acc_type", accType);}catch(e){}
         _HP_UID=session.user.id;
         setNeedsOnboarding(false);
         setAuth(AuthService.buildSession(accType, status, session.user.email, session.user.id));
+        var _uid=session.user.id;
+        sb.from("profiles").select("user_id,account_type").eq("user_id",_uid).maybeSingle()
+          .then(function(r){
+            var _dname=meta.full_name||meta.name||(session.user.email?session.user.email.split("@")[0]:"");
+            if(!r||!r.data){
+              sb.from("profiles").upsert([{user_id:_uid,display_name:_dname,account_type:accType,svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){}).catch(function(){});
+              if(!meta.account_type){sb.auth.updateUser({data:{account_type:accType}}).catch(function(){});}
+            } else if(!meta.account_type){
+              sb.auth.updateUser({data:{account_type:r.data.account_type||accType}}).catch(function(){});
+            }
+          }).catch(function(){});
         // Sync photo profil depuis Supabase si localStorage vide
         try{
           if(!localStorage.getItem(_lk("hp_profile_photo"))){
@@ -4052,11 +4064,23 @@ export default function App() {
     var sub = sb.auth.onAuthStateChange(function(event, session){
       if(event==="SIGNED_IN" && session && session.user){
         var meta = session.user.user_metadata || {};
-        var accType = meta.account_type || "client";
+        var _storedType2;try{_storedType2=localStorage.getItem("hp_acc_type");}catch(e){}
+        var accType = meta.account_type || _storedType2 || "client";
         var status = accType !== "client" ? "pending" : "active";
         try{localStorage.setItem("hp_acc_type", accType);}catch(e){}
         _HP_UID=session.user.id;
         setNeedsOnboarding(false);
+        var _uid2=session.user.id;
+        sb.from("profiles").select("user_id,account_type").eq("user_id",_uid2).maybeSingle()
+          .then(function(r){
+            var _dname2=meta.full_name||meta.name||(session.user.email?session.user.email.split("@")[0]:"");
+            if(!r||!r.data){
+              sb.from("profiles").upsert([{user_id:_uid2,display_name:_dname2,account_type:accType,svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){}).catch(function(){});
+              if(!meta.account_type){sb.auth.updateUser({data:{account_type:accType}}).catch(function(){});}
+            } else if(!meta.account_type){
+              sb.auth.updateUser({data:{account_type:r.data.account_type||accType}}).catch(function(){});
+            }
+          }).catch(function(){});
         setAuth(function(prev){
           if(prev) return prev;
           // Sync photo profil depuis Supabase à la connexion si localStorage vide
