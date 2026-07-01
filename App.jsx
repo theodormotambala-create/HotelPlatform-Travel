@@ -3689,7 +3689,7 @@ function ProProf(props){
   var color=rC(proType);
   var s1=useState("about");var tab=s1[0];var setTab=s1[1];
   var s2=useState(false);var showVerif=s2[0];var setShowVerif=s2[1];
-  var _vfKey="hp_verif_status_"+(proType||"hotel");
+  var _vfKey=_lk("hp_verif_status_"+(proType||"hotel"));
   var s3=useState(function(){try{return localStorage.getItem(_vfKey)||null;}catch(e){return null;}});var verifStatus=s3[0];var _setVerifStatusRaw=s3[1];
   function setVerifStatus(v){_setVerifStatusRaw(v);try{if(v)localStorage.setItem(_vfKey,v);else localStorage.removeItem(_vfKey);}catch(e){}}
   useEffect(function(){
@@ -3700,7 +3700,7 @@ function ProProf(props){
         if(res.data.verified===true){_setVerifStatusRaw("approved");try{localStorage.setItem(_vfKey,"approved");}catch(e){}}
       }).catch(function(){});
   },[props.authUserId]);
-  var _descKey="hp_pro_desc_"+(proType||"hotel");
+  var _descKey=_lk("hp_pro_desc_"+(proType||"hotel"));
   var sd=useState(function(){try{var v=localStorage.getItem(_descKey);return v||data.description;}catch(e){return data.description;}});var description=sd[0];var setDescription=sd[1];
   var se=useState(false);var editingAbout=se[0];var setEditingAbout=se[1];
   var sdv=useState(description);var draftDesc=sdv[0];var setDraftDesc=sdv[1];
