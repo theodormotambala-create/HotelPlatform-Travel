@@ -4019,88 +4019,80 @@ export default function App() {
   var s0=useState(null);  var auth=s0[0];          var setAuth=s0[1];
   var _initNeedsOB=(function(){try{return!localStorage.getItem("hp_acc_type");}catch(e){return true;}})();
   var sOB=useState(_initNeedsOB);var needsOnboarding=sOB[0];var setNeedsOnboarding=sOB[1];
+  // Ecran de chargement pendant que Supabase restaure la session (comme LinkedIn)
+  var sSessLoad=useState(true);var sessionLoading=sSessLoad[0];var setSessionLoading=sSessLoad[1];
   // Persistance de session Supabase : restaure la session au rechargement + ecoute les changements
   useEffect(function(){
     var sb = (typeof window!=="undefined" && window.__supabase) ? window.__supabase : null;
-    if(!sb) return;
+    if(!sb){setSessionLoading(false);return;}
+    // Helper : applique photos et notifs en cache apres login
+    function _applyCacheExtras(uid){
+      try{
+        if(!localStorage.getItem(_lk("hp_profile_photo"))){DataLayer.syncProfilePhoto(uid,function(url){if(url){setProfilePhotoRaw(url);try{localStorage.setItem(_lk("hp_profile_photo"),url);}catch(e){}}});}
+        if(!localStorage.getItem(_lk("hp_cover_photo"))){DataLayer.syncCoverPhoto(uid,function(url){if(url){setCoverPhotoRaw(url);try{localStorage.setItem(_lk("hp_cover_photo"),url);}catch(e){}}});}
+      }catch(e){}
+      try{var _sn=localStorage.getItem(_lk("hp_notifs"));if(_sn){var _pn=JSON.parse(_sn);if(Array.isArray(_pn)&&_pn.length>0&&_pn[0].icon)setNotifStored(_pn);}}catch(e){}
+    }
+    // Helper : lit profiles (source de verite) puis set auth
+    function _resolveAuthFromProfiles(sb,session,quickType,onDone){
+      var meta=session.user.user_metadata||{};
+      var uid=session.user.id;
+      sb.from("profiles").select("account_type,status").eq("user_id",uid).maybeSingle()
+        .then(function(r){
+          var accType=(r&&r.data&&r.data.account_type)||quickType;
+          var status=(r&&r.data&&r.data.status)||(accType!=="client"?"pending":"active");
+          try{localStorage.setItem("hp_acc_type",accType);}catch(e){}
+          setAuth(function(prev){
+            if(prev&&prev.type===accType&&prev.accountStatus===status&&prev.userId===uid)return prev;
+            return AuthService.buildSession(accType,status,session.user.email,uid);
+          });
+          if(!r||!r.data){
+            var _dn=meta.full_name||meta.name||(session.user.email?session.user.email.split("@")[0]:"");
+            sb.from("profiles").upsert([{user_id:uid,display_name:_dn,account_type:accType,svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){}).catch(function(){});
+            if(!meta.account_type){sb.auth.updateUser({data:{account_type:accType}}).catch(function(){});}
+          } else if(!meta.account_type){
+            sb.auth.updateUser({data:{account_type:accType}}).catch(function(){});
+          }
+          if(onDone)onDone();
+        }).catch(function(){
+          // Fallback reseau : utilise le type rapide
+          try{localStorage.setItem("hp_acc_type",quickType);}catch(e){}
+          setAuth(function(prev){
+            if(prev)return prev;
+            return AuthService.buildSession(quickType,quickType!=="client"?"pending":"active",session.user.email,uid);
+          });
+          if(onDone)onDone();
+        });
+    }
     sb.auth.getSession().then(function(res){
       var session = res.data && res.data.session;
       if(session && session.user){
         var meta = session.user.user_metadata || {};
         var _storedType;try{_storedType=localStorage.getItem("hp_acc_type");}catch(e){}
-        var accType = meta.account_type || _storedType || "client";
-        var status = accType !== "client" ? "pending" : "active";
-        try{localStorage.setItem("hp_acc_type", accType);}catch(e){}
+        var quickType = meta.account_type || _storedType || "client";
         _HP_UID=session.user.id;
         setNeedsOnboarding(false);
-        setAuth(AuthService.buildSession(accType, status, session.user.email, session.user.id));
-        var _uid=session.user.id;
-        sb.from("profiles").select("user_id,account_type").eq("user_id",_uid).maybeSingle()
-          .then(function(r){
-            var _dname=meta.full_name||meta.name||(session.user.email?session.user.email.split("@")[0]:"");
-            if(!r||!r.data){
-              sb.from("profiles").upsert([{user_id:_uid,display_name:_dname,account_type:accType,svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){}).catch(function(){});
-              if(!meta.account_type){sb.auth.updateUser({data:{account_type:accType}}).catch(function(){});}
-            } else if(!meta.account_type){
-              sb.auth.updateUser({data:{account_type:r.data.account_type||accType}}).catch(function(){});
-            }
-          }).catch(function(){});
-        // Sync photo profil depuis Supabase si localStorage vide
-        try{
-          if(!localStorage.getItem(_lk("hp_profile_photo"))){
-            DataLayer.syncProfilePhoto(session.user.id, function(url){
-              if(url){setProfilePhotoRaw(url);try{localStorage.setItem(_lk("hp_profile_photo"),url);}catch(e){}}
-            });
-          }
-          if(!localStorage.getItem(_lk("hp_cover_photo"))){
-            DataLayer.syncCoverPhoto(session.user.id, function(url){
-              if(url){setCoverPhotoRaw(url);try{localStorage.setItem(_lk("hp_cover_photo"),url);}catch(e){}}
-            });
-          }
-        }catch(e){}
-        try{var _sn=localStorage.getItem(_lk("hp_notifs"));if(_sn){var _pn=JSON.parse(_sn);if(Array.isArray(_pn)&&_pn.length>0&&_pn[0].icon)setNotifStored(_pn);}}catch(e){}
+        _resolveAuthFromProfiles(sb,session,quickType,function(){
+          setSessionLoading(false);
+          _applyCacheExtras(session.user.id);
+        });
+      } else {
+        setSessionLoading(false);
       }
-    }).catch(function(){});
+    }).catch(function(){setSessionLoading(false);});
     var sub = sb.auth.onAuthStateChange(function(event, session){
       if(event==="SIGNED_IN" && session && session.user){
         var meta = session.user.user_metadata || {};
         var _storedType2;try{_storedType2=localStorage.getItem("hp_acc_type");}catch(e){}
-        var accType = meta.account_type || _storedType2 || "client";
-        var status = accType !== "client" ? "pending" : "active";
-        try{localStorage.setItem("hp_acc_type", accType);}catch(e){}
+        var quickType2 = meta.account_type || _storedType2 || "client";
         _HP_UID=session.user.id;
         setNeedsOnboarding(false);
-        var _uid2=session.user.id;
-        sb.from("profiles").select("user_id,account_type").eq("user_id",_uid2).maybeSingle()
-          .then(function(r){
-            var _dname2=meta.full_name||meta.name||(session.user.email?session.user.email.split("@")[0]:"");
-            if(!r||!r.data){
-              sb.from("profiles").upsert([{user_id:_uid2,display_name:_dname2,account_type:accType,svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){}).catch(function(){});
-              if(!meta.account_type){sb.auth.updateUser({data:{account_type:accType}}).catch(function(){});}
-            } else if(!meta.account_type){
-              sb.auth.updateUser({data:{account_type:r.data.account_type||accType}}).catch(function(){});
-            }
-          }).catch(function(){});
-        setAuth(function(prev){
-          if(prev) return prev;
-          // Sync photo profil depuis Supabase à la connexion si localStorage vide
-          try{
-            if(!localStorage.getItem(_lk("hp_profile_photo"))){
-              DataLayer.syncProfilePhoto(session.user.id, function(url){
-                if(url){setProfilePhotoRaw(url);try{localStorage.setItem(_lk("hp_profile_photo"),url);}catch(e){}}
-              });
-            }
-            if(!localStorage.getItem(_lk("hp_cover_photo"))){
-              DataLayer.syncCoverPhoto(session.user.id, function(url){
-                if(url){setCoverPhotoRaw(url);try{localStorage.setItem(_lk("hp_cover_photo"),url);}catch(e){}}
-              });
-            }
-          }catch(e){}
-          try{var _sn=localStorage.getItem(_lk("hp_notifs"));if(_sn){var _pn=JSON.parse(_sn);if(Array.isArray(_pn)&&_pn.length>0&&_pn[0].icon)setNotifStored(_pn);}}catch(e){}
-          return AuthService.buildSession(accType, status, session.user.email, session.user.id);
+        _resolveAuthFromProfiles(sb,session,quickType2,function(){
+          _applyCacheExtras(session.user.id);
         });
       } else if(event==="SIGNED_OUT"){
         setAuth(null);
+        setSessionLoading(false);
       }
     });
     return function(){ if(sub && sub.data && sub.data.subscription) sub.data.subscription.unsubscribe(); };
@@ -4445,6 +4437,12 @@ export default function App() {
   }
 
   if(!_resolvedAuth){
+    if(sessionLoading) return(
+      <div style={{position:"fixed",inset:0,background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:9999}}>
+        <div style={{fontSize:26,fontWeight:900,color:DS.text,letterSpacing:-1,marginBottom:24}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>
+        <div style={{width:40,height:40,borderRadius:"50%",border:"3px solid "+DS.border,borderTopColor:DS.primary,animation:"hp-spin 0.8s linear infinite"}}/>
+      </div>
+    );
     if(needsOnboarding){
       return(<AccountTypeScreen onSelect={function(t){try{localStorage.setItem("hp_acc_type",t);}catch(e){}setNeedsOnboarding(false);}}/>);
     }
