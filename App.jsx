@@ -274,13 +274,13 @@ var DataLayer = {
       supabase.from("reservations").select("*").then(function(res){
         if(res && res.data && res.data.length>0){
           try{
-            var existing=[];try{existing=JSON.parse(localStorage.getItem("hp_resas_all")||"[]");}catch(ex){}
+            var existing=[];try{existing=JSON.parse(localStorage.getItem(_lk("hp_resas_all"))||"[]");}catch(ex){}
             var existingIds=existing.map(function(r){return r.id;});
             var newFromSb=res.data.filter(function(row){ return !existingIds.includes(row.id); })
               .map(function(row){ return row.data ? Object.assign({},row.data,{status:row.status}) : row; });
             if(newFromSb.length>0){
               var merged=existing.concat(newFromSb);
-              localStorage.setItem("hp_resas_all",JSON.stringify(merged));
+              localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(merged));
               BookingService._all=merged;
             } else {
               // Mettre a jour les statuts depuis Supabase pour les reservations existantes
@@ -288,7 +288,7 @@ var DataLayer = {
                 var sbRow=res.data.find(function(row){ return row.id===r.id; });
                 return sbRow ? Object.assign({},r,{status:sbRow.status}) : r;
               });
-              localStorage.setItem("hp_resas_all",JSON.stringify(updated));
+              localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(updated));
               BookingService._all=updated;
             }
           }catch(ex){}
@@ -630,7 +630,7 @@ var AuthService = {
 //   }
 // =====================================================================
 var BookingService = {
-  _all: (function(){try{return JSON.parse(localStorage.getItem("hp_resas_all")||"[]");}catch(e){return [];}}()),
+  _all: (function(){try{return JSON.parse(localStorage.getItem(_lk("hp_resas_all"))||"[]");}catch(e){return [];}}()),
   generateId: function(){
     return "R" + Date.now().toString().slice(-8);
   },
@@ -639,7 +639,7 @@ var BookingService = {
     if(!resa.id){ resa.id = BookingService.generateId(); }
     if(!resa.createdAt){ resa.createdAt = new Date().toISOString(); }
     BookingService._all.push(resa);
-    try{localStorage.setItem("hp_resas_all",JSON.stringify(BookingService._all));}catch(e){}
+    try{localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(BookingService._all));}catch(e){}
     try{ if(DataLayer._client){ DataLayer.saveReservation(resa,clientId||null).then(function(){}); } }catch(e){}
     return resa;
   },
@@ -1878,8 +1878,8 @@ function ClientDisc(props){
     var _h0=DataLayer.getHotels()[0];var _r0=DataLayer.getRestaurants()[0];
     return _base.map(function(item){
       try{
-        if(tab==="hotels"&&_h0&&item.id===_h0.id){var _rr=localStorage.getItem("hp_hotelsvc_rooms");if(_rr){var _av=JSON.parse(_rr).filter(function(r){return r.available&&r.price>0;});if(_av.length){var _mn=Math.min.apply(null,_av.map(function(r){return r.price;}));if(_mn>0)return Object.assign({},item,{priceFrom:_mn});}}}
-        else if(tab==="restaurants"&&_r0&&item.id===_r0.id){var _ri=localStorage.getItem("hp_restoff_items");if(_ri){var _av2=JSON.parse(_ri).filter(function(d){return d.available&&d.price>0;});if(_av2.length){var _mn2=Math.min.apply(null,_av2.map(function(d){return d.price;}));if(_mn2>0)return Object.assign({},item,{priceFrom:_mn2});}}}
+        if(tab==="hotels"&&_h0&&item.id===_h0.id){var _rr=localStorage.getItem(_lk("hp_hotelsvc_rooms"));if(_rr){var _av=JSON.parse(_rr).filter(function(r){return r.available&&r.price>0;});if(_av.length){var _mn=Math.min.apply(null,_av.map(function(r){return r.price;}));if(_mn>0)return Object.assign({},item,{priceFrom:_mn});}}}
+        else if(tab==="restaurants"&&_r0&&item.id===_r0.id){var _ri=localStorage.getItem(_lk("hp_restoff_items"));if(_ri){var _av2=JSON.parse(_ri).filter(function(d){return d.available&&d.price>0;});if(_av2.length){var _mn2=Math.min.apply(null,_av2.map(function(d){return d.price;}));if(_mn2>0)return Object.assign({},item,{priceFrom:_mn2});}}}
       }catch(_e){}
       return item;
     });
@@ -2088,7 +2088,7 @@ function EstabM(props){
   try{
     var _h0=DataLayer.getHotels()[0];var _r0=DataLayer.getRestaurants()[0];
     if(_h0&&e&&e.id===_h0.id){
-      var _rmsRaw=localStorage.getItem("hp_hotelsvc_rooms");var _amsRaw=localStorage.getItem("hp_hotelsvc_amenities");var _dshRaw=localStorage.getItem("hp_hotelsvc_dishes");var _descRawH=localStorage.getItem("hp_pro_desc_hotel");
+      var _rmsRaw=localStorage.getItem(_lk("hp_hotelsvc_rooms"));var _amsRaw=localStorage.getItem(_lk("hp_hotelsvc_amenities"));var _dshRaw=localStorage.getItem(_lk("hp_hotelsvc_dishes"));var _descRawH=localStorage.getItem("hp_pro_desc_hotel");
       var _patch={};
       if(_rmsRaw){var _rms=JSON.parse(_rmsRaw);_patch.rooms=_rms;var _avail=_rms.filter(function(r){return r.available&&r.price>0;});if(_avail.length){var _minH=Math.min.apply(null,_avail.map(function(r){return r.price;}));if(_minH>0)_patch.priceFrom=_minH;}}
       if(_amsRaw)_patch.services=JSON.parse(_amsRaw).filter(function(a){return a.active!==false;});
@@ -2096,7 +2096,7 @@ function EstabM(props){
       if(_descRawH)_patch.description=_descRawH;
       if(Object.keys(_patch).length)e=Object.assign({},e,_patch);
     }else if(_r0&&e&&e.id===_r0.id){
-      var _itRaw=localStorage.getItem("hp_restoff_items");var _ofRaw=localStorage.getItem("hp_restoff_offers");var _descRawR=localStorage.getItem("hp_pro_desc_restaurant");
+      var _itRaw=localStorage.getItem(_lk("hp_restoff_items"));var _ofRaw=localStorage.getItem(_lk("hp_restoff_offers"));var _descRawR=localStorage.getItem("hp_pro_desc_restaurant");
       var _patch2={};
       if(_itRaw){var _fl2=JSON.parse(_itRaw);var _mc2={};_fl2.forEach(function(d){var c=d.category||"Plats";if(!_mc2[c])_mc2[c]=[];_mc2[c].push(d);});_patch2.menu=Object.keys(_mc2).map(function(c){return{cat:c,items:_mc2[c]};});var _availR=_fl2.filter(function(d){return d.available&&d.price>0;});if(_availR.length){var _minR=Math.min.apply(null,_availR.map(function(d){return d.price;}));if(_minR>0)_patch2.priceFrom=_minR;}}
       if(_ofRaw)_patch2.offers=JSON.parse(_ofRaw).filter(function(o){return o.available!==false;});
@@ -3235,14 +3235,14 @@ function HotelSvc(props){
   var data=props.data||DataLayer.getHotels()[0];
   var userId=props.userId||null;
   var color=DS.hotel;
-  var s1=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_rooms");return v?JSON.parse(v):(data.rooms||[]);}catch(e){return data.rooms||[];}});var rooms=s1[0];var setRooms=s1[1];
+  var s1=useState(function(){try{var v=localStorage.getItem(_lk("hp_hotelsvc_rooms"));return v?JSON.parse(v):(data.rooms||[]);}catch(e){return data.rooms||[];}});var rooms=s1[0];var setRooms=s1[1];
   var s2=useState(null);var editItem=s2[0];var setEditItem=s2[1];
   var s3=useState(false);var showAdd=s3[0];var setShowAdd=s3[1];
-  var s4=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_svcmode");return v||data.svcMode||"hotel";}catch(e){return data.svcMode||"hotel";}});var svcMode=s4[0];var setSvcMode=s4[1];
+  var s4=useState(function(){try{var v=localStorage.getItem(_lk("hp_hotelsvc_svcmode"));return v||data.svcMode||"hotel";}catch(e){return data.svcMode||"hotel";}});var svcMode=s4[0];var setSvcMode=s4[1];
   var hasResto=svcMode==="combined";
-  var s5=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_dishes");return v?JSON.parse(v):[];}catch(e){return[];}});var menu=s5[0];var setMenu=s5[1];
+  var s5=useState(function(){try{var v=localStorage.getItem(_lk("hp_hotelsvc_dishes"));return v?JSON.parse(v):[];}catch(e){return[];}});var menu=s5[0];var setMenu=s5[1];
   var s6=useState(data.svcMode==="restaurant"?"menu":"rooms");var tab=s6[0];var setTab=s6[1];
-  var sa=useState(function(){try{var v=localStorage.getItem("hp_hotelsvc_amenities");return v?JSON.parse(v):(data.services||[]).map(function(s,i){return typeof s==="object"?Object.assign({},s):{id:"svc"+i,name:s,active:true};});}catch(e){return(data.services||[]).map(function(s,i){return typeof s==="object"?Object.assign({},s):{id:"svc"+i,name:s,active:true};});}});
+  var sa=useState(function(){try{var v=localStorage.getItem(_lk("hp_hotelsvc_amenities"));return v?JSON.parse(v):(data.services||[]).map(function(s,i){return typeof s==="object"?Object.assign({},s):{id:"svc"+i,name:s,active:true};});}catch(e){return(data.services||[]).map(function(s,i){return typeof s==="object"?Object.assign({},s):{id:"svc"+i,name:s,active:true};});}});
   var amenities=sa[0];var setAmenities=sa[1];
   var sb=useState(false);var addSvc=sb[0];var setAddSvc=sb[1];
   var sc=useState("");var newSvcName=sc[0];var setNewSvcName=sc[1];
@@ -3256,28 +3256,28 @@ function HotelSvc(props){
       .then(function(res){
         if(res.error||!res.data||res.data.length===0)return;
         var rs=res.data.map(function(r){return{id:r.id,name:r.name,price:r.price||0,capacity:r.capacity||2,available:r.available!==false,stock:r.stock||1,description:r.description||null};});
-        setRooms(rs);try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}
+        setRooms(rs);try{localStorage.setItem(_lk("hp_hotelsvc_rooms"),JSON.stringify(rs));}catch(e){}
       }).catch(function(){});
     DataLayer._client.from("establishment_dishes").select("*").eq("establishment_id",_hEstabId)
       .then(function(res){
         if(res.error||!res.data||res.data.length===0)return;
         var ds=res.data.map(function(d){return{id:d.id,name:d.name,price:d.price||0,category:d.category||"Plats",description:d.description||null,available:d.available!==false};});
-        setMenu(ds);try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ds));}catch(e){}
+        setMenu(ds);try{localStorage.setItem(_lk("hp_hotelsvc_dishes"),JSON.stringify(ds));}catch(e){}
       }).catch(function(){});
     DataLayer._client.from("establishment_amenities").select("*").eq("establishment_id",_hEstabId)
       .then(function(res){
         if(res.error||!res.data||res.data.length===0)return;
         var am=res.data.map(function(a){return{id:a.id,name:a.name,active:a.active!==false};});
-        setAmenities(am);try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}
+        setAmenities(am);try{localStorage.setItem(_lk("hp_hotelsvc_amenities"),JSON.stringify(am));}catch(e){}
       }).catch(function(){});
   },[_hEstabId]);
   function _saveSvcMode(v){
-    try{localStorage.setItem("hp_hotelsvc_svcmode",v);}catch(e){}
+    try{localStorage.setItem(_lk("hp_hotelsvc_svcmode"),v);}catch(e){}
     if(userId&&DataLayer._client){DataLayer._client.from("profiles").update({svc_mode:v,updated_at:new Date().toISOString()}).eq("user_id",userId).then(function(){});}
   }
-  function _saveRooms(rs){try{localStorage.setItem("hp_hotelsvc_rooms",JSON.stringify(rs));}catch(e){}try{DataLayer.saveEstabRooms(_hEstabId,rs);}catch(e){}}
-  function _saveDishes(ms){try{localStorage.setItem("hp_hotelsvc_dishes",JSON.stringify(ms));}catch(e){}try{DataLayer.saveEstabDishes(_hEstabId,ms);}catch(e){}}
-  function _saveAmenities(am){try{localStorage.setItem("hp_hotelsvc_amenities",JSON.stringify(am));}catch(e){}try{DataLayer.saveEstabAmenities(_hEstabId,am);}catch(e){}}
+  function _saveRooms(rs){try{localStorage.setItem(_lk("hp_hotelsvc_rooms"),JSON.stringify(rs));}catch(e){}try{DataLayer.saveEstabRooms(_hEstabId,rs);}catch(e){}}
+  function _saveDishes(ms){try{localStorage.setItem(_lk("hp_hotelsvc_dishes"),JSON.stringify(ms));}catch(e){}try{DataLayer.saveEstabDishes(_hEstabId,ms);}catch(e){}}
+  function _saveAmenities(am){try{localStorage.setItem(_lk("hp_hotelsvc_amenities"),JSON.stringify(am));}catch(e){}try{DataLayer.saveEstabAmenities(_hEstabId,am);}catch(e){}}
   function toggleAmenity(id){setAmenities(function(am){var next=am.map(function(a){return a.id===id?Object.assign({},a,{active:!a.active}):a;});_saveAmenities(next);return next;});}
   function addAmenity(){if(!newSvcName.trim())return;var am=amenities.concat([{id:"svc"+Date.now(),name:newSvcName.trim(),active:true}]);setAmenities(am);_saveAmenities(am);setNewSvcName("");setAddSvc(false);}
   function removeAmenity(id){setAmenities(function(am){var next=am.filter(function(a){return a.id!==id;});_saveAmenities(next);return next;});}
@@ -3447,12 +3447,12 @@ function RestOff(props){
   var data=props.data||DataLayer.getRestaurants()[0];
   var color=DS.restaurant;
   var _defaultItems=(data.menu||[]).reduce(function(acc,cat){return acc.concat(cat.items.map(function(item){return Object.assign({},item,{id:"d_"+cat.cat+"_"+item.name.replace(/\s/g,""),category:cat.cat,available:true});}));},  []);
-  var s1=useState(function(){try{var v=localStorage.getItem("hp_restoff_items");return v?JSON.parse(v):_defaultItems;}catch(e){return _defaultItems;}});
+  var s1=useState(function(){try{var v=localStorage.getItem(_lk("hp_restoff_items"));return v?JSON.parse(v):_defaultItems;}catch(e){return _defaultItems;}});
   var items=s1[0];var setItems=s1[1];
   var s2=useState(null);var editItem=s2[0];var setEditItem=s2[1];
   var s3=useState(false);var showAdd=s3[0];var setShowAdd=s3[1];
   var _defaultOffers=(data.offers||[]).map(function(o,i){return Object.assign({},{id:"o"+i,name:typeof o==="string"?o:o.name,price:typeof o==="object"&&o.price?o.price:null,available:true});});
-  var s4=useState(function(){try{var v=localStorage.getItem("hp_restoff_offers");return v?JSON.parse(v):_defaultOffers;}catch(e){return _defaultOffers;}});
+  var s4=useState(function(){try{var v=localStorage.getItem(_lk("hp_restoff_offers"));return v?JSON.parse(v):_defaultOffers;}catch(e){return _defaultOffers;}});
   var offers=s4[0];var setOffers=s4[1];
   var s4a=useState(false);var showAddOffer=s4a[0];var setShowAddOffer=s4a[1];
   var s4b=useState("");var newOfferName=s4b[0];var setNewOfferName=s4b[1];
@@ -3465,20 +3465,20 @@ function RestOff(props){
       .then(function(res){
         if(res.error||!res.data||res.data.length===0)return;
         var ds=res.data.map(function(d){return{id:d.id,name:d.name,price:d.price||0,category:d.category||"Plats",description:d.description||null,available:d.available!==false};});
-        setItems(ds);try{localStorage.setItem("hp_restoff_items",JSON.stringify(ds));}catch(e){}
+        setItems(ds);try{localStorage.setItem(_lk("hp_restoff_items"),JSON.stringify(ds));}catch(e){}
       }).catch(function(){});
     DataLayer._client.from("establishment_offers").select("*").eq("establishment_id",_rEstabId)
       .then(function(res){
         if(res.error||!res.data||res.data.length===0)return;
         var os=res.data.map(function(o){return{id:o.id,name:o.name,price:o.price||null,available:o.available!==false};});
-        setOffers(os);try{localStorage.setItem("hp_restoff_offers",JSON.stringify(os));}catch(e){}
+        setOffers(os);try{localStorage.setItem(_lk("hp_restoff_offers"),JSON.stringify(os));}catch(e){}
       }).catch(function(){});
   },[_rEstabId]);
-  function _saveOffers(next){try{localStorage.setItem("hp_restoff_offers",JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabOffers(_rEstabId,next);}catch(e){}}
+  function _saveOffers(next){try{localStorage.setItem(_lk("hp_restoff_offers"),JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabOffers(_rEstabId,next);}catch(e){}}
   var tkO=useToast();var toastO=tkO.show;var ToastO=tkO.Toast;
   function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next);toastO("Offre supprimée","info");}
   function addOffer(){if(!newOfferName.trim())return;var o={id:"o"+Date.now(),name:newOfferName.trim(),price:newOfferPrice?parseFloat(newOfferPrice):null,available:true};var next=offers.concat([o]);setOffers(next);_saveOffers(next);setNewOfferName("");setNewOfferPrice("");setShowAddOffer(false);toastO("Offre ajoutée","success");}
-  function _saveItems(next){try{localStorage.setItem("hp_restoff_items",JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabDishes(_rEstabId,next);}catch(e){}}
+  function _saveItems(next){try{localStorage.setItem(_lk("hp_restoff_items"),JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabDishes(_rEstabId,next);}catch(e){}}
   function saveItem(item){
     if(editItem){setItems(function(is){var next=is.map(function(i){return i.id===item.id?item:i;});_saveItems(next);return next;});toastO("Plat mis a jour","success");}
     else{setItems(function(is){var next=is.concat([item]);_saveItems(next);return next;});toastO("Plat ajouté","success");}
@@ -3603,7 +3603,7 @@ function ProResa(props){
   var filtered=filter==="all"?resas:resas.filter(function(r){return r.status===filter;});
   var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim};
   var sLabels={confirmed:"Confirmée",pending:"En attente",refused:"Refusée",consumed:"Consommée"};
-  function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem("hp_resas_all",JSON.stringify(updated));}catch(e){}try{if(patch&&patch.status)DataLayer.updateReservationStatus(id,patch.status);}catch(e2){}}
+  function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(updated));}catch(e){}try{if(patch&&patch.status)DataLayer.updateReservationStatus(id,patch.status);}catch(e2){}}
   function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Réservation confirmée","success");}
   function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Réservation refusée","info");}
   function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivée confirmée · Client marqué présent","success");}
@@ -3907,8 +3907,8 @@ function ProProf(props){
         {tab==="services"&&(function(){
           var _svcs=[];
           try{
-            if(proType==="hotel"){var va=localStorage.getItem("hp_hotelsvc_amenities");_svcs=va?JSON.parse(va).filter(function(a){return a.active;}):(data.services||[]);}
-            else{var vb=localStorage.getItem("hp_restoff_offers");_svcs=vb?JSON.parse(vb):(data.offers||[]);}
+            if(proType==="hotel"){var va=localStorage.getItem(_lk("hp_hotelsvc_amenities"));_svcs=va?JSON.parse(va).filter(function(a){return a.active;}):(data.services||[]);}
+            else{var vb=localStorage.getItem(_lk("hp_restoff_offers"));_svcs=vb?JSON.parse(vb):(data.offers||[]);}
           }catch(ex){_svcs=data.services||data.offers||[];}
           if(!_svcs.length)_svcs=data.services||data.offers||[];
           return _svcs.map(function(s,i){var name=typeof s==="string"?s:s.name;var Ic=getIcon(name);return <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid "+DS.border+"20"}}><div style={{width:30,height:30,borderRadius:8,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={13} color={color}/></div><div style={{fontSize:12,color:DS.text}}>{name}</div></div>;});
@@ -4134,7 +4134,7 @@ export default function App() {
   }
   var s10=useState(function(){try{var v=localStorage.getItem(_lk("hp_premium"));return v?JSON.parse(v):null;}catch(e){return null;}});var premiumData=s10[0];    var setPremiumData=s10[1];
   var _sCDN=useState(function(){try{return localStorage.getItem(_lk("hp_client_display_name"))||"";}catch(e){return "";}});var clientDisplayName=_sCDN[0];var setClientDisplayName=_sCDN[1];
-  function _onClientNameChange(nm){setClientDisplayName(nm);try{localStorage.setItem(_lk("hp_client_display_name"),nm);}catch(e){}}
+  function _onClientNameChange(nm){setClientDisplayName(nm);try{localStorage.setItem(_lk("hp_client_display_name"),nm);}catch(e){}try{var _uid=_authForUserData&&_authForUserData.userId;if(DataLayer._client&&_uid&&nm&&nm.trim()){DataLayer._client.from("profiles").update({display_name:nm.trim(),updated_at:new Date().toISOString()}).eq("user_id",_uid).then(function(){}).catch(function(){});}}catch(e){}}
   var isPremium=premiumData!==null && new Date(premiumData.expiresAt)>new Date();
   function _savePremiumToDB(pd){
     var sb=DataLayer._client;var uid=_authForUserData&&_authForUserData.userId;var atype=_authForUserData&&_authForUserData.type;
