@@ -4090,6 +4090,15 @@ export default function App() {
         _resolveAuthFromProfiles(sb,session,quickType2,function(){
           _applyCacheExtras(session.user.id);
         });
+      } else if(event==="TOKEN_REFRESHED" && session && session.user){
+        _HP_UID=session.user.id;
+        var meta3 = session.user.user_metadata || {};
+        var _storedType3;try{_storedType3=localStorage.getItem("hp_acc_type");}catch(e){}
+        var quickType3 = meta3.account_type || _storedType3 || "client";
+        setAuth(function(prev){
+          if(prev&&prev.userId===session.user.id)return prev;
+          return AuthService.buildSession(quickType3,quickType3!=="client"?"pending":"active",session.user.email,session.user.id);
+        });
       } else if(event==="SIGNED_OUT"){
         setAuth(null);
         setSessionLoading(false);
