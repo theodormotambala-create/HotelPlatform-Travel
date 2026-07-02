@@ -545,6 +545,8 @@ var DataLayer = {
         if(res.error){ if(onSuccess)onSuccess(null); return; }
         var urlRes = DataLayer._client.storage.from("profile-photos").getPublicUrl(path);
         var publicUrl = urlRes&&urlRes.data&&urlRes.data.publicUrl ? urlRes.data.publicUrl : null;
+        // Anti-cache CDN : le chemin est constant (upsert), sans ce parametre l'ancienne image resterait affichee
+        if(publicUrl) publicUrl += (publicUrl.indexOf("?")<0?"?v=":"&v=")+Date.now();
         if(publicUrl && userId){
           DataLayer._client.from("profiles")
             .upsert([{ user_id: userId, photo_url: publicUrl, account_type: accountType||"client" }],
@@ -575,6 +577,8 @@ var DataLayer = {
         if(res.error){ if(onSuccess)onSuccess(null); return; }
         var urlRes = DataLayer._client.storage.from("profile-photos").getPublicUrl(path);
         var publicUrl = urlRes&&urlRes.data&&urlRes.data.publicUrl ? urlRes.data.publicUrl : null;
+        // Anti-cache CDN : le chemin est constant (upsert), sans ce parametre l'ancienne image resterait affichee
+        if(publicUrl) publicUrl += (publicUrl.indexOf("?")<0?"?v=":"&v=")+Date.now();
         if(publicUrl && userId){
           DataLayer._client.from("profiles")
             .upsert([{ user_id: userId, cover_url: publicUrl, account_type: accountType||"hotel" }],
@@ -2019,16 +2023,17 @@ function ClientProf(props){
 
   var _locked=privacySettings.locked||false;
   var _uploadRef=useRef(null);
+  var tkCP=useToast();var toastCP=tkCP.show;var ToastCP=tkCP.Toast;
   var _sViewer=useState(null);var _viewer=_sViewer[0];var _setViewer=_sViewer[1];
   var _sCPMenu=useState(false);var _cpMenu=_sCPMenu[0];var _setCPMenu=_sCPMenu[1];
   var _sCPPend=useState(null);var _cpPend=_sCPPend[0];var _setCPPend=_sCPPend[1];
-  function _handlePhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){_setCPPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
+  function _handlePhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>5*1024*1024){toastCP("Photo trop volumineuse (maximum 5 Mo)","error");e.target.value="";return;}var r=new FileReader();r.onload=function(ev){_setCPPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
   function _saveClientPhoto(){if(!_cpPend)return;if(onPhotoChange)onPhotoChange(_cpPend);_setCPPend(null);_setCPMenu(false);}
   function _deleteClientPhoto(){if(onPhotoChange)onPhotoChange(null);_setCPMenu(false);}
   if(profSkLoading)return <ProfSkeleton/>;
   var _loyaltyPoints=resaHistory.length*150;
   var _loyaltyLevel=_loyaltyPoints>=15000?"plat":_loyaltyPoints>=5000?"gold":_loyaltyPoints>=1000?"silver":"bronze";
-  return(<div style={{paddingBottom:20}}><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input id="hp-client-photo-input" ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/>
+  return(<div style={{paddingBottom:20}}><ToastCP/><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input id="hp-client-photo-input" ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/>
     {_cpMenu&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){_setCPMenu(false);_setCPPend(null);}}>
       <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:"20px 16px 32px",animation:"hp-slide-up 0.28s ease"}}>
         {_cpPend?(
@@ -2865,6 +2870,8 @@ function ProFeed(props){
     var file=ev.target.files&&ev.target.files[0];if(!file)return;
     var isVideo=file.type.indexOf("video")===0;
     if(isVideo&&!isPremium){setShowVideoGate(true);ev.target.value="";return;}
+    if(isVideo&&file.size>50*1024*1024){toast("Vidéo trop volumineuse (maximum 50 Mo)","error");ev.target.value="";return;}
+    if(!isVideo&&file.size>8*1024*1024){toast("Image trop volumineuse (maximum 8 Mo)","error");ev.target.value="";return;}
     var url=URL.createObjectURL(file);
     setMediaPreview(url);setMediaType(isVideo?"video":"image");setMediaFile(file);
     ev.target.value="";
@@ -2893,11 +2900,18 @@ function ProFeed(props){
             var pub=DataLayer._client.storage.from("media").getPublicUrl(path);
             _doPublish(pub.data.publicUrl);
           } else {
-            _doPublish(mediaPreview);
+            // Jamais persister une URL blob: (morte au rechargement) — publier sans media + prevenir
+            if(res.error)console.warn("[Media] Upload echoue:",res.error.message||res.error);
+            toast("Échec de l'envoi du média — publication sans image/vidéo","error");
+            _doPublish(null);
           }
-        }).catch(function(){_doPublish(mediaPreview);});
+        }).catch(function(err){console.warn("[Media] Upload exception:",err);toast("Échec de l'envoi du média — publication sans image/vidéo","error");_doPublish(null);});
+    } else if(mediaFile){
+      // Pas de connexion Supabase : le media ne peut pas etre sauvegarde
+      toast("Média non enregistré (hors connexion) — publication sans média","error");
+      _doPublish(null);
     } else {
-      _doPublish(mediaPreview);
+      _doPublish(null);
     }
   }
   return(
@@ -3844,8 +3858,8 @@ function ProProf(props){
   var _sDraftName=useState(data.name||"");var _draftName=_sDraftName[0];var _setDraftName=_sDraftName[1];
   var _sDraftLoc=useState(data.location||"");var _draftLoc=_sDraftLoc[0];var _setDraftLoc=_sDraftLoc[1];
   var _sProSaving=useState(false);var _proSaving=_sProSaving[0];var _setProSaving=_sProSaving[1];
-  function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){_setPPPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
-  function _handleProCoverFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){_setPCPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
+  function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>5*1024*1024){toastP("Photo trop volumineuse (maximum 5 Mo)","error");e.target.value="";return;}var r=new FileReader();r.onload=function(ev){_setPPPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
+  function _handleProCoverFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>8*1024*1024){toastP("Image de couverture trop volumineuse (maximum 8 Mo)","error");e.target.value="";return;}var r=new FileReader();r.onload=function(ev){_setPCPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
   function _saveProPhoto(){if(!_ppPend)return;if(onPhotoChange)onPhotoChange(_ppPend);_setPPPend(null);_setPPMenu(false);toastP("Photo de profil mise à jour","success");}
   function _saveProCover(){if(!_pcPend)return;if(onCoverChange)onCoverChange(_pcPend);_setPCPend(null);_setPCMenu(false);toastP("Photo de couverture mise à jour","success");}
   function _deleteProPhoto(){if(onPhotoChange)onPhotoChange(null);_setPPMenu(false);toastP("Photo supprimée","success");}
@@ -4408,6 +4422,10 @@ export default function App() {
   function setProfilePhoto(v){
     setProfilePhotoRaw(v);
     try{if(v)localStorage.setItem(_lk("hp_profile_photo"),v);else localStorage.removeItem(_lk("hp_profile_photo"));}catch(e){}
+    // Suppression reelle : efface aussi photo_url en base (sinon la photo revient au prochain login)
+    if(v===null&&DataLayer._client&&auth&&auth.userId){
+      try{DataLayer._client.from("profiles").update({photo_url:null,updated_at:new Date().toISOString()}).eq("user_id",auth.userId).then(function(){}).catch(function(){});}catch(e){}
+    }
     // Upload vers Supabase Storage si c'est un DataURL base64
     if(v&&v.startsWith("data:")&&DataLayer._client&&auth&&auth.userId){
       try{
@@ -4432,6 +4450,9 @@ export default function App() {
           if(url&&setProfilePhotoRaw._lastToken===_uploadToken){
             setProfilePhotoRaw(url);
             try{localStorage.setItem(_lk("hp_profile_photo"),url);}catch(e){}
+          } else if(!url){
+            // Echec d'upload : la photo n'est PAS sauvegardee (elle serait perdue a la deconnexion)
+            toastApp("Échec de l'enregistrement de la photo — vérifiez votre connexion et réessayez","error");
           }
         });
       }catch(ex){ console.warn("[Photo] Erreur conversion base64:", ex); }
@@ -4441,6 +4462,10 @@ export default function App() {
   function setCoverPhoto(v){
     setCoverPhotoRaw(v);
     try{if(v)localStorage.setItem(_lk("hp_cover_photo"),v);else localStorage.removeItem(_lk("hp_cover_photo"));}catch(e){}
+    // Suppression reelle : efface aussi cover_url en base
+    if(v===null&&DataLayer._client&&auth&&auth.userId){
+      try{DataLayer._client.from("profiles").update({cover_url:null,updated_at:new Date().toISOString()}).eq("user_id",auth.userId).then(function(){}).catch(function(){});}catch(e){}
+    }
     if(v&&v.startsWith("data:")&&DataLayer._client&&auth&&auth.userId){
       try{
         var _ca=v.split(",");
@@ -4459,6 +4484,16 @@ export default function App() {
           if(url&&setCoverPhotoRaw._lastToken===_ctoken){
             setCoverPhotoRaw(url);
             try{localStorage.setItem(_lk("hp_cover_photo"),url);}catch(e){}
+            // Rafraichit immediatement Decouverte / EstabM / avatars du feed (champ img de l'etablissement)
+            try{
+              var _uidCv=auth.userId;
+              var _patchImg=function(arr){return arr.map(function(x){return x.userId===_uidCv?Object.assign({},x,{img:url}):x;});};
+              DataLayer._cache.hotels=_patchImg(DataLayer._cache.hotels);
+              DataLayer._cache.restaurants=_patchImg(DataLayer._cache.restaurants);
+              if(DataLayer._onUpdate)DataLayer._onUpdate();
+            }catch(exCv){}
+          } else if(!url){
+            toastApp("Échec de l'enregistrement de la couverture — vérifiez votre connexion et réessayez","error");
           }
         });
       }catch(ex){ console.warn("[Cover] Erreur conversion base64:", ex); }
