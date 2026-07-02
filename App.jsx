@@ -46,6 +46,18 @@ function fmtK(n){
   if(n>=1000){var k=Math.round(n/100)/10;return(k%1===0?k.toFixed(0):k)+"k";}
   return String(n);
 }
+// Temps relatif type LinkedIn : "maintenant", "il y a 5 min", "il y a 2 h", "il y a 3 j", puis date
+function timeAgo(iso){
+  if(!iso)return"maintenant";
+  var d=new Date(iso);
+  if(isNaN(d.getTime()))return String(iso);
+  var s=Math.floor((Date.now()-d.getTime())/1000);
+  if(s<60)return"maintenant";
+  var mn=Math.floor(s/60);if(mn<60)return"il y a "+mn+" min";
+  var h=Math.floor(mn/60);if(h<24)return"il y a "+h+" h";
+  var j=Math.floor(h/24);if(j<7)return"il y a "+j+" j";
+  return d.toLocaleDateString("fr-FR");
+}
 
 const ANIM_CSS="@keyframes hp-fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-slide-right{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:translateX(0)}}@keyframes hp-slide-out-right{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}@keyframes hp-slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes hp-scale-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}@keyframes hp-fade{from{opacity:0}to{opacity:1}}@keyframes hp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes hp-item-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}@keyframes hp-heart-pop{0%{transform:scale(1)}20%{transform:scale(1.45)}40%{transform:scale(1.1)}60%{transform:scale(1.28)}80%{transform:scale(.97)}100%{transform:scale(1)}}@keyframes hp-bounce-in{0%{opacity:0;transform:scale(.87) translateY(10px)}55%{opacity:1;transform:scale(1.03)}75%{transform:scale(.99)}100%{opacity:1;transform:scale(1)}}@keyframes hp-toast-in{from{opacity:0;transform:translateX(-50%) translateY(18px) scale(.93)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}@keyframes hp-slide-down{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}@keyframes hp-sheet-out{from{transform:translateY(0);opacity:1}to{transform:translateY(100%);opacity:0}}@keyframes hp-msg-in{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes hp-success-ring{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.12);opacity:1}80%{transform:scale(.96)}100%{transform:scale(1);opacity:1}}button{transition:opacity .16s cubic-bezier(0.22,1,0.36,1),transform .14s cubic-bezier(0.22,1,0.36,1),background .18s ease,color .18s ease}button:active{transform:scale(.94);opacity:.82}.hp-scroll{-webkit-overflow-scrolling:touch}.hp-card{transition:box-shadow .18s ease,transform .16s ease}.hp-card:active{transform:scale(.984)}.hp-img{opacity:0;transition:opacity .38s ease}.hp-img-loaded{opacity:1}.hp-input-focus{outline:none!important;box-shadow:0 0 0 2.5px #6366F133!important;border-color:#6366F1!important;transition:box-shadow .18s ease,border-color .18s ease}.hp-sk{background:linear-gradient(90deg,#17171F 25%,#252533 50%,#17171F 75%);background-size:600px 100%;animation:hp-shimmer 1.5s infinite linear;border-radius:8px}input,textarea{transition:box-shadow .18s ease,border-color .18s ease}";
 function useAnimations(){useEffect(function(){if(document.getElementById("hp-a"))return;var s=document.createElement("style");s.id="hp-a";s.textContent=ANIM_CSS;document.head.appendChild(s);},[]);}
@@ -97,6 +109,24 @@ const SPLASH_AD={
 // =====================================================================
 var _HP_UID=null;
 function _lk(k){return _HP_UID?(k.replace(/^hp_/,"hp_"+_HP_UID+"_")):k;}
+// Notifie le VRAI destinataire (proprietaire du post/etablissement) — jamais soi-meme.
+// Le destinataire la recevra via le chargement des notifications au login.
+function notifyUser(targetUserId,notif){
+  try{
+    if(!DataLayer._client||!targetUserId||!notif)return;
+    if(_HP_UID&&targetUserId===_HP_UID)return;
+    DataLayer._client.from("notifications").insert([{id:notif.id,user_id:targetUserId,icon:notif.icon||"Bell",color:notif.color||"#6366f1",title:notif.title,body:notif.body,time:notif.time||"maintenant",read:false,tab:notif.tab||"feed",pref_key:notif.prefKey||"reservation"}]).then(function(){}).catch(function(){});
+  }catch(e){}
+}
+// Retrouve le userId du proprietaire d'un post (etablissement reel inscrit)
+function _postOwnerUid(post){
+  try{
+    if(!post)return null;
+    var all=DataLayer.getEstablishments();
+    var own=all.find(function(x){return x.userId&&(x.id===post.id||x.name===post.author);});
+    return own?own.userId:null;
+  }catch(e){return null;}
+}
 var DataLayer = {
   // Cache interne : initialise avec les donnees de demonstration.
   // L'UI lit TOUJOURS depuis ce cache (synchrone, jamais vide).
@@ -164,7 +194,7 @@ var DataLayer = {
       // 2. Posts
       supabase.from("posts").select("*").then(function(res){
         if(res && res.data && res.data.length>0){
-          DataLayer._cache.feed = res.data.map(function(r){ return r.data || r; });
+          DataLayer._cache.feed = res.data.map(function(r){ var obj=r.data||r; if(r.created_at)obj=Object.assign({},obj,{time:timeAgo(r.created_at)}); return obj; });
           if(DataLayer._onUpdate) DataLayer._onUpdate();
         } else if(res && res.data && res.data.length===0){
           DataLayer._seedPosts(supabase);
@@ -257,6 +287,19 @@ var DataLayer = {
               localStorage.setItem(key,JSON.stringify(merged));
             });
           }catch(ex){}
+          // Note et nombre d'avis REELS : agrege les avis Supabase par etablissement
+          try{
+            DataLayer._reviewAgg=DataLayer._reviewAgg||{};
+            Object.keys(byEstab).forEach(function(eid){
+              var list=byEstab[eid];var n=list.length;
+              var avg=n>0?Math.round((list.reduce(function(s,r){return s+(r.rating||0);},0)/n)*10)/10:0;
+              DataLayer._reviewAgg[eid]={avg:avg,n:n};
+            });
+            var _applyAgg=function(arr){return arr.map(function(x){var a=DataLayer._reviewAgg[x.id];return a?Object.assign({},x,{rating:a.avg,reviewCount:a.n}):x;});};
+            DataLayer._cache.hotels=_applyAgg(DataLayer._cache.hotels);
+            DataLayer._cache.restaurants=_applyAgg(DataLayer._cache.restaurants);
+            if(DataLayer._onUpdate)DataLayer._onUpdate();
+          }catch(ex2){}
         }
       });
       // 8. Profils Pro — ajoute les vrais etablissements inscrits au cache
@@ -265,13 +308,26 @@ var DataLayer = {
           if(res&&res.data&&res.data.length>0){
             var newHotels=res.data.filter(function(p){return p.account_type==="hotel";}).map(function(p){return{id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:"hotel",svcMode:p.svc_mode||"hotel",location:p.location||"",description:p.description||"",img:p.cover_url||"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70",verified:p.verified||false,isPremium:p.is_premium||false,priceFrom:0,services:[],rooms:[],offers:[]};});
             var newRestos=res.data.filter(function(p){return p.account_type==="restaurant";}).map(function(p){return{id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:"restaurant",svcMode:"restaurant",location:p.location||"",description:p.description||"",img:p.cover_url||"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70",verified:p.verified||false,isPremium:p.is_premium||false,priceFrom:0,services:[],rooms:[],offers:[]};});
+            // Applique les notes reelles deja agregees (si l'etape avis a fini avant)
+            try{if(DataLayer._reviewAgg){var _ap=function(x){var a=DataLayer._reviewAgg[x.id];return a?Object.assign({},x,{rating:a.avg,reviewCount:a.n}):x;};newHotels=newHotels.map(_ap);newRestos=newRestos.map(_ap);}}catch(exA){}
             if(newHotels.length){DataLayer._cache.hotels=DataLayer._cache.hotels.filter(function(h){return!h.userId;}).concat(newHotels);}
             if(newRestos.length){DataLayer._cache.restaurants=DataLayer._cache.restaurants.filter(function(r){return!r.userId;}).concat(newRestos);}
             if(DataLayer._onUpdate)DataLayer._onUpdate();
+            // Abonnes REELS : compte combien d'utilisateurs suivent chaque etablissement inscrit
+            supabase.from("profiles").select("following").then(function(fres){
+              if(!fres||!fres.data)return;
+              var fc={};
+              fres.data.forEach(function(p){(p.following||[]).forEach(function(fid){fc[fid]=(fc[fid]||0)+1;});});
+              var _applyF=function(arr){return arr.map(function(x){return x.userId?Object.assign({},x,{followers:fc[x.id]||0}):x;});};
+              DataLayer._cache.hotels=_applyF(DataLayer._cache.hotels);
+              DataLayer._cache.restaurants=_applyF(DataLayer._cache.restaurants);
+              if(DataLayer._onUpdate)DataLayer._onUpdate();
+            });
           }
         });
       // 9. Reservations — re-hydrate BookingService depuis Supabase
-      supabase.from("reservations").select("*").then(function(res){
+      // Confidentialite : uniquement les reservations de l'utilisateur connecte (jamais celles des autres)
+      if(_HP_UID) supabase.from("reservations").select("*").eq("client_id",_HP_UID).then(function(res){
         if(res && res.data && res.data.length>0){
           try{
             var existing=[];try{existing=JSON.parse(localStorage.getItem(_lk("hp_resas_all"))||"[]");}catch(ex){}
@@ -638,6 +694,7 @@ var BookingService = {
     if(!resa) return null;
     if(!resa.id){ resa.id = BookingService.generateId(); }
     if(!resa.createdAt){ resa.createdAt = new Date().toISOString(); }
+    if(clientId&&!resa.clientId){ resa.clientId = clientId; }
     BookingService._all.push(resa);
     try{localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(BookingService._all));}catch(e){}
     try{ if(DataLayer._client){ DataLayer.saveReservation(resa,clientId||null).then(function(){}); } }catch(e){}
@@ -851,7 +908,7 @@ function BotNav(props){
     setTapped(id);setTimeout(function(){setTapped(null);},200);
     if(id==="feed"&&active===id&&onHomeRefresh)onHomeRefresh();else set(id);
   }
-  return(<div style={{position:"sticky",bottom:0,background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}}>{tabs.map(function(tab){var Icon=tab.icon;var id=tab.id;var isAct=active===id;var isTapped=tapped===id;return(<button key={id} onClick={function(){tap(id);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"9px 0 7px",background:"none",border:"none",cursor:"pointer",gap:3,transform:isTapped?"scale(.88)":"scale(1)",transition:"transform .14s cubic-bezier(0.22,1,0.36,1)"}}><Icon size={22} color={isAct?accent:DS.textMuted} strokeWidth={isAct?2.5:1.5}/><div style={{fontSize:9,fontWeight:isAct?800:400,color:isAct?accent:DS.textMuted,transition:"color .18s"}}>{tab.label}</div><div style={{width:isAct?18:0,height:2.5,borderRadius:2,background:accent,transition:"width .25s cubic-bezier(0.22,1,0.36,1)"}}/></button>);})}</div>);
+  return(<div style={{position:"sticky",bottom:0,background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",zIndex:100,paddingBottom:"env(safe-area-inset-bottom)"}}>{tabs.map(function(tab){var Icon=tab.icon;var id=tab.id;var isAct=active===id;var isTapped=tapped===id;return(<button key={id} onClick={function(){tap(id);}} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"9px 0 7px",background:"none",border:"none",cursor:"pointer",gap:3,transform:isTapped?"scale(.88)":"scale(1)",transition:"transform .14s cubic-bezier(0.22,1,0.36,1)"}}><div style={{position:"relative"}}><Icon size={22} color={isAct?accent:DS.textMuted} strokeWidth={isAct?2.5:1.5}/>{tab.badge>0&&<span style={{position:"absolute",top:-4,right:-9,minWidth:15,height:15,borderRadius:8,background:DS.error,border:"2px solid "+DS.surface,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800,color:"#fff",padding:"0 3px",boxSizing:"content-box"}}>{tab.badge>9?"9+":tab.badge}</span>}</div><div style={{fontSize:9,fontWeight:isAct?800:400,color:isAct?accent:DS.textMuted,transition:"color .18s"}}>{tab.label}</div><div style={{width:isAct?18:0,height:2.5,borderRadius:2,background:accent,transition:"width .25s cubic-bezier(0.22,1,0.36,1)"}}/></button>);})}</div>);
 }
 
 function Ov(props){
@@ -1134,7 +1191,7 @@ function NotifP(props){
   var title=isPro?"Notifications Pro":"Notifications";
   var snSk=useState(true);var notifSkLoading=snSk[0];var setNotifSkLoading=snSk[1];
   useEffect(function(){var t=setTimeout(function(){setNotifSkLoading(false);},300);return function(){clearTimeout(t);};},[]);
-  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>{title}</div>} right={null}/>{notifSkLoading?<NotifSkeleton/>:<>{notifs.length===0&&<Emp Icon={Bell} title="Aucune notification" sub="Vos notifications apparaîtront ici"/>}{notifs.map(function(n,_ni){var Icon=ICON_MAP[n.icon]||ICON_MAP[n.Icon&&n.Icon.displayName]||Bell;return(<div key={n.id} onClick={function(){handleMarkRead(n.id);if(onNavigate)onNavigate(n.tab);}} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",background:n.read?"transparent":n.color+"08",animation:"hp-item-in 0.3s ease both",animationDelay:(_ni*50)+"ms"}}><div style={{width:40,height:40,borderRadius:"50%",background:n.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={n.color}/></div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?600:800,color:DS.text,marginBottom:2}}>{n.title}</div><div style={{fontSize:12,color:DS.textMuted}}>{n.body}</div><div style={{fontSize:10,color:DS.textDim,marginTop:4}}>{n.time}</div></div>{!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:accent,marginTop:6,flexShrink:0}}/>}</div>);})}</>}</div>);
+  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>{title}</div>} right={null}/>{notifSkLoading?<NotifSkeleton/>:<>{notifs.length===0&&<Emp Icon={Bell} title="Aucune notification" sub="Vos notifications apparaîtront ici"/>}{notifs.map(function(n,_ni){var Icon=ICON_MAP[n.icon]||ICON_MAP[n.Icon&&n.Icon.displayName]||Bell;return(<div key={n.id} onClick={function(){handleMarkRead(n.id);if(onNavigate)onNavigate(n.tab);}} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",background:n.read?"transparent":n.color+"08",animation:"hp-item-in 0.3s ease both",animationDelay:(_ni*50)+"ms"}}><div style={{width:40,height:40,borderRadius:"50%",background:n.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={n.color}/></div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?600:800,color:DS.text,marginBottom:2}}>{n.title}</div><div style={{fontSize:12,color:DS.textMuted}}>{n.body}</div><div style={{fontSize:10,color:DS.textDim,marginTop:4}}>{n.createdAt?timeAgo(n.createdAt):n.time}</div></div>{!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:accent,marginTop:6,flexShrink:0}}/>}</div>);})}</>}</div>);
 }
 
 function SettingsS(props){
@@ -1287,6 +1344,7 @@ function ChatUI(props){
       .then(function(res){
         setConvLoading(false);
         if(res.error||!res.data||res.data.length===0){
+          if(props.initialConvId){var nc1={convId:props.initialConvId,msgs:[]};nc1[nK]=props.initialConvName||"Conversation";if(iK)nc1[iK]=props.initialConvImg||null;nc1[vK]=false;setThr([nc1]);setActive(0);if(props.onInitialConvConsumed)props.onInitialConvConsumed();return;}
           if(init&&init.length>0)setThr(init.map(function(c){return Object.assign({},c,{msgs:(c.messages||[]).slice()});}));
           return;
         }
@@ -1297,7 +1355,25 @@ function ChatUI(props){
           obj[vK]=isClientChat?(c.pro_verified||false):false;
           return obj;
         });
+        // Ouverture directe de la conversation demandee (clic "Chat" depuis un etablissement)
+        if(props.initialConvId){
+          var _ix=newThr.findIndex(function(c){return c.convId===props.initialConvId;});
+          if(_ix<0){var nc0={convId:props.initialConvId,msgs:[]};nc0[nK]=props.initialConvName||"Conversation";if(iK)nc0[iK]=props.initialConvImg||null;nc0[vK]=false;newThr=[nc0].concat(newThr);_ix=0;}
+          setActive(_ix);
+          if(props.onInitialConvConsumed)props.onInitialConvConsumed();
+        }
         setThr(newThr);
+        // Compteur non lus par conversation (badge liste + onglet)
+        var _cids=newThr.map(function(c){return c.convId;}).filter(Boolean);
+        if(_cids.length){
+          client.from("messages").select("conversation_id").in("conversation_id",_cids).eq("read",false).neq("sender_id",myId)
+            .then(function(mres){
+              if(mres.error||!mres.data)return;
+              var uc={};mres.data.forEach(function(m){uc[m.conversation_id]=(uc[m.conversation_id]||0)+1;});
+              setThr(function(ts){return ts.map(function(c){return Object.assign({},c,{unreadCount:c.convId?(uc[c.convId]||0):(c.unreadCount||0)});});});
+              if(props.onUnreadChange){var _tot=0;Object.keys(uc).forEach(function(k){_tot+=uc[k];});props.onUnreadChange(_tot);}
+            }).catch(function(){});
+        }
       }).catch(function(err){setConvLoading(false);if(err&&err.message!=="no-client"){setConvErr("Erreur de chargement des conversations.");}});
   },[myId,isClientChat]);
   // Charge les messages et souscrit au Realtime quand une conversation est ouverte
@@ -1337,6 +1413,8 @@ function ChatUI(props){
       var _insertMsg=function(){
         client.from("messages").insert([{conversation_id:convId,sender_id:myId,sender_name:myName,body:sentMsg,reply_to_body:sentReply?sentReply.t:null,reply_to_sender:sentReply?(sentReply.f==="me"?myId:null):null,deleted:false,read:false}]).then(function(){});
         client.from("conversations").update({last_message:sentMsg,updated_at:new Date().toISOString()}).eq("id",convId).then(function(){});
+        // Notifie le destinataire du nouveau message (id = clientId_proId)
+        try{var _parts=convId.split("_");var _other=_parts.find(function(x){return x&&x!==myId&&x.length>=32;});if(_other)notifyUser(_other,{id:"notif_msg_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau message",body:(myName||"Un utilisateur")+" vous a envoyé un message.",time:"maintenant",read:false,tab:"chat",prefKey:"message"});}catch(e){}
       };
       // Vérifier si la conversation existe, sinon la créer
       client.from("conversations").select("id").eq("id",convId).maybeSingle().then(function(res){
@@ -1352,7 +1430,7 @@ function ChatUI(props){
     setThr(function(ts){return ts.map(function(c,i){return i===active?Object.assign({},c,{msgs:c.msgs.map(function(m){return MessageService.markDeleted(m,id);})}):c;});});
     if(myId&&DataLayer._client){DataLayer._client.from("messages").update({deleted:true}).eq("id",id).eq("sender_id",myId).then(function(){});}
   }
-  function markRead(idx){setThr(function(ts){return ts.map(function(c,i){return i===idx?Object.assign({},c,{msgs:c.msgs.map(function(m){return MessageService.markRead(m);})}):c;});});}
+  function markRead(idx){setThr(function(ts){var next=ts.map(function(c,i){return i===idx?Object.assign({},c,{unreadCount:0,msgs:c.msgs.map(function(m){return MessageService.markRead(m);})}):c;});if(props.onUnreadChange){var _tot=0;next.forEach(function(c){_tot+=(c.unreadCount||0);});props.onUnreadChange(_tot);}return next;});}
   var conv=active!==null?thr[active]:null;
   var sChatSk=useState(true);var chatSkLoading=sChatSk[0];var setChatSkLoading=sChatSk[1];
   useEffect(function(){if(active!==null)return;var t=setTimeout(function(){setChatSkLoading(false);},280);return function(){clearTimeout(t);};},[active]);
@@ -1401,7 +1479,7 @@ function ChatUI(props){
       })}
     </div>
   </div>);}
-  if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</span><button onClick={function(){setShowCompose(true);}} style={{width:32,height:32,borderRadius:"50%",background:myColor,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Plus size={16} color="#fff"/></button></div></div>{convErr&&<div style={{padding:"10px 16px",background:"#ff4d4d22",color:"#ff4d4d",fontSize:12,textAlign:"center"}}>{convErr}</div>}{(chatSkLoading||convLoading)?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length;return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"Début de la conversation"}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
+  if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</span><button onClick={function(){setShowCompose(true);}} style={{width:32,height:32,borderRadius:"50%",background:myColor,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Plus size={16} color="#fff"/></button></div></div>{convErr&&<div style={{padding:"10px 16px",background:"#ff4d4d22",color:"#ff4d4d",fontSize:12,textAlign:"center"}}>{convErr}</div>}{(chatSkLoading||convLoading)?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.length?t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length:(t.unreadCount||0);return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"Début de la conversation"}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
   var msgs=conv?conv.msgs:[];
   return(<div style={{display:"flex",flexDirection:"column",height:"100%",background:DS.bg}}><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false} isClient={isClientChat}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>Membre HotelPlatform</div></div></div><div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",animation:"hp-msg-in 0.3s ease both",animationDelay:Math.min(i*20,200)+"ms"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprimé]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoyé"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Répondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()} style={{width:40,height:40,borderRadius:"50%",background:msg.trim()?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
 }
@@ -1645,8 +1723,8 @@ function CommentsSheet(props){
       <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",borderTop:"1px solid "+DS.border+"40",flexShrink:0,background:DS.surface}}>
         <Av sz={30} letter={selfLetter} verified={selfVerified} isClient={true}/>
         <div style={{flex:1,position:"relative"}}>
-          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter"){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre à "+replyTo.author+"...":"Ajouter un commentaire..."} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
-          <button onClick={function(){addCmt(post.id,replyTo);if(replyTo&&replyTo.author!==selfName&&onAddNotif)onAddNotif({id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
+          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter"){addCmt(post.id,replyTo);if(replyTo&&replyTo.userId&&replyTo.author!==selfName)notifyUser(replyTo.userId,{id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre à "+replyTo.author+"...":"Ajouter un commentaire..."} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          <button onClick={function(){addCmt(post.id,replyTo);if(replyTo&&replyTo.userId&&replyTo.author!==selfName)notifyUser(replyTo.userId,{id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
         </div>
       </div>
     </div>
@@ -1679,7 +1757,7 @@ function ClientFeed(props){
   var s1=useState(function(){
     var base=DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes+(_initLikes[p.id]?1:0),comments:[],showCmt:false});});
     try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:false,comments:p.comments||[],showCmt:false});});base=_new.concat(base);}}catch(_e){}
-    base.sort(function(a,b){var aB=(a.verified&&a.isPremium)?1:a.verified?1:0;var bB=(b.verified&&b.isPremium)?1:b.verified?1:0;return bB-aB;});
+    base.sort(function(a,b){var aB=(a.verified?2:0)+(a.isPremium?1:0);var bB=(b.verified?2:0)+(b.isPremium?1:0);return bB-aB;});
     return base;
   });
   var posts=s1[0];var setPosts=s1[1];
@@ -1709,7 +1787,21 @@ function ClientFeed(props){
             return Object.assign({},p,{liked:nowLiked,likes:nowLiked?p.likes+1:p.likes-1});
           });
         });
+        // Compteurs de likes REELS agreges depuis Supabase (preuve sociale authentique)
+        DataLayer._client.from("post_likes").select("post_id").then(function(r2){
+          if(r2.error||!r2.data)return;
+          var cnt={};r2.data.forEach(function(r){cnt[r.post_id]=(cnt[r.post_id]||0)+1;});
+          setPosts(function(ps){return ps.map(function(p){return cnt[p.id]!==undefined?Object.assign({},p,{likes:cnt[p.id]}):p;});});
+        });
       });
+    // Commentaires REELS hydrates depuis Supabase (avant : ecriture seule, perdus au rechargement)
+    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at").order("created_at",{ascending:true})
+      .then(function(r3){
+        if(r3.error||!r3.data||r3.data.length===0)return;
+        var byPost={};
+        r3.data.forEach(function(c){if(!byPost[c.post_id])byPost[c.post_id]=[];byPost[c.post_id].push({id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),replyTo:null});});
+        setPosts(function(ps){return ps.map(function(p){var cs=byPost[p.id];if(!cs||!cs.length)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
+      }).catch(function(){});
   },[selfUserId]);
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState({});var cmtText=s2[0];var setCmtText=s2[1];
@@ -1758,17 +1850,18 @@ function ClientFeed(props){
         else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}
       }
     }catch(e){}
-    if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:selfName+" a aimé la publication de "+post.author+".",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
+    if(!wasLiked&&post){var _ownUid=_postOwnerUid(post);if(_ownUid)notifyUser(_ownUid,{id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:selfName+" a aimé votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
   function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partagé avec succès","success");}
   function addCmt(id,replyTo){
     var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
-    var cm={id:Date.now(),author:selfName,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
+    var cm={id:Date.now(),userId:selfUserId,author:selfName,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
     try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:selfName,body:text}]).then(function(){}).catch(function(){});}}catch(e){}
+    try{var _pC=posts.find(function(p){return p.id===id;});var _ownUidC=_postOwnerUid(_pC);if(_ownUidC)notifyUser(_ownUidC,{id:"notif_cmt_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau commentaire",body:selfName+" a commenté votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});}catch(e){}
     toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
@@ -2231,7 +2324,7 @@ function EstabM(props){
                 </div>
               )}
             </div>
-          )}{tab==="reviews"&&<div><div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:selfName};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{DataLayer.saveReview(e&&e.id,rv,selfUserId||null);}catch(ex2){}toast("Avis publié","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier à partager votre expérience"/>}</div>}</div></div>);
+          )}{tab==="reviews"&&<div>{(e.isPremium||!e.userId)?<div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:selfName};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{DataLayer.saveReview(e&&e.id,rv,selfUserId||null);}catch(ex2){}toast("Avis publié","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>:<div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 16px",marginBottom:14,fontSize:12,color:DS.textMuted,lineHeight:1.5,display:"flex",alignItems:"center",gap:8}}><Lock size={13} color={DS.textDim}/>Cet établissement ne collecte pas encore d'avis clients.</div>}{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}><Av sz={26} letter={((rv.author||"C")[0]||"C").toUpperCase()}/><span style={{fontSize:12,fontWeight:800,color:DS.text,flex:1}}>{rv.author||"Client"}</span></div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier à partager votre expérience"/>}</div>}</div></div>);
 }
 
 // Formulaire de paiement Stripe — monté dans un Elements provider
@@ -2317,7 +2410,7 @@ function BookM(props){
   var s3b=useState(1);var nightsCount=s3b[0];var setNightsCount=s3b[1];
   function computeDateOut(din,nc){if(!din)return"";var d=new Date(din);d.setDate(d.getDate()+nc);return d.toISOString().slice(0,10);}
   var s5=useState("sans");var payMode=s5[0];var setPayMode=s5[1];
-  var s6=useState("mobile");var payMethod=s6[0];var setPayMethod=s6[1];
+  var s6=useState("card");var payMethod=s6[0];var setPayMethod=s6[1];
   var spay=useState(false);var paying=spay[0];var setPaying=spay[1];
   var sSCS=useState(null);var stripeClientSecret=sSCS[0];var setStripeClientSecret=sSCS[1];
   var sSM=useState(false);var showStripeModal=sSM[0];var setShowStripeModal=sSM[1];
@@ -2485,10 +2578,10 @@ function BookM(props){
               {payMode==="avec"&&(
                 <div style={{marginTop:8,marginBottom:14}}>
                   <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:8}}>METHODE DE PAIEMENT</div>
-                  {[["mobile","Mobile Money","Wave, Orange Money, MTN"],["card","Carte bancaire","Visa, Mastercard, CB"]].map(function(_i){
-                    var v=_i[0];var l=_i[1];var sub=_i[2];var isSel=payMethod===v;
+                  {[["card","Carte bancaire","Visa, Mastercard, CB",false],["mobile","Mobile Money","Bientôt disponible",true]].map(function(_i){
+                    var v=_i[0];var l=_i[1];var sub=_i[2];var isDisabled=_i[3];var isSel=payMethod===v;
                     return(
-                      <div key={v} onClick={function(){setPayMethod(v);}} style={{padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
+                      <div key={v} onClick={function(){if(isDisabled){toast("Mobile Money sera bientôt disponible","info");return;}setPayMethod(v);}} style={{padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:isDisabled?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:12,opacity:isDisabled?0.5:1}}>
                         <div style={{width:20,height:20,borderRadius:"50%",border:"2px solid "+(isSel?color:DS.border),background:isSel?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                           {isSel&&<div style={{width:8,height:8,borderRadius:"50%",background:"#fff"}}/>}
                         </div>
@@ -2502,10 +2595,12 @@ function BookM(props){
                 <button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
                 <button onClick={function(){
                   if(paying) return;
-                  // Flux sans paiement ou Mobile Money : simulation conservée
-                  if(payMode==="sans"||(payMode==="avec"&&payMethod==="mobile")){
+                  // Mobile Money : pas encore branché sur un vrai fournisseur — aucune fausse confirmation
+                  if(payMode==="avec"&&payMethod==="mobile"){toast("Mobile Money sera bientôt disponible. Utilisez la carte bancaire.","info");return;}
+                  // Flux sans paiement : demande envoyée à l'établissement (pending)
+                  if(payMode==="sans"){
                     setPaying(true);
-                    var delay=payMode==="avec"?1100:500;
+                    var delay=500;
                     setTimeout(function(){
                       var initStatus=payMode==="avec"?"confirmed":"pending";
                       var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
@@ -2668,10 +2763,11 @@ function ProFeed(props){
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
   function addCmt(id,replyTo){
     var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
-    var cm={id:Date.now(),author:data.name,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
+    var cm={id:Date.now(),userId:selfUserId,author:data.name,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
     try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:data.name,body:text}]).then(function(){}).catch(function(){});}}catch(e){}
+    try{var _pC2=posts.find(function(p){return p.id===id;});var _ownUidC2=_postOwnerUid(_pC2);if(_ownUidC2)notifyUser(_ownUidC2,{id:"notif_cmt_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau commentaire",body:data.name+" a commenté votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});}catch(e){}
     toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
@@ -2727,7 +2823,19 @@ function ProFeed(props){
             return Object.assign({},p,{liked:nowLiked,likes:nowLiked?p.likes+1:p.likes-1});
           });
         });
+        DataLayer._client.from("post_likes").select("post_id").then(function(r2){
+          if(r2.error||!r2.data)return;
+          var cnt={};r2.data.forEach(function(r){cnt[r.post_id]=(cnt[r.post_id]||0)+1;});
+          setPosts(function(ps){return ps.map(function(p){return cnt[p.id]!==undefined?Object.assign({},p,{likes:cnt[p.id]}):p;});});
+        });
       });
+    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at").order("created_at",{ascending:true})
+      .then(function(r3){
+        if(r3.error||!r3.data||r3.data.length===0)return;
+        var byPost={};
+        r3.data.forEach(function(c){if(!byPost[c.post_id])byPost[c.post_id]=[];byPost[c.post_id].push({id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),replyTo:null});});
+        setPosts(function(ps){return ps.map(function(p){var cs=byPost[p.id];if(!cs||!cs.length)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
+      }).catch(function(){});
   },[selfUserId]);
   var sHeartPro=useState(null);var heartAnimPro=sHeartPro[0];var setHeartAnimPro=sHeartPro[1];
   function triggerHeartPro(id){setHeartAnimPro(id);setTimeout(function(){setHeartAnimPro(null);},500);}
@@ -2736,7 +2844,6 @@ function ProFeed(props){
     setPosts(function(ps){
       var next=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});
       try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem(_lk("hp_pro_likes"),JSON.stringify(lk));}catch(e){}
-      if(!wasLiked&&post&&onAddNotif){onAddNotif({id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:"Quelqu'un a aimé votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
       return next;
     });
     try{
@@ -2745,6 +2852,7 @@ function ProFeed(props){
         else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}
       }
     }catch(e){}
+    if(!wasLiked&&post){var _ownUidP=_postOwnerUid(post);if(_ownUidP)notifyUser(_ownUidP,{id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:data.name+" a aimé votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
@@ -3588,13 +3696,33 @@ function ProResa(props){
   var proType=props.proType;var onOpenChat=props.onOpenChat;
   var clientPrivacySettings=props.clientPrivacySettings||{locked:false,msgPermission:"everyone"};
   var selfEmail=props.selfEmail||"";
+  var estabName=props.estabName||null;
   var CONNECTED_CLIENT_NAME=props.selfName||(function(){try{return localStorage.getItem(_lk("hp_client_display_name"))||"";}catch(e){return "";}}())||(selfEmail.split("@")[0]||"Client");
   var color=rC(proType);
-  var _liveResas=BookingService.getAll().map(function(r){return {id:r.id,client:r.clientName||CONNECTED_CLIENT_NAME,service:r.service||"Reservation",dateIn:r.dateIn||"",dateOut:r.dateOut||r.dateIn||"",nights:r.nights||1,guests:r.guests||1,total:r.total||0,payMode:r.payMode||"sans",status:r.status||"pending",qrScanned:r.status==="consumed"};});
+  var _liveResas=BookingService.getAll().map(function(r){return {id:r.id,clientId:r.clientId||null,client:r.clientName||CONNECTED_CLIENT_NAME,service:r.service||"Reservation",dateIn:r.dateIn||"",dateOut:r.dateOut||r.dateIn||"",nights:r.nights||1,guests:r.guests||1,total:r.total||0,payMode:r.payMode||"sans",status:r.status||"pending",qrScanned:r.status==="consumed"};});
   var s1=useState(function(){
     return _liveResas;
   });
   var resas=s1[0];var setResas=s1[1];
+  // Source de verite : les reservations de CET etablissement depuis Supabase (pas celles de tout le monde)
+  useEffect(function(){
+    if(!DataLayer._client||!estabName)return;
+    DataLayer._client.from("reservations").select("*").eq("estab_id",estabName).order("created_at",{ascending:false})
+      .then(function(res){
+        if(res.error||!res.data)return;
+        var rows=res.data.map(function(row){
+          var d=row.data||{};
+          return{id:row.id,clientId:row.client_id||null,client:d.clientName||"Client",service:d.service||"Reservation",dateIn:d.dateIn||"",dateOut:d.dateOut||d.dateIn||"",nights:d.nights||1,guests:d.guests||1,total:d.total||0,payMode:d.payMode||"sans",status:row.status||"pending",qrScanned:row.status==="consumed"};
+        });
+        setResas(rows);
+      }).catch(function(){});
+  },[estabName]);
+  function _notifyResaClient(id,title,body,col){
+    try{
+      var _r=resas.find(function(x){return x.id===id;});
+      if(_r&&_r.clientId)notifyUser(_r.clientId,{id:"notif_resast_"+Date.now(),icon:"Calendar",color:col,title:title,body:body+" (réf. "+id+")",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});
+    }catch(e){}
+  }
   var s2=useState("all");var filter=s2[0];var setFilter=s2[1];
   var s3=useState(null);var scanTarget=s3[0];var setScanTarget=s3[1];
   var tkR=useToast();var toastR=tkR.show;var ToastR=tkR.Toast;
@@ -3604,9 +3732,9 @@ function ProResa(props){
   var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim};
   var sLabels={confirmed:"Confirmée",pending:"En attente",refused:"Refusée",consumed:"Consommée"};
   function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(updated));}catch(e){}try{if(patch&&patch.status)DataLayer.updateReservationStatus(id,patch.status);}catch(e2){}}
-  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Réservation confirmée","success");}
-  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Réservation refusée","info");}
-  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivée confirmée · Client marqué présent","success");}
+  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});_notifyResaClient(id,"Réservation acceptée","Votre réservation a été acceptée par l'établissement.",DS.success);toastR("Réservation confirmée","success");}
+  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});_notifyResaClient(id,"Réservation refusée","Votre réservation a été refusée par l'établissement.",DS.error);toastR("Réservation refusée","info");}
+  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});_notifyResaClient(id,"Arrivée confirmée","Votre QR code a été scanné. Bon séjour !",DS.primary);setScanTarget(null);toastR("Arrivée confirmée · Client marqué présent","success");}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
       <ToastR/>
@@ -4142,7 +4270,11 @@ export default function App() {
     if(sb&&uid){sb.from("profiles").update({premium_data:pd,is_premium:pd!==null,updated_at:new Date().toISOString()}).eq("user_id",uid).then(function(){});}
     try{var _prem=pd!==null;var _cache=atype==="restaurant"?DataLayer._cache.restaurants:DataLayer._cache.hotels;var _idx=_cache.findIndex(function(h){return h.userId===uid;});if(_idx>=0){_cache[_idx]=Object.assign({},_cache[_idx],{isPremium:_prem});if(DataLayer._onUpdate)DataLayer._onUpdate();}}catch(ex){}
   }
-  function subscribePremium(plan,durationMonths){
+  // Paiement Premium via Stripe : l'abonnement n'est active QU'APRES paiement reussi
+  var sPPay=useState(null);var premiumPay=sPPay[0];var setPremiumPay=sPPay[1];
+  var PREMIUM_PRICES={std:9.99,plus:19.99,biz:49.99};
+  var PREMIUM_DISCOUNTS={1:0,3:0.10,6:0.20,12:0.30};
+  function _activatePremium(plan,durationMonths){
     var now=new Date();
     var exp=new Date(now);
     exp.setMonth(exp.getMonth()+durationMonths);
@@ -4150,10 +4282,9 @@ export default function App() {
     setPremiumData(pd);
     try{localStorage.setItem(_lk("hp_premium"),JSON.stringify(pd));}catch(e){}
     _savePremiumToDB(pd);
-    setShowPremium(false);
     tk.show("Premium actif jusqu'au "+exp.toLocaleDateString("fr-FR"),"success");
   }
-  function renewPremium(){
+  function _renewPremiumNow(){
     if(!premiumData)return;
     var base=new Date(premiumData.expiresAt)>new Date()?new Date(premiumData.expiresAt):new Date();
     var exp=new Date(base);
@@ -4163,6 +4294,31 @@ export default function App() {
     try{localStorage.setItem(_lk("hp_premium"),JSON.stringify(pd));}catch(e){}
     _savePremiumToDB(pd);
     tk.show("Abonnement renouvelé jusqu'au "+exp.toLocaleDateString("fr-FR"),"success");
+  }
+  function _startPremiumPayment(plan,durationMonths,isRenew){
+    var total=(PREMIUM_PRICES[plan]||9.99)*durationMonths*(1-(PREMIUM_DISCOUNTS[durationMonths]||0));
+    var cents=Math.round(total*100);
+    if(!_stripePromise){tk.show("Paiement indisponible : Stripe non configuré","error");return;}
+    if(!cents||cents<50){tk.show("Montant invalide","error");return;}
+    setShowPremium(false);
+    fetch("/api/create-payment-intent",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({amount:cents,currency:"eur",resaId:"PREMIUM-"+plan+"-"+durationMonths+"M-"+Date.now(),estabName:"Abonnement Premium HotelPlatform"})
+    })
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.error){tk.show("Erreur paiement : "+data.error,"error");return;}
+      setPremiumPay({plan:plan,durationMonths:durationMonths,amount:total,clientSecret:data.clientSecret,renew:!!isRenew});
+    })
+    .catch(function(){tk.show("Impossible de contacter le service de paiement","error");});
+  }
+  function subscribePremium(plan,durationMonths){
+    _startPremiumPayment(plan,durationMonths,false);
+  }
+  function renewPremium(){
+    if(!premiumData)return;
+    _startPremiumPayment(premiumData.plan,premiumData.durationMonths,true);
   }
   function cancelPremium(){
     setPremiumData(null);
@@ -4194,12 +4350,21 @@ export default function App() {
   var _authForUserData=s0[0];
   useEffect(function(){
     if(!_authForUserData||!_authForUserData.userId||!DataLayer._client)return;
-    DataLayer._client.from("notifications").select("id,icon,color,title,body,time,read,tab,pref_key").eq("user_id",_authForUserData.userId).order("created_at",{ascending:false}).limit(50)
+    DataLayer._client.from("notifications").select("id,icon,color,title,body,time,read,tab,pref_key,created_at").eq("user_id",_authForUserData.userId).order("created_at",{ascending:false}).limit(50)
       .then(function(res){
         if(res.error||!res.data||res.data.length===0)return;
-        var sbNotifs=res.data.map(function(n){return{id:n.id,icon:n.icon,color:n.color,title:n.title,body:n.body,time:n.time,read:n.read,tab:n.tab,prefKey:n.pref_key};});
+        var sbNotifs=res.data.map(function(n){return{id:n.id,icon:n.icon,color:n.color,title:n.title,body:n.body,time:n.created_at?timeAgo(n.created_at):n.time,createdAt:n.created_at||null,read:n.read,tab:n.tab,prefKey:n.pref_key};});
         setNotifStored(sbNotifs);
         try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(sbNotifs));}catch(e){}
+      }).catch(function(){});
+    // Badge messages non lus (onglet Messages) — comme LinkedIn
+    var _convCol=_authForUserData.type==="client"?"client_id":"pro_id";
+    DataLayer._client.from("conversations").select("id").eq(_convCol,_authForUserData.userId)
+      .then(function(cres){
+        if(cres.error||!cres.data||cres.data.length===0)return;
+        var _cids=cres.data.map(function(c){return c.id;});
+        DataLayer._client.from("messages").select("id",{count:"exact",head:true}).in("conversation_id",_cids).eq("read",false).neq("sender_id",_authForUserData.userId)
+          .then(function(mres){if(mres&&typeof mres.count==="number")setChatUnread(mres.count);}).catch(function(){});
       }).catch(function(){});
     if(_authForUserData.type==="client"){
       DataLayer._client.from("reservations").select("*").eq("client_id",_authForUserData.userId).order("created_at",{ascending:false})
@@ -4299,6 +4464,9 @@ export default function App() {
       }catch(ex){ console.warn("[Cover] Erreur conversion base64:", ex); }
     }
   }
+  // Conversation a ouvrir directement (clic "Chat" depuis un etablissement) + compteur messages non lus
+  var sPConv=useState(null);var pendingConv=sPConv[0];var setPendingConv=sPConv[1];
+  var sCU=useState(0);var chatUnread=sCU[0];var setChatUnread=sCU[1];
   var sCEmail=useState(false);var showChangeEmail=sCEmail[0];var setShowChangeEmail=sCEmail[1];
   var sCPwd=useState(false);var showChangePwd=sCPwd[0];var setShowChangePwd=sCPwd[1];
   var tk=useToast(); var Toast=tk.Toast; var toastApp=tk.show;
@@ -4353,7 +4521,7 @@ export default function App() {
       }
       return next;
     });
-    if(!was&&!isPro){addNotif({id:"notif_follow_"+Date.now(),icon:"Users",color:DS.hotel,title:"Nouvel abonne",body:"Un utilisateur suit maintenant votre etablissement.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
+    if(!was){var _tgtEst=DataLayer.getEstablishmentById(id);if(_tgtEst&&_tgtEst.userId)notifyUser(_tgtEst.userId,{id:"notif_follow_"+Date.now(),icon:"Users",color:DS.hotel,title:"Nouvel abonné",body:"Un utilisateur suit maintenant votre établissement.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
     tk.show(was?"Vous ne suivez plus cet etablissement":"Vous suivez cet etablissement","success");
   }
   function toggleFavEstab(id){
@@ -4491,7 +4659,7 @@ export default function App() {
   var _defaultNotifList = isPro ? NP_DATA : NC_DATA;
   var notifList = _notifStored !== null ? _notifStored : _defaultNotifList;
   function markNotifRead(id){var next=notifList.map(function(n){return n.id===id?Object.assign({},n,{read:true}):n;});setNotifStored(next);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}try{if(DataLayer._client&&auth&&auth.userId){DataLayer._client.from("notifications").update({read:true}).eq("id",id).eq("user_id",auth.userId).then(function(){}).catch(function(){});}}catch(e){}}
-  function addNotif(notif){if(!notifPrefs[notif.prefKey!==undefined?notif.prefKey:"reservation"])return;var next=[notif].concat(notifList);setNotifStored(next);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}try{if(DataLayer._client&&auth&&auth.userId){DataLayer._client.from("notifications").upsert([{id:notif.id,user_id:auth.userId,icon:notif.icon||"Bell",color:notif.color||"#6366f1",title:notif.title,body:notif.body,time:notif.time||"maintenant",read:false,tab:notif.tab||"feed",pref_key:notif.prefKey||"reservation"}],{onConflict:"id,user_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}}catch(e){}}
+  function addNotif(notif){if(!notifPrefs[notif.prefKey!==undefined?notif.prefKey:"reservation"])return;if(!notif.createdAt)notif=Object.assign({},notif,{createdAt:new Date().toISOString()});var next=[notif].concat(notifList);setNotifStored(next);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}try{if(DataLayer._client&&auth&&auth.userId){DataLayer._client.from("notifications").upsert([{id:notif.id,user_id:auth.userId,icon:notif.icon||"Bell",color:notif.color||"#6366f1",title:notif.title,body:notif.body,time:notif.time||"maintenant",read:false,tab:notif.tab||"feed",pref_key:notif.prefKey||"reservation"}],{onConflict:"id,user_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}}catch(e){}}
   var unread = notifList.filter(function(n){return !n.read;}).length;
 
   function openProf(id,type){
@@ -4520,6 +4688,9 @@ export default function App() {
         client_name:clientName,pro_name:e.name||e.author||"",
         pro_img:e.img||null,pro_verified:e.verified||false,pro_type:e.type||"hotel"
       }],{onConflict:"id"}).then(function(){});
+      setPendingConv({id:convId,name:e.name||e.author||"",img:e.img||null});
+    } else {
+      setPendingConv(null);
     }
     setEstab(null);
     if(!isPro)setCTab("chat");else setPTab("chat");
@@ -4559,7 +4730,7 @@ export default function App() {
     var cTabs=[
       {id:"feed",        icon:Home,          label:"Accueil"},
       {id:"discover",    icon:Search,        label:"Découverte"},
-      {id:"chat",        icon:MessageCircle, label:"Messages"},
+      {id:"chat",        icon:MessageCircle, label:"Messages", badge:chatUnread},
       {id:"profile",     icon:User,          label:"Profil"},
     ];
     return(
@@ -4573,13 +4744,14 @@ export default function App() {
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
           {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif} isPremium={isPremium} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
-          {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")}/>}
+          {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} initialConvImg={pendingConv&&pendingConv.img} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client")}/>}
-        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client")} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Votre réservation chez "+(resa.estab||"l'établissement")+" est enregistrée.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});setBook(null);}}/>}
+        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client")} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:resa.status==="confirmed"?DS.success:DS.warning,title:resa.status==="confirmed"?"Réservation confirmée":"Demande de réservation envoyée",body:resa.status==="confirmed"?("Votre réservation chez "+(resa.estab||"l'établissement")+" est confirmée."):("Votre demande chez "+(resa.estab||"l'établissement")+" est en attente de confirmation (24h)."),time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});try{if(book&&book.userId)notifyUser(book.userId,{id:"notif_newresa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Nouvelle réservation",body:(resa.clientName||"Un client")+" a réservé : "+(resa.service||"")+(resa.dateIn?(" · "+resa.dateIn):""),time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});}catch(e){}setBook(null);}}/>}
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
+        {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){var pp=premiumPay;setPremiumPay(null);if(pp.renew)_renewPremiumNow();else _activatePremium(pp.plan,pp.durationMonths);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
         {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setCTab(t);}}/>;}}</Ov>}
         {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}
@@ -4593,12 +4765,12 @@ export default function App() {
     ? [{id:"feed",         icon:Home,          label:"Accueil"},
        {id:"services",     icon:Package,       label:"Services"},
        {id:"reservations", icon:Calendar,      label:"Réservations"},
-       {id:"chat",         icon:MessageCircle, label:"Messages"},
+       {id:"chat",         icon:MessageCircle, label:"Messages", badge:chatUnread},
        {id:"profile",      icon:User,          label:"Profil"}]
     : [{id:"feed",         icon:Home,          label:"Accueil"},
        {id:"offres",       icon:Tag,           label:"Offres"},
        {id:"reservations", icon:Calendar,      label:"Réservations"},
-       {id:"chat",         icon:MessageCircle, label:"Messages"},
+       {id:"chat",         icon:MessageCircle, label:"Messages", badge:chatUnread},
        {id:"profile",      icon:User,          label:"Profil"}];
 
   return(
@@ -4618,14 +4790,15 @@ export default function App() {
         {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
-        {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email}/>}
-        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]}/>}
+        {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
+        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]} onUnreadChange={setChatUnread}/>}
         {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId} selfName={proD.name||(auth&&auth.email?auth.email.split("@")[0]:"Pro")}/>}
-      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Réservation confirmée",body:"Votre réservation chez "+(resa.estab||"l'établissement")+" est enregistrée.",time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});setBook(null);}}/>}
+      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:resa.status==="confirmed"?DS.success:DS.warning,title:resa.status==="confirmed"?"Réservation confirmée":"Demande de réservation envoyée",body:resa.status==="confirmed"?("Votre réservation chez "+(resa.estab||"l'établissement")+" est confirmée."):("Votre demande chez "+(resa.estab||"l'établissement")+" est en attente de confirmation (24h)."),time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});try{if(book&&book.userId)notifyUser(book.userId,{id:"notif_newresa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Nouvelle réservation",body:(resa.clientName||"Un client")+" a réservé : "+(resa.service||"")+(resa.dateIn?(" · "+resa.dateIn):""),time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});}catch(e){}setBook(null);}}/>}
       {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
+      {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){var pp=premiumPay;setPremiumPay(null);if(pp.renew)_renewPremiumNow();else _activatePremium(pp.plan,pp.durationMonths);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
       {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setPTab(t);}}/>;}}</Ov>}
       {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}
