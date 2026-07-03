@@ -181,6 +181,18 @@ var DataLayer = {
           var hotels=[], rests=[];
           res.data.forEach(function(row){
             var obj = row.data || row;
+            // Normalisation : les lignes sans blob "data" utilisent les noms de colonnes SQL (snake_case)
+            if(!row.data){
+              obj = Object.assign({}, row, {
+                priceFrom: row.price_from!=null?Number(row.price_from):obj.priceFrom,
+                reviewCount: row.review_count!=null?row.review_count:(obj.reviewCount||0),
+                rating: row.rating!=null?Number(row.rating):(obj.rating||0),
+                svcMode: row.svc_mode||obj.svcMode,
+                hasRestaurant: row.has_restaurant===true||obj.hasRestaurant===true,
+                isPremium: row.is_premium===true,
+                userId: row.owner_id||undefined
+              });
+            }
             if(obj.type==="hotel") hotels.push(obj); else rests.push(obj);
           });
           if(hotels.length) DataLayer._cache.hotels = hotels;
@@ -4683,7 +4695,7 @@ export default function App() {
   }
   var _fallbackProD=auth.type==="hotel"?DataLayer.getHotels()[0]:DataLayer.getRestaurants()[0];
   var proD=proProfile&&proProfile.display_name?{
-    id:auth.userId,userId:auth.userId,
+    id:"prof_"+auth.userId,userId:auth.userId,
     name:proProfile.display_name,author:proProfile.display_name,
     type:auth.type,svcMode:proProfile.svc_mode||auth.type,
     location:proProfile.location||"",description:proProfile.description||"",
