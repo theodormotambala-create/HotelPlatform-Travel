@@ -1811,11 +1811,11 @@ function ClientFeed(props){
         });
       });
     // Commentaires REELS hydrates depuis Supabase (avant : ecriture seule, perdus au rechargement)
-    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at").order("created_at",{ascending:true})
+    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at,reply_to_author,reply_to_text").order("created_at",{ascending:true})
       .then(function(r3){
         if(r3.error||!r3.data||r3.data.length===0)return;
         var byPost={};
-        r3.data.forEach(function(c){if(!byPost[c.post_id])byPost[c.post_id]=[];byPost[c.post_id].push({id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),replyTo:null});});
+        r3.data.forEach(function(c){if(!byPost[c.post_id])byPost[c.post_id]=[];byPost[c.post_id].push({id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null});});
         setPosts(function(ps){return ps.map(function(p){var cs=byPost[p.id];if(!cs||!cs.length)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
       }).catch(function(){});
   },[selfUserId]);
@@ -1876,7 +1876,7 @@ function ClientFeed(props){
     var cm={id:Date.now(),userId:selfUserId,author:selfName,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:selfName,body:text}]).then(function(){}).catch(function(){});}}catch(e){}
+    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:selfName,body:text,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).then(function(){}).catch(function(){});}}catch(e){}
     try{var _pC=posts.find(function(p){return p.id===id;});var _ownUidC=_postOwnerUid(_pC);if(_ownUidC)notifyUser(_ownUidC,{id:"notif_cmt_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau commentaire",body:selfName+" a commenté votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});}catch(e){}
     toast("Commentaire publié","neutral");
   }
@@ -2783,7 +2783,7 @@ function ProFeed(props){
     var cm={id:Date.now(),userId:selfUserId,author:data.name,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:data.name,body:text}]).then(function(){}).catch(function(){});}}catch(e){}
+    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:data.name,body:text,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).then(function(){}).catch(function(){});}}catch(e){}
     try{var _pC2=posts.find(function(p){return p.id===id;});var _ownUidC2=_postOwnerUid(_pC2);if(_ownUidC2)notifyUser(_ownUidC2,{id:"notif_cmt_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau commentaire",body:data.name+" a commenté votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});}catch(e){}
     toast("Commentaire publié","neutral");
   }
@@ -2846,11 +2846,11 @@ function ProFeed(props){
           setPosts(function(ps){return ps.map(function(p){return cnt[p.id]!==undefined?Object.assign({},p,{likes:cnt[p.id]}):p;});});
         });
       });
-    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at").order("created_at",{ascending:true})
+    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at,reply_to_author,reply_to_text").order("created_at",{ascending:true})
       .then(function(r3){
         if(r3.error||!r3.data||r3.data.length===0)return;
         var byPost={};
-        r3.data.forEach(function(c){if(!byPost[c.post_id])byPost[c.post_id]=[];byPost[c.post_id].push({id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),replyTo:null});});
+        r3.data.forEach(function(c){if(!byPost[c.post_id])byPost[c.post_id]=[];byPost[c.post_id].push({id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null});});
         setPosts(function(ps){return ps.map(function(p){var cs=byPost[p.id];if(!cs||!cs.length)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
       }).catch(function(){});
   },[selfUserId]);
