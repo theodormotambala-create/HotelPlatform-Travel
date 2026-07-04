@@ -203,10 +203,19 @@ var DataLayer = {
           DataLayer._seedEstablishments(supabase);
         }
       });
-      // 2. Posts
-      supabase.from("posts").select("*").then(function(res){
+      // 2. Posts — tri chronologique + compteurs serveur (likes/commentaires/partages maintenus par triggers, jamais les valeurs de démo)
+      supabase.from("posts").select("*").order("created_at",{ascending:false}).limit(100).then(function(res){
         if(res && res.data && res.data.length>0){
-          DataLayer._cache.feed = res.data.map(function(r){ var obj=r.data||r; if(r.created_at)obj=Object.assign({},obj,{time:timeAgo(r.created_at)}); return obj; });
+          DataLayer._cache.feed = res.data.map(function(r){
+            var obj=r.data||r;
+            obj=Object.assign({},obj,{
+              time:r.created_at?timeAgo(r.created_at):obj.time,
+              likes:typeof r.likes==="number"?r.likes:0,
+              shares:typeof r.shares==="number"?r.shares:0,
+              cmtCount:typeof r.comments_count==="number"?r.comments_count:0
+            });
+            return obj;
+          });
           if(DataLayer._onUpdate) DataLayer._onUpdate();
         } else if(res && res.data && res.data.length===0){
           DataLayer._seedPosts(supabase);
@@ -1593,11 +1602,14 @@ function ShareSheet(props){
 function CommentsSheet(props){
   var post=props.post;var cmtText=props.cmtText;var setCmtText=props.setCmtText;var addCmt=props.addCmt;var delCmt=props.delCmt;var onClose=props.onClose;var selfLetter=props.selfLetter||"V";
   var selfName=props.selfName||"Vous";var onAddNotif=props.onAddNotif||null;var selfVerified=props.selfVerified||false;
+  var selfUserId=props.selfUserId||null;
+  // Propriete d'un commentaire : par identifiant de compte (le nom seul permet des collisions)
+  function isMine(cm){return cm.userId!=null&&selfUserId!=null?String(cm.userId)===String(selfUserId):cm.author===selfName;}
   var sReply=useState(null);var replyTo=sReply[0];var setReplyTo=sReply[1];
   var menuC=useState(null);var menuCm=menuC[0];var setMenuCm=menuC[1];
   var sExp=useState({});var expandedReplies=sExp[0];var setExpandedReplies=sExp[1];
   var lpTimer=useRef(null);
-  function lpStart(cm,e){if(cm.author!==selfName)return;lpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuCm(cm);},480);}
+  function lpStart(cm,e){if(!isMine(cm))return;lpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuCm(cm);},480);}
   function lpCancel(){if(lpTimer.current){clearTimeout(lpTimer.current);lpTimer.current=null;}}
   // Closing animation
   var sClosing=useState(false);var closing=sClosing[0];var setClosing=sClosing[1];
@@ -1654,19 +1666,22 @@ function CommentsSheet(props){
       <div ref={scrollerRef} style={{flex:1,minHeight:0,overflowY:"auto",overflowX:"hidden",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",overscrollBehavior:"contain"}}>
         {post.comments.length===0&&<div style={{textAlign:"center",color:DS.textDim,fontSize:13,padding:"24px 0"}}>Aucun commentaire. Soyez le premier !</div>}
         {(function(){
-          // Groupement séquentiel : chaque réponse appartient au dernier parent avant elle
-          var groups=[];
+          // Rattachement par parentId (standard Facebook) ; repli séquentiel pour les anciens commentaires sans parentId
+          var groups=[];var byId={};
           post.comments.forEach(function(cm){
-            if(!cm.replyTo){
-              groups.push({parent:cm,replies:[]});
+            var isReply=!!(cm.replyTo||cm.parentId);
+            if(!isReply){
+              var g={parent:cm,replies:[]};groups.push(g);
+              if(cm.id!=null)byId[String(cm.id)]=g;
             } else {
-              if(groups.length>0) groups[groups.length-1].replies.push(cm);
-              else groups.push({parent:cm,replies:[]});
+              var tg=(cm.parentId!=null&&byId[String(cm.parentId)])||(groups.length>0?groups[groups.length-1]:null);
+              if(tg)tg.replies.push(cm);
+              else{var g2={parent:cm,replies:[]};groups.push(g2);if(cm.id!=null)byId[String(cm.id)]=g2;}
             }
           });
           return groups.map(function(g,gi){
             var cm=g.parent;
-            var mine=cm.author===selfName;
+            var mine=isMine(cm);
             var cmIdx=post.comments.indexOf(cm);
             var isNew=cmIdx>=initCmtCount.current;
             var repCount=g.replies.length;
@@ -1702,7 +1717,7 @@ function CommentsSheet(props){
                           <span style={{fontSize:12,fontWeight:700,color:DS.textMuted}}>Masquer les réponses</span>
                         </button>
                         {g.replies.map(function(rep,ri){
-                          var repMine=rep.author===selfName;
+                          var repMine=isMine(rep);
                           var repIsNew=post.comments.indexOf(rep)>=initCmtCount.current;
                           return(
                             <div key={rep.id||("r"+gi+ri)} style={{display:"flex",gap:8,marginBottom:10,paddingLeft:4,animation:repIsNew?"hp-item-in 0.25s ease both":"none"}}>
@@ -1739,8 +1754,8 @@ function CommentsSheet(props){
       <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",borderTop:"1px solid "+DS.border+"40",flexShrink:0,background:DS.surface}}>
         <Av sz={30} letter={selfLetter} verified={selfVerified} isClient={true}/>
         <div style={{flex:1,position:"relative"}}>
-          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter"){addCmt(post.id,replyTo);if(replyTo&&replyTo.userId&&replyTo.author!==selfName)notifyUser(replyTo.userId,{id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre à "+replyTo.author+"...":"Ajouter un commentaire..."} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
-          <button onClick={function(){addCmt(post.id,replyTo);if(replyTo&&replyTo.userId&&replyTo.author!==selfName)notifyUser(replyTo.userId,{id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});setReplyTo(null);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
+          <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter"){addCmt(post.id,replyTo);setReplyTo(null);}}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre à "+replyTo.author+"...":"Ajouter un commentaire..."} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+          <button onClick={function(){addCmt(post.id,replyTo);setReplyTo(null);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
         </div>
       </div>
     </div>
@@ -1770,25 +1785,26 @@ function ClientFeed(props){
   var _init=useRef(null);
   if(!_init.current){var _lkC={};var _fv=[];try{_lkC=JSON.parse(localStorage.getItem(_lk("hp_likes"))||"{}");_fv=JSON.parse(localStorage.getItem(_lk("hp_favs"))||"[]");}catch(e){}_init.current={likes:_lkC,favs:_fv};}
   var _initLikes=_init.current.likes;var _initFavs=_init.current.favs;
-  var s1=useState(function(){
-    var base=DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes+(_initLikes[p.id]?1:0),comments:[],showCmt:false});});
-    try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:false,comments:p.comments||[],showCmt:false});});base=_new.concat(base);}}catch(_e){}
+  function _feedBase(){
+    var base=DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes||0,shares:p.shares||0,cmtCount:typeof p.cmtCount==="number"?p.cmtCount:0,comments:[],showCmt:false});});
+    try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes||0,shares:p.shares||0,cmtCount:typeof p.cmtCount==="number"?p.cmtCount:(p.comments||[]).length,comments:p.comments||[],showCmt:false});});base=_new.concat(base);}}catch(_e){}
     base.sort(function(a,b){var aB=(a.verified?2:0)+(a.isPremium?1:0);var bB=(b.verified?2:0)+(b.isPremium?1:0);return bB-aB;});
     return base;
-  });
+  }
+  var s1=useState(_feedBase);
   var posts=s1[0];var setPosts=s1[1];
   var _dvRef=useRef(0);
   useEffect(function(){
     if(!props.dataVersion||props.dataVersion===_dvRef.current)return;
     _dvRef.current=props.dataVersion;
-    var base=DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:p.likes+(_initLikes[p.id]?1:0),comments:[],showCmt:false});});
-    try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:!!_initLikes[p.id],likes:(p.likes||0)+(_initLikes[p.id]?1:0),comments:p.comments||[],showCmt:false});});base=_new.concat(base);}}catch(_e){}
+    var base=_feedBase();
     setPosts(function(cur){var curIds=cur.map(function(x){return x.id;});var merged=base.filter(function(p){return curIds.indexOf(p.id)<0;}).concat(cur);return merged;});
   },[props.dataVersion]);
   var _sbLikesLoaded=useRef(false);
   useEffect(function(){
     if(_sbLikesLoaded.current||!selfUserId||!DataLayer._client)return;
     _sbLikesLoaded.current=true;
+    // Etat "j'aime" de l'utilisateur (requete filtree, legere)
     DataLayer._client.from("post_likes").select("post_id").eq("user_id",selfUserId)
       .then(function(res){
         if(res.error||!res.data)return;
@@ -1796,29 +1812,57 @@ function ClientFeed(props){
         res.data.forEach(function(r){sbLikes[r.post_id]=1;});
         _init.current.likes=sbLikes;
         try{localStorage.setItem(_lk("hp_likes"),JSON.stringify(sbLikes));}catch(e){}
-        setPosts(function(ps){
-          return ps.map(function(p){
-            var nowLiked=!!sbLikes[p.id];
-            if(nowLiked===p.liked)return p;
-            return Object.assign({},p,{liked:nowLiked,likes:nowLiked?p.likes+1:p.likes-1});
-          });
-        });
-        // Compteurs de likes REELS agreges depuis Supabase (preuve sociale authentique)
-        DataLayer._client.from("post_likes").select("post_id").then(function(r2){
-          if(r2.error||!r2.data)return;
-          var cnt={};r2.data.forEach(function(r){cnt[r.post_id]=(cnt[r.post_id]||0)+1;});
-          setPosts(function(ps){return ps.map(function(p){return cnt[p.id]!==undefined?Object.assign({},p,{likes:cnt[p.id]}):p;});});
-        });
+        setPosts(function(ps){return ps.map(function(p){var nowLiked=!!sbLikes[p.id];return nowLiked===p.liked?p:Object.assign({},p,{liked:nowLiked});});});
       });
-    // Commentaires REELS hydrates depuis Supabase (avant : ecriture seule, perdus au rechargement)
-    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at,reply_to_author,reply_to_text").order("created_at",{ascending:true})
-      .then(function(r3){
-        if(r3.error||!r3.data||r3.data.length===0)return;
-        var byPost={};
-        r3.data.forEach(function(c){if(!byPost[c.post_id])byPost[c.post_id]=[];byPost[c.post_id].push({id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null});});
-        setPosts(function(ps){return ps.map(function(p){var cs=byPost[p.id];if(!cs||!cs.length)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
+    // Compteurs authentiques depuis les colonnes serveur (maintenues par triggers) — une seule requete O(posts)
+    DataLayer._client.from("posts").select("id,likes,comments_count,shares")
+      .then(function(r2){
+        if(r2.error||!r2.data)return;
+        var byId={};r2.data.forEach(function(r){byId[r.id]=r;});
+        setPosts(function(ps){return ps.map(function(p){var r=byId[p.id];return r?Object.assign({},p,{likes:r.likes||0,shares:r.shares||0,cmtCount:r.comments_count||0}):p;});});
       }).catch(function(){});
   },[selfUserId]);
+  // Temps reel : compteurs et nouvelles publications pousses par le serveur (colonnes maintenues par triggers)
+  useEffect(function(){
+    var c=DataLayer._client;
+    if(!c||typeof c.channel!=="function")return;
+    var ch=c.channel("feed-posts-"+(selfUserId||"anon"))
+      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"posts"},function(payload){
+        var r=payload&&payload.new;if(!r||!r.id)return;
+        setPosts(function(ps){return ps.map(function(p){return p.id===r.id?Object.assign({},p,{likes:typeof r.likes==="number"?r.likes:p.likes,shares:typeof r.shares==="number"?r.shares:p.shares,cmtCount:typeof r.comments_count==="number"?r.comments_count:p.cmtCount}):p;});});
+      })
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"posts"},function(payload){
+        var r=payload&&payload.new;if(!r||!r.id)return;
+        var obj=Object.assign({},r.data||{},{id:r.id,author:r.author||(r.data&&r.data.author)||"Établissement",type:r.type||(r.data&&r.data.type)||"hotel",time:r.created_at?timeAgo(r.created_at):"maintenant",likes:r.likes||0,shares:r.shares||0,cmtCount:r.comments_count||0,liked:false,comments:[],showCmt:false});
+        setPosts(function(ps){return ps.some(function(p){return p.id===obj.id;})?ps:[obj].concat(ps);});
+      })
+      .subscribe();
+    return function(){try{c.removeChannel(ch);}catch(e){}};
+  },[selfUserId]);
+  // Rendu progressif : lots de 8 publications via sentinelle (fluidite constante quel que soit le volume)
+  var sVis=useState(8);var visibleCount=sVis[0];var setVisibleCount=sVis[1];
+  var sentinelRef=useRef(null);
+  useEffect(function(){
+    var el=sentinelRef.current;
+    if(!el||typeof IntersectionObserver==="undefined")return;
+    var obs=new IntersectionObserver(function(entries){
+      if(entries[0]&&entries[0].isIntersecting)setVisibleCount(function(n){return n+8;});
+    },{rootMargin:"600px"});
+    obs.observe(el);
+    return function(){obs.disconnect();};
+  },[posts.length,visibleCount]);
+  // Commentaires charges a la demande, par publication (pattern Facebook — pas de telechargement global)
+  var _cmtLoaded=useRef({});
+  function _loadCmts(id){
+    if(_cmtLoaded.current[id]||!DataLayer._client)return;
+    _cmtLoaded.current[id]=true;
+    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at,parent_id,reply_to_author,reply_to_text").eq("post_id",id).order("created_at",{ascending:true}).limit(200)
+      .then(function(r3){
+        if(r3.error||!r3.data||r3.data.length===0)return;
+        var cs=r3.data.map(function(c){return {id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),parentId:c.parent_id||null,replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null};});
+        setPosts(function(ps){return ps.map(function(p){if(p.id!==id)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
+      }).catch(function(){});
+  }
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState({});var cmtText=s2[0];var setCmtText=s2[1];
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
@@ -1870,19 +1914,32 @@ function ClientFeed(props){
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
-  function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partagé avec succès","success");}
+  function confirmShare(id){
+    setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});
+    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_shares").insert([{post_id:id,user_id:selfUserId}]).then(function(){}).catch(function(){});}}catch(e){}
+    toast("Partagé avec succès","success");
+  }
   function addCmt(id,replyTo){
     var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
-    var cm={id:Date.now(),userId:selfUserId,author:selfName,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
-    setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
+    var localId="local_"+Date.now();
+    var _parentId=replyTo&&replyTo.id&&String(replyTo.id).indexOf("-")>0?replyTo.id:null;
+    var cm={id:localId,userId:selfUserId,author:selfName,text:text,time:"maintenant",parentId:_parentId,replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
+    setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm]),cmtCount:(p.cmtCount||p.comments.length)+1}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:selfName,body:text,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).then(function(){}).catch(function(){});}}catch(e){}
-    try{var _pC=posts.find(function(p){return p.id===id;});var _ownUidC=_postOwnerUid(_pC);if(_ownUidC)notifyUser(_ownUidC,{id:"notif_cmt_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau commentaire",body:selfName+" a commenté votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});}catch(e){}
+    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:selfName,body:text,parent_id:_parentId,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).select("id").then(function(r){
+      if(r.data&&r.data[0]&&r.data[0].id){var dbId=r.data[0].id;setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.map(function(c){return c.id===localId?Object.assign({},c,{id:dbId}):c;})}):p;});});}
+    }).catch(function(){});}}catch(e){}
+    try{
+      var _pC=posts.find(function(p){return p.id===id;});var _ownUidC=_postOwnerUid(_pC);
+      var _replyUid=replyTo&&replyTo.userId?replyTo.userId:null;
+      if(_ownUidC&&_ownUidC!==_replyUid)notifyUser(_ownUidC,{id:"notif_cmt_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau commentaire",body:selfName+" a commenté votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});
+      if(_replyUid&&_replyUid!==selfUserId)notifyUser(_replyUid,{id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});
+    }catch(e){}
     toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
-    setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
-    try{if(DataLayer._client&&selfUserId)DataLayer._client.from("post_comments").delete().eq("id",String(cmId)).eq("user_id",selfUserId).then(function(){}).catch(function(){});}catch(e){}
+    setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;}),cmtCount:Math.max((p.cmtCount||p.comments.length)-1,0)}):p;});});
+    try{if(DataLayer._client&&selfUserId&&String(cmId).indexOf("local_")!==0)DataLayer._client.from("post_comments").delete().eq("id",String(cmId)).eq("user_id",selfUserId).then(function(){}).catch(function(){});}catch(e){}
     toast("Commentaire supprimé","neutral");
   }
   var sLoad=useState(true);var loading=sLoad[0];var setLoading=sLoad[1];
@@ -1893,6 +1950,7 @@ function ClientFeed(props){
   if(!_estabMap.current){var _em={};DataLayer.getHotels().concat(DataLayer.getRestaurants()).forEach(function(e){_em[e.id]=e;});_estabMap.current=_em;}
   var postRefs=useRef({});
   function openCmt(id){
+    _loadCmts(id);
     var el=postRefs.current[id];
     if(el){
       var rect=el.getBoundingClientRect();
@@ -1913,7 +1971,7 @@ function ClientFeed(props){
       {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} reporterId={selfUserId} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoyé · Merci pour votre contribution","success");}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       {posts.length===0&&<Emp Icon={Home} title="Aucune publication" sub="Les publications des établissements apparaîtront ici"/>}
-      {posts.map(function(post,_pi){
+      {posts.slice(0,visibleCount).map(function(post,_pi){
         var color=rC(post.type);
         return(
           <div key={post.id} ref={function(el){postRefs.current[post.id]=el;}} style={{background:DS.surface,marginBottom:8,borderTop:"1px solid "+DS.border+"22",borderBottom:"1px solid "+DS.border+"22",animation:"hp-item-in 0.38s cubic-bezier(0.22,1,0.36,1) both",animationDelay:(_pi*45)+"ms"}}>
@@ -1952,9 +2010,10 @@ function ClientFeed(props){
             </div>
             <FeedText text={post.text}/>
             {post.img&&<div style={{position:"relative",overflow:"hidden",background:DS.card}}><img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100%25' height='100%25'%3E%3Crect fill='%2317171F' width='100%25' height='100%25'/%3E%3C/svg%3E";e.target.style.opacity="0.3";}} style={{width:"100%",height:"min(500px,62vh)",objectFit:"cover",display:"block"}}/></div>}
+            {post.video&&<video src={post.video} controls playsInline preload="metadata" style={{width:"100%",maxHeight:"min(500px,62vh)",display:"block",background:"#000"}}/>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"10px 16px 2px",fontSize:12,color:DS.textDim}}>
               <span>{post.likes} réaction{post.likes!==1?"s":""}</span>
-              <span style={{cursor:"pointer"}} onClick={function(){openCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
+              <span style={{cursor:"pointer"}} onClick={function(){openCmt(post.id);}}>{(function(){var n=post.cmtCount!=null?Math.max(post.cmtCount,post.comments.length):post.comments.length;return n+" commentaire"+(n!==1?"s":"");})()}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
             <div style={{display:"flex",borderTop:"1px solid "+DS.border+"28",marginTop:6}}>
               {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLike(post.id);triggerHeart(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){openCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
@@ -1967,11 +2026,12 @@ function ClientFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfVerified={isPremium} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfUserId={selfUserId} selfVerified={isPremium} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
       })}
+    {posts.length>visibleCount&&<div ref={sentinelRef} style={{height:1}}/>}
     {sharePost&&<ShareSheet post={sharePost} onClose={function(){setSharePost(null);}} onShared={function(){confirmShare(sharePost.id);}}/>}
     </div>
   );
@@ -2766,12 +2826,18 @@ function ProFeed(props){
   var _allData=proType==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
   var selfEmail=props.selfEmail||"";
   var selfUserId=props.selfUserId||null;
-  var data=(selfUserId&&_allData.find(function(h){return h.userId===selfUserId;}))||(_allData.length>0?_allData[0]:{name:selfEmail.split("@")[0]||"Pro",verified:false,followers:0,rating:0,reviewCount:0});
+  // Repli NEUTRE : jamais l'identite d'un autre etablissement (pas d'usurpation de nom/badge)
+  var data=(selfUserId&&_allData.find(function(h){return h.userId===selfUserId;}))||{name:selfEmail.split("@")[0]||"Pro",verified:false,followers:0,rating:0,reviewCount:0};
   // Fix #6 : localStorage pour likes et favs
   var _initPro=useRef(null);
   if(!_initPro.current){var _lkP={};var _fvP=[];try{_lkP=JSON.parse(localStorage.getItem(_lk("hp_pro_likes"))||"{}");_fvP=JSON.parse(localStorage.getItem(_lk("hp_pro_favs"))||"[]");}catch(e){}_initPro.current={likes:_lkP,favs:_fvP};}
   var _initLikesPro=_initPro.current.likes;var _initFavsPro=_initPro.current.favs;
-  var s1=useState(function(){var base=DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikesPro[p.id],likes:p.likes+(_initLikesPro[p.id]?1:0),comments:[],showCmt:false});});try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:!!_initLikesPro[p.id],likes:(p.likes||0)+(_initLikesPro[p.id]?1:0),comments:p.comments||[],showCmt:false});});base=_new.concat(base);}}catch(_e){}return base;});
+  var s1=useState(function(){
+    var base=DataLayer.getFeed().map(function(p){return Object.assign({},p,{liked:!!_initLikesPro[p.id],likes:p.likes||0,shares:p.shares||0,cmtCount:typeof p.cmtCount==="number"?p.cmtCount:0,comments:[],showCmt:false});});
+    try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");if(_pp.length){var _ids=base.map(function(x){return x.id;});var _new=_pp.filter(function(p){return _ids.indexOf(p.id)<0;}).map(function(p){return Object.assign({},p,{liked:!!_initLikesPro[p.id],likes:p.likes||0,shares:p.shares||0,cmtCount:typeof p.cmtCount==="number"?p.cmtCount:(p.comments||[]).length,comments:p.comments||[],showCmt:false});});base=_new.concat(base);}}catch(_e){}
+    base.sort(function(a,b){var aB=(a.verified?2:0)+(a.isPremium?1:0);var bB=(b.verified?2:0)+(b.isPremium?1:0);return bB-aB;});
+    return base;
+  });
   var posts=s1[0];var setPosts=s1[1];
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
   var s2=useState("");var newPost=s2[0];var setNewPost=s2[1];
@@ -2780,16 +2846,25 @@ function ProFeed(props){
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
   function addCmt(id,replyTo){
     var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
-    var cm={id:Date.now(),userId:selfUserId,author:data.name,text:text,time:"maintenant",replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
-    setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm])}):p;});});
+    var localId="local_"+Date.now();
+    var _parentId=replyTo&&replyTo.id&&String(replyTo.id).indexOf("-")>0?replyTo.id:null;
+    var cm={id:localId,userId:selfUserId,author:data.name,text:text,time:"maintenant",parentId:_parentId,replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
+    setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm]),cmtCount:(p.cmtCount||p.comments.length)+1}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:data.name,body:text,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).then(function(){}).catch(function(){});}}catch(e){}
-    try{var _pC2=posts.find(function(p){return p.id===id;});var _ownUidC2=_postOwnerUid(_pC2);if(_ownUidC2)notifyUser(_ownUidC2,{id:"notif_cmt_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau commentaire",body:data.name+" a commenté votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});}catch(e){}
+    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:data.name,body:text,parent_id:_parentId,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).select("id").then(function(r){
+      if(r.data&&r.data[0]&&r.data[0].id){var dbId=r.data[0].id;setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.map(function(c){return c.id===localId?Object.assign({},c,{id:dbId}):c;})}):p;});});}
+    }).catch(function(){});}}catch(e){}
+    try{
+      var _pC2=posts.find(function(p){return p.id===id;});var _ownUidC2=_postOwnerUid(_pC2);
+      var _replyUid2=replyTo&&replyTo.userId?replyTo.userId:null;
+      if(_ownUidC2&&_ownUidC2!==_replyUid2)notifyUser(_ownUidC2,{id:"notif_cmt_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau commentaire",body:data.name+" a commenté votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});
+      if(_replyUid2&&_replyUid2!==selfUserId)notifyUser(_replyUid2,{id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:data.name+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});
+    }catch(e){}
     toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
-    setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;})}):p;});});
-    try{if(DataLayer._client&&selfUserId)DataLayer._client.from("post_comments").delete().eq("id",String(cmId)).eq("user_id",selfUserId).then(function(){}).catch(function(){});}catch(e){}
+    setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;}),cmtCount:Math.max((p.cmtCount||p.comments.length)-1,0)}):p;});});
+    try{if(DataLayer._client&&selfUserId&&String(cmId).indexOf("local_")!==0)DataLayer._client.from("post_comments").delete().eq("id",String(cmId)).eq("user_id",selfUserId).then(function(){}).catch(function(){});}catch(e){}
     toast("Commentaire supprimé","neutral");
   }
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
@@ -2819,13 +2894,13 @@ function ProFeed(props){
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   var followingPosts=props.followingIds||[];
   function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
-  function toggleLike(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{liked:!p.liked,likes:p.liked?p.likes-1:p.likes+1}):p;});});}
   var sLoadPro=useState(true);var loadingPro=sLoadPro[0];var setLoadingPro=sLoadPro[1];
   useEffect(function(){var t=setTimeout(function(){setLoadingPro(false);},350);return function(){clearTimeout(t);};},[]);
   var _sbLikesLoadedPro=useRef(false);
   useEffect(function(){
     if(_sbLikesLoadedPro.current||!selfUserId||!DataLayer._client)return;
     _sbLikesLoadedPro.current=true;
+    // Etat "j'aime" de l'utilisateur (requete filtree, legere)
     DataLayer._client.from("post_likes").select("post_id").eq("user_id",selfUserId)
       .then(function(res){
         if(res.error||!res.data)return;
@@ -2833,27 +2908,57 @@ function ProFeed(props){
         res.data.forEach(function(r){sbLikes[r.post_id]=1;});
         _initPro.current.likes=sbLikes;
         try{localStorage.setItem(_lk("hp_pro_likes"),JSON.stringify(sbLikes));}catch(e){}
-        setPosts(function(ps){
-          return ps.map(function(p){
-            var nowLiked=!!sbLikes[p.id];
-            if(nowLiked===p.liked)return p;
-            return Object.assign({},p,{liked:nowLiked,likes:nowLiked?p.likes+1:p.likes-1});
-          });
-        });
-        DataLayer._client.from("post_likes").select("post_id").then(function(r2){
-          if(r2.error||!r2.data)return;
-          var cnt={};r2.data.forEach(function(r){cnt[r.post_id]=(cnt[r.post_id]||0)+1;});
-          setPosts(function(ps){return ps.map(function(p){return cnt[p.id]!==undefined?Object.assign({},p,{likes:cnt[p.id]}):p;});});
-        });
+        setPosts(function(ps){return ps.map(function(p){var nowLiked=!!sbLikes[p.id];return nowLiked===p.liked?p:Object.assign({},p,{liked:nowLiked});});});
       });
-    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at,reply_to_author,reply_to_text").order("created_at",{ascending:true})
-      .then(function(r3){
-        if(r3.error||!r3.data||r3.data.length===0)return;
-        var byPost={};
-        r3.data.forEach(function(c){if(!byPost[c.post_id])byPost[c.post_id]=[];byPost[c.post_id].push({id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null});});
-        setPosts(function(ps){return ps.map(function(p){var cs=byPost[p.id];if(!cs||!cs.length)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
+    // Compteurs authentiques depuis les colonnes serveur (maintenues par triggers)
+    DataLayer._client.from("posts").select("id,likes,comments_count,shares")
+      .then(function(r2){
+        if(r2.error||!r2.data)return;
+        var byId={};r2.data.forEach(function(r){byId[r.id]=r;});
+        setPosts(function(ps){return ps.map(function(p){var r=byId[p.id];return r?Object.assign({},p,{likes:r.likes||0,shares:r.shares||0,cmtCount:r.comments_count||0}):p;});});
       }).catch(function(){});
   },[selfUserId]);
+  // Temps reel : compteurs et nouvelles publications pousses par le serveur
+  useEffect(function(){
+    var c=DataLayer._client;
+    if(!c||typeof c.channel!=="function")return;
+    var ch=c.channel("feed-posts-pro-"+(selfUserId||"anon"))
+      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"posts"},function(payload){
+        var r=payload&&payload.new;if(!r||!r.id)return;
+        setPosts(function(ps){return ps.map(function(p){return p.id===r.id?Object.assign({},p,{likes:typeof r.likes==="number"?r.likes:p.likes,shares:typeof r.shares==="number"?r.shares:p.shares,cmtCount:typeof r.comments_count==="number"?r.comments_count:p.cmtCount}):p;});});
+      })
+      .on("postgres_changes",{event:"INSERT",schema:"public",table:"posts"},function(payload){
+        var r=payload&&payload.new;if(!r||!r.id)return;
+        var obj=Object.assign({},r.data||{},{id:r.id,author:r.author||(r.data&&r.data.author)||"Établissement",type:r.type||(r.data&&r.data.type)||"hotel",time:r.created_at?timeAgo(r.created_at):"maintenant",likes:r.likes||0,shares:r.shares||0,cmtCount:r.comments_count||0,liked:false,comments:[],showCmt:false});
+        setPosts(function(ps){return ps.some(function(p){return p.id===obj.id;})?ps:[obj].concat(ps);});
+      })
+      .subscribe();
+    return function(){try{c.removeChannel(ch);}catch(e){}};
+  },[selfUserId]);
+  // Rendu progressif : lots de 8 publications via sentinelle
+  var sVisPro=useState(8);var visibleCountPro=sVisPro[0];var setVisibleCountPro=sVisPro[1];
+  var sentinelRefPro=useRef(null);
+  useEffect(function(){
+    var el=sentinelRefPro.current;
+    if(!el||typeof IntersectionObserver==="undefined")return;
+    var obs=new IntersectionObserver(function(entries){
+      if(entries[0]&&entries[0].isIntersecting)setVisibleCountPro(function(n){return n+8;});
+    },{rootMargin:"600px"});
+    obs.observe(el);
+    return function(){obs.disconnect();};
+  },[posts.length,visibleCountPro]);
+  // Commentaires charges a la demande, par publication (pattern Facebook)
+  var _cmtLoadedPro=useRef({});
+  function _loadCmtsPro(id){
+    if(_cmtLoadedPro.current[id]||!DataLayer._client)return;
+    _cmtLoadedPro.current[id]=true;
+    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at,parent_id,reply_to_author,reply_to_text").eq("post_id",id).order("created_at",{ascending:true}).limit(200)
+      .then(function(r3){
+        if(r3.error||!r3.data||r3.data.length===0)return;
+        var cs=r3.data.map(function(c){return {id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),parentId:c.parent_id||null,replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null};});
+        setPosts(function(ps){return ps.map(function(p){if(p.id!==id)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
+      }).catch(function(){});
+  }
   var sHeartPro=useState(null);var heartAnimPro=sHeartPro[0];var setHeartAnimPro=sHeartPro[1];
   function triggerHeartPro(id){setHeartAnimPro(id);setTimeout(function(){setHeartAnimPro(null);},500);}
   function toggleLikePro(id){
@@ -2873,7 +2978,12 @@ function ProFeed(props){
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
-  function confirmShare(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});toast("Partagé avec succès","success");}
+  function confirmShare(id){
+    setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});
+    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_shares").insert([{post_id:id,user_id:selfUserId}]).then(function(){}).catch(function(){});}}catch(e){}
+    toast("Partagé avec succès","success");
+  }
+  function openCmtPro(id){_loadCmtsPro(id);toggleCmt(id);}
   var smedia=useState(null);var mediaPreview=smedia[0];var setMediaPreview=smedia[1];
   var smtype=useState(null);var mediaType=smtype[0];var setMediaType=smtype[1];
   var smfile=useState(null);var mediaFile=smfile[0];var setMediaFile=smfile[1];
@@ -2888,18 +2998,19 @@ function ProFeed(props){
     setMediaPreview(url);setMediaType(isVideo?"video":"image");setMediaFile(file);
     ev.target.value="";
   }
-  function removeMedia(){setMediaPreview(null);setMediaType(null);setMediaFile(null);}
+  function removeMedia(){try{if(mediaPreview)URL.revokeObjectURL(mediaPreview);}catch(e){}setMediaPreview(null);setMediaType(null);setMediaFile(null);}
   function publish(){
     var _cleanPost=sanitizeText(newPost,2000);
     if(!_cleanPost&&!mediaPreview)return;
     var newId="post-"+Date.now();
     var _doPublish=function(mediaUrl){
-      var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:_cleanPost,img:mediaType==="image"?mediaUrl:null,video:mediaType==="video"?mediaUrl:null,likes:0,comments:[],showCmt:false,verified:data.verified};
+      var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:_cleanPost,img:mediaType==="image"?mediaUrl:null,video:mediaType==="video"?mediaUrl:null,likes:0,shares:0,cmtCount:0,comments:[],showCmt:false,verified:data.verified};
       setPosts(function(ps){return [newObj].concat(ps);});
       DataLayer._cache.feed=[newObj].concat(DataLayer.getFeed());
       if(DataLayer._onUpdate)DataLayer._onUpdate();
       try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");localStorage.setItem(_lk("hp_pro_posts"),JSON.stringify([newObj].concat(_pp).slice(0,30)));}catch(_e){}
       try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,owner_id:selfUserId||null,data:newObj}]).catch(function(){});}catch(e){}
+      try{if(mediaPreview&&mediaUrl!==mediaPreview)URL.revokeObjectURL(mediaPreview);}catch(e){}
       setNewPost("");setShowNew(false);setMediaPreview(null);setMediaType(null);setMediaFile(null);
       toast("Publication publiée avec succès","success");
     };
@@ -2989,7 +3100,7 @@ function ProFeed(props){
       )}
       {loadingPro&&<FeedSkeleton/>}
       {posts.length===0&&<Emp Icon={FileText} title="Aucune publication" sub="Vos publications apparaîtront ici"/>}
-      {posts.map(function(post,_pfi){
+      {posts.slice(0,visibleCountPro).map(function(post,_pfi){
         var pc=rC(post.type);
         return(
           <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pfi*50)+"ms"}}>
@@ -3028,10 +3139,10 @@ function ProFeed(props){
             {post.img&&<img src={post.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} onError={function(e){e.target.style.display="none";}} style={{width:"100%",minHeight:380,maxHeight:620,objectFit:"cover",display:"block"}}/>}{post.video&&<video src={post.video} controls style={{width:"100%",maxHeight:620,display:"block",background:"#000"}}/>}
             <div style={{display:"flex",justifyContent:"space-between",padding:"12px 16px 2px",fontSize:12,color:DS.textDim}}>
               <span>{post.likes} réaction{post.likes!==1?"s":""}</span>
-              <span style={{cursor:"pointer"}} onClick={function(){toggleCmt(post.id);}}>{post.comments.length} commentaire{post.comments.length!==1?"s":""}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
+              <span style={{cursor:"pointer"}} onClick={function(){openCmtPro(post.id);}}>{(function(){var n=post.cmtCount!=null?Math.max(post.cmtCount,post.comments.length):post.comments.length;return n+" commentaire"+(n!==1?"s":"");})()}</span><span>{post.shares||0} partage{(post.shares||0)!==1?"s":""}</span>
             </div>
             <div style={{display:"flex",borderTop:"1px solid "+DS.border+"30",marginTop:8}}>
-              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLikePro(post.id);triggerHeartPro(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){toggleCmt(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
+              {[["Liker",Heart,post.liked?DS.error:DS.textMuted,function(){toggleLikePro(post.id);triggerHeartPro(post.id);}],["Commenter",MessageCircle,DS.textMuted,function(){openCmtPro(post.id);}],["Partager",Share2,DS.textMuted,function(){doShare(post.id);}]].map(function(_i){
                 var lb=_i[0];var Icon=_i[1];var col=_i[2];var fn=_i[3];
                 return(
                   <button key={lb} onClick={fn} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7,padding:"13px 0",background:"none",border:"none",cursor:"pointer",color:col,fontSize:13}}>
@@ -3041,11 +3152,12 @@ function ProFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} selfUserId={selfUserId} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
       })}
+    {posts.length>visibleCountPro&&<div ref={sentinelRefPro} style={{height:1}}/>}
     {sharePost&&<ShareSheet post={sharePost} onClose={function(){setSharePost(null);}} onShared={function(){confirmShare(sharePost.id);}}/>}
     </div>
   );
