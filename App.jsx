@@ -2899,7 +2899,7 @@ function ProFeed(props){
       DataLayer._cache.feed=[newObj].concat(DataLayer.getFeed());
       if(DataLayer._onUpdate)DataLayer._onUpdate();
       try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");localStorage.setItem(_lk("hp_pro_posts"),JSON.stringify([newObj].concat(_pp).slice(0,30)));}catch(_e){}
-      try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,data:newObj}]).catch(function(){});}catch(e){}
+      try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,owner_id:selfUserId||null,data:newObj}]).catch(function(){});}catch(e){}
       setNewPost("");setShowNew(false);setMediaPreview(null);setMediaType(null);setMediaFile(null);
       toast("Publication publiée avec succès","success");
     };
