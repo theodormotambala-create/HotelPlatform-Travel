@@ -1407,6 +1407,28 @@ function ChatUI(props){
       setProClients(list);
     }).catch(function(){});
   },[estabName,isClientChat]);
+  // Annuaire : recherche de comptes par nom (clients et etablissements) — messagerie ouverte a tous.
+  // Les profils verrouilles/pseudonymes sont NON trouvables (c'est le sens de leur protection).
+  var sDir=useState([]);var dirResults=sDir[0];var setDirResults=sDir[1];
+  useEffect(function(){
+    var q=(composeQ||"").trim();
+    if(q.length<2||!DataLayer._client){setDirResults([]);return;}
+    var cancelled=false;
+    DataLayer._client.from("profiles").select("user_id,display_name,photo_url,account_type,privacy_settings").ilike("display_name","%"+q+"%").neq("user_id",myId||"").limit(20)
+      .then(function(r){
+        if(cancelled||r.error||!r.data)return;
+        var list=r.data.filter(function(p){
+          if(!p.display_name)return false;
+          var ps=p.privacy_settings||{};
+          if(p.account_type==="client"&&(ps.locked===true||ps.pseudo===true))return false;
+          return true;
+        }).map(function(p){
+          return {userId:p.user_id,clientId:p.user_id,name:p.display_name,clientName:p.display_name,img:p.photo_url||null,verified:false,dirKind:p.account_type==="client"?"Utilisateur":(p.account_type==="hotel"?"Hôtel":"Restaurant")};
+        });
+        setDirResults(list);
+      }).catch(function(){});
+    return function(){cancelled=true;};
+  },[composeQ,myId]);
   useEffect(function(){
     var client=DataLayer._client;
     if(!convId||!myId||!client)return;
@@ -1471,9 +1493,14 @@ function ChatUI(props){
   // Compose — nouveau message
   var sCompose=useState(false);var showCompose=sCompose[0];var setShowCompose=sCompose[1];
   var sComposeQ=useState("");var composeQ=sComposeQ[0];var setComposeQ=sComposeQ[1];
-  var _composeList=isClientChat
-    ? DataLayer.getEstablishments().filter(function(e){return !composeQ||(e.name||"").toLowerCase().includes(composeQ.toLowerCase());})
-    : proClients.filter(function(r){return !composeQ||(r.clientName||"").toLowerCase().includes(composeQ.toLowerCase());});
+  var _composeList=(function(){
+    var base=isClientChat
+      ? DataLayer.getEstablishments().filter(function(e){return !composeQ||(e.name||"").toLowerCase().includes(composeQ.toLowerCase());})
+      : proClients.filter(function(r){return !composeQ||(r.clientName||"").toLowerCase().includes(composeQ.toLowerCase());});
+    var seenUid={};base.forEach(function(b){if(b.userId)seenUid[b.userId]=true;if(b.clientId)seenUid[b.clientId]=true;});
+    var extra=dirResults.filter(function(d){return !seenUid[d.userId];});
+    return base.concat(extra);
+  })();
   function startConv(contact){
     var name=isClientChat?(contact.name||"Établissement"):(contact.clientName||"Client");
     var otherId=isClientChat?(contact.userId||null):(contact.clientId||null);
@@ -1506,10 +1533,10 @@ function ChatUI(props){
     <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
       {_composeList.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:13,padding:"40px 20px"}}>Aucun résultat</div>}
       {_composeList.map(function(c,i){
-        var name=isClientChat?(c.name||"?"):(c.clientName||"Client");
-        var sub=isClientChat?(c.type==="hotel"?"Hôtel":"Restaurant"):("Réservation · "+(c.service||"Séjour"));
+        var name=isClientChat?(c.name||c.clientName||"?"):(c.clientName||c.name||"Client");
+        var sub=c.dirKind?c.dirKind:(isClientChat?(c.type==="hotel"?"Hôtel":"Restaurant"):("Réservation · "+(c.service||"Séjour")));
         return(<div key={i} onClick={function(){startConv(c);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.25s ease both",animationDelay:(i*40)+"ms"}}>
-          <Av sz={46} letter={(name[0]||"?").toUpperCase()} img={isClientChat?(c.img||null):null} verified={isClientChat?(c.verified||false):false} isClient={!isClientChat}/>
+          <Av sz={46} letter={(name[0]||"?").toUpperCase()} img={c.img||null} verified={isClientChat?(c.verified||false):false} isClient={c.dirKind==="Utilisateur"||(!isClientChat&&!c.dirKind)}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:13,fontWeight:700,color:DS.text}}>{name}</div>
             <div style={{fontSize:11,color:DS.textMuted,marginTop:2}}>{sub}</div>
