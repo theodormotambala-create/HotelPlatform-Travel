@@ -1043,6 +1043,17 @@ function AuthScreen(props){
       setAuthErr("Connexion Google impossible. Vérifiez que le service est configuré.");
     }finally{setGLoading(false);}
   }
+  var sLLoad=useState(false);var lLoading=sLLoad[0];var setLLoading=sLLoad[1];
+  async function handleLinkedIn(){
+    setLLoading(true);setAuthErr("");
+    try{
+      try{localStorage.setItem("hp_acc_type",accType);}catch(e){}
+      var s=await AuthService.loginWithProvider(accType,"linkedin_oidc");
+      if(s)onAuth(accType,s.accountStatus,s.email,s.userId);
+    }catch(e){
+      setAuthErr("Connexion LinkedIn impossible. Vérifiez que le service est configuré.");
+    }finally{setLLoading(false);}
+  }
   if(emailPending){
     return(
       <div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,animation:"hp-fade-up 0.28s ease"}}>
@@ -1117,6 +1128,10 @@ function AuthScreen(props){
         <button onClick={handleGoogle} disabled={gLoading} style={{width:"100%",padding:"12px",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,color:DS.text,fontSize:13,fontWeight:700,cursor:gLoading?"not-allowed":"pointer",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:10,opacity:gLoading?.7:1}}>
           {gLoading?<span style={{display:"inline-block",width:14,height:14,border:"2px solid "+DS.text,borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite"}}/>:<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20" height="20"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>}
           {gLoading?"Connexion...":"Continuer avec Google"}
+        </button>
+        <button onClick={handleLinkedIn} disabled={lLoading} style={{width:"100%",padding:"12px",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,color:DS.text,fontSize:13,fontWeight:700,cursor:lLoading?"not-allowed":"pointer",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"center",gap:10,opacity:lLoading?.7:1}}>
+          {lLoading?<span style={{display:"inline-block",width:14,height:14,border:"2px solid "+DS.text,borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite"}}/>:<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><rect width="24" height="24" rx="4" fill="#0A66C2"/><path fill="#fff" d="M6.94 8.5H4.56V19h2.38V8.5zM5.75 7.44a1.38 1.38 0 1 0 0-2.76 1.38 1.38 0 0 0 0 2.76zM13.32 10.28c-1.15 0-1.92.63-2.24 1.23h-.03V8.5H8.77V19h2.38v-5.2c0-1.37.26-2.7 1.96-2.7 1.67 0 1.69 1.57 1.69 2.79V19h2.38v-5.59c0-2.63-.57-4.13-3.86-4.13z"/></svg>}
+          {lLoading?"Connexion...":"Continuer avec LinkedIn"}
         </button>
         <div style={{textAlign:"center",fontSize:13,color:DS.textMuted}}>
           {mode==="login"
