@@ -1580,7 +1580,7 @@ function ShareSheet(props){
 }
 function CommentsSheet(props){
   var post=props.post;var cmtText=props.cmtText;var setCmtText=props.setCmtText;var addCmt=props.addCmt;var delCmt=props.delCmt;var onClose=props.onClose;var selfLetter=props.selfLetter||"V";
-  var selfName=props.selfName||"Vous";var onAddNotif=props.onAddNotif||null;var selfVerified=props.selfVerified||false;
+  var selfName=props.selfName||"Vous";var selfVerified=props.selfVerified||false;
   var selfUserId=props.selfUserId||null;
   // Propriete d'un commentaire : par identifiant de compte (le nom seul permet des collisions)
   function isMine(cm){return cm.userId!=null&&selfUserId!=null?String(cm.userId)===String(selfUserId):cm.author===selfName;}
@@ -1755,7 +1755,7 @@ function FeedText(props){
   );
 }
 function ClientFeed(props){
-  var onProfile=props.onProfile;var onAddNotif=props.onAddNotif||null;
+  var onProfile=props.onProfile;
   var selfEmail=props.selfEmail||"";
   var selfUserId=props.selfUserId||null;
   var isPremium=props.isPremium||false;
@@ -2003,7 +2003,7 @@ function ClientFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfUserId={selfUserId} selfPhoto={selfPhoto} selfVerified={isPremium} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfUserId={selfUserId} selfPhoto={selfPhoto} selfVerified={isPremium} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -2797,7 +2797,7 @@ function BookM(props){
   );
 }
 function ProFeed(props){
-  var proType=props.proType;var isPremium=props.isPremium||false;var onPremium=props.onPremium;var onProfile=props.onProfile;var onAddNotif=props.onAddNotif||null;
+  var proType=props.proType;var isPremium=props.isPremium||false;var onPremium=props.onPremium;var onProfile=props.onProfile;
   // Fix #3 : data declare en premier pour eviter crash dans addCmt
   var color=rC(proType);
   var _allData=proType==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
@@ -3126,7 +3126,7 @@ function ProFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} selfUserId={selfUserId} selfPhoto={selfPhoto} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} selfUserId={selfUserId} selfPhoto={selfPhoto} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -4398,6 +4398,25 @@ export default function App() {
     _savePremiumToDB(pd);
     tk.show("Abonnement renouvelé jusqu'au "+exp.toLocaleDateString("fr-FR"),"success");
   }
+  // Cycle de vie Premium : rappel avant expiration (3 jours) et notification d'expiration — une seule fois chacun
+  useEffect(function(){
+    if(!premiumData||!premiumData.expiresAt||!auth)return;
+    var exp=new Date(premiumData.expiresAt);var now=new Date();
+    var dayKey=premiumData.expiresAt.slice(0,10);
+    var msLeft=exp.getTime()-now.getTime();
+    if(msLeft>0&&msLeft<=3*24*3600*1000){
+      var idSoon="notif_premexp_"+dayKey;
+      if(!notifList.some(function(n){return n.id===idSoon;})){
+        var days=Math.max(1,Math.ceil(msLeft/(24*3600*1000)));
+        addNotif({id:idSoon,icon:"Star",color:DS.gold,title:"Votre Premium expire bientôt",body:"Votre abonnement Premium expire dans "+days+" jour"+(days>1?"s":"")+". Renouvelez-le pour conserver vos avantages.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});
+      }
+    } else if(msLeft<=0){
+      var idEnd="notif_premend_"+dayKey;
+      if(!notifList.some(function(n){return n.id===idEnd;})){
+        addNotif({id:idEnd,icon:"Star",color:DS.warning,title:"Premium expiré",body:"Votre abonnement Premium a expiré le "+exp.toLocaleDateString("fr-FR")+". Renouvelez-le depuis votre profil.",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});
+      }
+    }
+  },[premiumData&&premiumData.expiresAt,auth&&auth.userId]);
   function _startPremiumPayment(plan,durationMonths,isRenew){
     var total=(PREMIUM_PRICES[plan]||9.99)*durationMonths*(1-(PREMIUM_DISCOUNTS[durationMonths]||0));
     var cents=Math.round(total*100);
@@ -4461,6 +4480,20 @@ export default function App() {
         setNotifStored(sbNotifs);
         try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(sbNotifs));}catch(e){}
       }).catch(function(){});
+    // Temps reel : la cloche se met a jour a la seconde (RLS garantit qu'on ne recoit que SES lignes)
+    var _notifCh=null;
+    try{
+      if(typeof DataLayer._client.channel==="function"){
+        _notifCh=DataLayer._client.channel("notifs-"+_authForUserData.userId)
+          .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications",filter:"user_id=eq."+_authForUserData.userId},function(payload){
+            var n=payload&&payload.new;if(!n||!n.id)return;
+            if(notifPrefs[n.pref_key||"reservation"]===false)return;
+            var notif={id:n.id,icon:n.icon,color:n.color,title:n.title,body:n.body,time:n.created_at?timeAgo(n.created_at):"maintenant",createdAt:n.created_at||null,read:n.read,tab:n.tab,prefKey:n.pref_key};
+            setNotifStored(function(list){if(list.some(function(x){return x.id===notif.id;}))return list;var next=[notif].concat(list);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}return next;});
+          })
+          .subscribe();
+      }
+    }catch(e){}
     // Badge messages non lus (onglet Messages) — comme LinkedIn
     var _convCol=_authForUserData.type==="client"?"client_id":"pro_id";
     DataLayer._client.from("conversations").select("id").eq(_convCol,_authForUserData.userId)
@@ -4511,6 +4544,7 @@ export default function App() {
           _onClientNameChange(d.display_name.trim());
         }
       }).catch(function(){});
+    return function(){try{if(_notifCh&&DataLayer._client)DataLayer._client.removeChannel(_notifCh);}catch(e){}};
   },[_authForUserData&&_authForUserData.userId]);
   var sPPhoto=useState(function(){try{return localStorage.getItem(_lk("hp_profile_photo"))||null;}catch(e){return null;}});var profilePhoto=sPPhoto[0];var setProfilePhotoRaw=sPPhoto[1];
   function setProfilePhoto(v){
@@ -4872,7 +4906,7 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto} onAddNotif={addNotif} isPremium={isPremium} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")}/></div>}
+          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto} isPremium={isPremium} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} initialConvImg={pendingConv&&pendingConv.img} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
@@ -4916,7 +4950,7 @@ export default function App() {
       {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto} onAddNotif={addNotif}/></div>}
+        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
