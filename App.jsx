@@ -1265,8 +1265,8 @@ function PrivacyModal(props){
     onUpdate({msgPermission:v});
   }
   var LOCK_ROWS=isClientAcc?[
-    ["Verrouiller mon profil","Photo floutée, galerie masquée",locked,function(v){onUpdate({locked:v});}],
-    ["Mode pseudonyme","Afficher « Voyageur » à la place de votre nom",pseudo,function(v){onUpdate({pseudo:v});}]
+    ["Verrouiller mon profil","Votre photo est masquée dans les commentaires et interactions sociales",locked,function(v){onUpdate({locked:v});}],
+    ["Mode pseudonyme","« Voyageur » remplace votre nom dans le feed et les avis. Les établissements où vous réservez voient toujours votre vrai nom.",pseudo,function(v){onUpdate({pseudo:v});}]
   ]:[];
   var VIS_ROWS=[["public","Tout le monde"],["friends","Amis uniquement"],["private","Profil privé"]];
   var MSG_ROWS=[["everyone","Tout le monde"],["booked","Établissements avec qui vous avez une réservation"],["none","Personne (messages bloqués)"]];
@@ -1307,7 +1307,7 @@ function PrivacyModal(props){
             );})}
           </div>}
           {!isClientAcc&&<div style={{background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:11,color:DS.textMuted}}>Votre profil d'établissement est toujours public et visible par tous les utilisateurs de la plateforme.</div>}
-          <div style={{marginBottom:14}}>
+          {isClientAcc&&<div style={{marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:2}}>Qui peut vous envoyer un message</div>
             <div style={{fontSize:11,color:DS.textMuted,marginBottom:8}}>Contrôlez quels établissements peuvent vous contacter</div>
             {MSG_ROWS.map(function(row){var v=row[0];var l=row[1];var isAct=msgPermission===v;return(
@@ -1316,7 +1316,7 @@ function PrivacyModal(props){
                 <span style={{fontSize:12,color:isAct?color:DS.textMuted,fontWeight:isAct?700:400}}>{l}</span>
               </button>
             );})}
-          </div>
+          </div>}
           <button onClick={handleClose} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button>
         </div>
       </div>
@@ -3806,7 +3806,6 @@ function genQRPixels(id){
 }
 function ProResa(props){
   var proType=props.proType;var onOpenChat=props.onOpenChat;
-  var clientPrivacySettings=props.clientPrivacySettings||{locked:false,msgPermission:"everyone"};
   var selfEmail=props.selfEmail||"";
   var estabName=props.estabName||null;
   var CONNECTED_CLIENT_NAME=props.selfName||(function(){try{return localStorage.getItem(_lk("hp_client_display_name"))||"";}catch(e){return "";}}())||(selfEmail.split("@")[0]||"Client");
@@ -3885,11 +3884,7 @@ function ProResa(props){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:14,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",gap:6}}>
-                  {r.client===CONNECTED_CLIENT_NAME&&clientPrivacySettings.locked
-                    ? <span style={{display:"flex",alignItems:"center",gap:5,color:DS.textMuted,filter:"blur(2.5px)",userSelect:"none"}}>{r.client}</span>
-                    : <span>{r.client}</span>
-                  }
-                  {r.client===CONNECTED_CLIENT_NAME&&clientPrivacySettings.locked&&<Lock size={11} color={DS.textDim}/>}
+                  <span>{r.client}</span>
                 </div>
                 <div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{r.service}</div>
                 <div style={{fontSize:11,color:DS.textDim,marginTop:3}}>{r.dateIn} au {r.dateOut} - {r.guests} pers.</div>
@@ -4906,13 +4901,13 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto} isPremium={isPremium} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")}/></div>}
+          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={privacySettings.locked?null:profilePhoto} isPremium={isPremium} selfName={privacySettings.pseudo?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous"))}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} initialConvImg={pendingConv&&pendingConv.img} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
-        {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client")}/>}
+        {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId} selfName={privacySettings.pseudo?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client"))}/>}
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){var pp=premiumPay;setPremiumPay(null);if(pp.renew)_renewPremiumNow();else _activatePremium(pp.plan,pp.durationMonths);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
@@ -4953,7 +4948,7 @@ export default function App() {
         {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
-        {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
+        {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
         {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]} onUnreadChange={setChatUnread}/>}
         {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto}/>}
       </div>
