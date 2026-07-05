@@ -118,13 +118,25 @@ function notifyUser(targetUserId,notif){
     DataLayer._client.from("notifications").insert([{id:notif.id,user_id:targetUserId,icon:notif.icon||"Bell",color:notif.color||"#6366f1",title:notif.title,body:notif.body,time:notif.time||"maintenant",read:false,tab:notif.tab||"feed",pref_key:notif.prefKey||"reservation"}]).then(function(){}).catch(function(){});
   }catch(e){}
 }
+// Resolution centrale post -> etablissement : par identifiant d'abord (estabId / ownerUid),
+// repli par nom uniquement pour les anciens posts sans reference. Jamais de repli arbitraire.
+function _estabForPost(post){
+  try{
+    if(!post)return null;
+    var all=DataLayer.getEstablishments();
+    if(post.estabId){var byEid=all.find(function(x){return x.id===post.estabId;});if(byEid)return byEid;}
+    var byPid=all.find(function(x){return x.id===post.id;});if(byPid)return byPid;
+    if(post.ownerUid){var byUid=all.find(function(x){return x.userId===post.ownerUid;});if(byUid)return byUid;}
+    return all.find(function(x){return x.name===post.author;})||null;
+  }catch(e){return null;}
+}
 // Retrouve le userId du proprietaire d'un post (etablissement reel inscrit)
 function _postOwnerUid(post){
   try{
     if(!post)return null;
-    var all=DataLayer.getEstablishments();
-    var own=all.find(function(x){return x.userId&&(x.id===post.id||x.name===post.author);});
-    return own?own.userId:null;
+    if(post.ownerUid)return post.ownerUid;
+    var own=_estabForPost(post);
+    return own&&own.userId?own.userId:null;
   }catch(e){return null;}
 }
 var DataLayer = {
@@ -212,7 +224,8 @@ var DataLayer = {
               time:r.created_at?timeAgo(r.created_at):obj.time,
               likes:typeof r.likes==="number"?r.likes:0,
               shares:typeof r.shares==="number"?r.shares:0,
-              cmtCount:typeof r.comments_count==="number"?r.comments_count:0
+              cmtCount:typeof r.comments_count==="number"?r.comments_count:0,
+              ownerUid:r.owner_id||obj.ownerUid||null
             });
             return obj;
           });
@@ -656,7 +669,7 @@ var AuthService = {
       var realType = accType;
       var realStatus = "active";
       try{
-        var prof = await sb.from("profiles").select("account_type,status").eq("user_id", userId).single();
+        var prof = await sb.from("profiles").select("account_type,status").eq("user_id", userId).maybeSingle();
         if(prof.data && prof.data.account_type) realType = prof.data.account_type;
         if(prof.data && prof.data.status) realStatus = prof.data.status;
       }catch(_){}
@@ -681,6 +694,8 @@ var AuthService = {
   loginWithProvider: async function(accType, provider){
     var sb = AuthService._sb();
     if(sb){
+      // Memorise le type choisi AVANT la redirection OAuth : au retour, la resolution de session le retrouve
+      try{ if(accType) localStorage.setItem("hp_acc_type", accType); }catch(e){}
       await sb.auth.signInWithOAuth({ provider: provider, options: { redirectTo: window.location.origin } });
       return null;
     }
@@ -1691,7 +1706,7 @@ function CommentsSheet(props){
               <div key={key} style={{marginBottom:16,animation:isNew?"hp-item-in 0.25s ease both":"none"}}>
                 {/* Commentaire parent */}
                 <div style={{display:"flex",gap:10}}>
-                  <Av sz={34} letter={cm.author[0]}/>
+                  <Av sz={34} letter={cm.author[0]} img={cm.photo||null}/>
                   <div style={{flex:1}}>
                     <div onTouchStart={function(e){lpStart(cm,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(cm);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(mine)setMenuCm(cm);}} style={{background:DS.card,borderRadius:"0 16px 16px 16px",padding:"9px 13px",cursor:mine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>
                       <div style={{fontSize:13,fontWeight:800,color:DS.text,marginBottom:3}}>{cm.author}</div>
@@ -1721,7 +1736,7 @@ function CommentsSheet(props){
                           var repIsNew=post.comments.indexOf(rep)>=initCmtCount.current;
                           return(
                             <div key={rep.id||("r"+gi+ri)} style={{display:"flex",gap:8,marginBottom:10,paddingLeft:4,animation:repIsNew?"hp-item-in 0.25s ease both":"none"}}>
-                              <Av sz={28} letter={rep.author[0]}/>
+                              <Av sz={28} letter={rep.author[0]} img={rep.photo||null}/>
                               <div style={{flex:1}}>
                                 <div onTouchStart={function(e){lpStart(rep,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(rep);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(repMine)setMenuCm(rep);}} style={{background:DS.card,borderRadius:"0 14px 14px 14px",padding:"8px 12px",cursor:repMine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
                                   <div style={{fontSize:12,fontWeight:800,color:DS.text,marginBottom:3}}>{rep.author}</div>
@@ -1752,7 +1767,7 @@ function CommentsSheet(props){
       </div>}
       {/* Input */}
       <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 14px",borderTop:"1px solid "+DS.border+"40",flexShrink:0,background:DS.surface}}>
-        <Av sz={30} letter={selfLetter} verified={selfVerified} isClient={true}/>
+        <Av sz={30} letter={selfLetter} img={props.selfPhoto||null} verified={selfVerified} isClient={true}/>
         <div style={{flex:1,position:"relative"}}>
           <input value={cmtText[post.id]||""} onChange={function(e){var nc=Object.assign({},cmtText);nc[post.id]=e.target.value;setCmtText(nc);}} onKeyDown={function(e){if(e.key==="Enter"){addCmt(post.id,replyTo);setReplyTo(null);}}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre à "+replyTo.author+"...":"Ajouter un commentaire..."} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:24,padding:"10px 46px 10px 16px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
           <button onClick={function(){addCmt(post.id,replyTo);setReplyTo(null);}} style={{position:"absolute",right:5,top:"50%",transform:"translateY(-50%)",background:DS.primary,border:"none",borderRadius:"50%",width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Send size={13} color="#fff"/></button>
@@ -1780,6 +1795,9 @@ function ClientFeed(props){
   var selfEmail=props.selfEmail||"";
   var selfUserId=props.selfUserId||null;
   var isPremium=props.isPremium||false;
+  var selfPhoto=props.selfPhoto||null;
+  // Jamais de base64 en base : seules les URLs de stockage sont persistees
+  var selfPhotoUrl=selfPhoto&&String(selfPhoto).indexOf("data:")!==0?selfPhoto:null;
   var selfName=props.selfName||(function(){try{return localStorage.getItem(_lk("hp_client_display_name"))||"";}catch(e){return "";}}())||(selfEmail?selfEmail.split("@")[0]:"Vous");
   var selfLetter=(selfName[0]||"V").toUpperCase();
   var _init=useRef(null);
@@ -1856,10 +1874,10 @@ function ClientFeed(props){
   function _loadCmts(id){
     if(_cmtLoaded.current[id]||!DataLayer._client)return;
     _cmtLoaded.current[id]=true;
-    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at,parent_id,reply_to_author,reply_to_text").eq("post_id",id).order("created_at",{ascending:true}).limit(200)
+    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,author_photo,body,created_at,parent_id,reply_to_author,reply_to_text").eq("post_id",id).order("created_at",{ascending:true}).limit(200)
       .then(function(r3){
         if(r3.error||!r3.data||r3.data.length===0)return;
-        var cs=r3.data.map(function(c){return {id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),parentId:c.parent_id||null,replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null};});
+        var cs=r3.data.map(function(c){return {id:c.id,userId:c.user_id,author:c.author||"Utilisateur",photo:c.author_photo||null,text:c.body,time:timeAgo(c.created_at),parentId:c.parent_id||null,replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null};});
         setPosts(function(ps){return ps.map(function(p){if(p.id!==id)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
       }).catch(function(){});
   }
@@ -1923,10 +1941,10 @@ function ClientFeed(props){
     var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
     var localId="local_"+Date.now();
     var _parentId=replyTo&&replyTo.id&&String(replyTo.id).indexOf("-")>0?replyTo.id:null;
-    var cm={id:localId,userId:selfUserId,author:selfName,text:text,time:"maintenant",parentId:_parentId,replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
+    var cm={id:localId,userId:selfUserId,author:selfName,photo:selfPhoto,text:text,time:"maintenant",parentId:_parentId,replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm]),cmtCount:(p.cmtCount||p.comments.length)+1}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:selfName,body:text,parent_id:_parentId,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).select("id").then(function(r){
+    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:selfName,author_photo:selfPhotoUrl,body:text,parent_id:_parentId,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).select("id").then(function(r){
       if(r.data&&r.data[0]&&r.data[0].id){var dbId=r.data[0].id;setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.map(function(c){return c.id===localId?Object.assign({},c,{id:dbId}):c;})}):p;});});}
     }).catch(function(){});}}catch(e){}
     try{
@@ -1946,8 +1964,8 @@ function ClientFeed(props){
   useEffect(function(){var t=setTimeout(function(){setLoading(false);},800);return function(){clearTimeout(t);};},[]);
   var sHeart=useState(null);var heartAnim=sHeart[0];var setHeartAnim=sHeart[1];
   function triggerHeart(id){setHeartAnim(id);setTimeout(function(){setHeartAnim(null);},500);}
-  var _estabMap=useRef(null);
-  if(!_estabMap.current){var _em={};DataLayer.getHotels().concat(DataLayer.getRestaurants()).forEach(function(e){_em[e.id]=e;});_estabMap.current=_em;}
+  // Resolution par identifiant a chaque rendu (cache toujours frais, photo de couverture a jour)
+  function _openPostProfile(post){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}
   var postRefs=useRef({});
   function openCmt(id){
     _loadCmts(id);
@@ -1977,11 +1995,11 @@ function ClientFeed(props){
           <div key={post.id} ref={function(el){postRefs.current[post.id]=el;}} style={{background:DS.surface,marginBottom:8,borderTop:"1px solid "+DS.border+"22",borderBottom:"1px solid "+DS.border+"22",animation:"hp-item-in 0.38s cubic-bezier(0.22,1,0.36,1) both",animationDelay:(_pi*45)+"ms"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px 10px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
-                <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{cursor:"pointer",flexShrink:0}}>
-                  <Av sz={52} letter={post.author[0]} img={_estabMap.current[post.id]?_estabMap.current[post.id].img:null} verified={post.verified}/>
+                <div onClick={function(){_openPostProfile(post);}} style={{cursor:"pointer",flexShrink:0}}>
+                  <Av sz={52} letter={post.author[0]} img={function(){var _pe=_estabForPost(post);return _pe?_pe.img:null;}()} verified={post.verified}/>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{fontSize:15,fontWeight:800,color:DS.text,lineHeight:1.3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:"pointer",display:"inline-block",maxWidth:"100%"}}>{post.author}</div>
+                  <div onClick={function(){_openPostProfile(post);}} style={{fontSize:15,fontWeight:800,color:DS.text,lineHeight:1.3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:"pointer",display:"inline-block",maxWidth:"100%"}}>{post.author}</div>
                   <div style={{display:"flex",flexWrap:"nowrap",alignItems:"center",gap:5,marginTop:2,overflow:"hidden"}}>
                     <span style={{fontSize:12,color:color,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hôtel":"Restaurant"}</span>
                     {post.combined&&<span style={{fontSize:9,color:DS.primary,fontWeight:800,background:DS.primarySoft,borderRadius:8,padding:"1px 6px",flexShrink:0,whiteSpace:"nowrap"}}>+ Restaurant</span>}
@@ -2026,7 +2044,7 @@ function ClientFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfUserId={selfUserId} selfVerified={isPremium} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfUserId={selfUserId} selfPhoto={selfPhoto} selfVerified={isPremium} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -2826,6 +2844,8 @@ function ProFeed(props){
   var _allData=proType==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
   var selfEmail=props.selfEmail||"";
   var selfUserId=props.selfUserId||null;
+  var selfPhoto=props.selfPhoto||null;
+  var selfPhotoUrl=selfPhoto&&String(selfPhoto).indexOf("data:")!==0?selfPhoto:null;
   // Repli NEUTRE : jamais l'identite d'un autre etablissement (pas d'usurpation de nom/badge)
   var data=(selfUserId&&_allData.find(function(h){return h.userId===selfUserId;}))||{name:selfEmail.split("@")[0]||"Pro",verified:false,followers:0,rating:0,reviewCount:0};
   // Fix #6 : localStorage pour likes et favs
@@ -2848,10 +2868,10 @@ function ProFeed(props){
     var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
     var localId="local_"+Date.now();
     var _parentId=replyTo&&replyTo.id&&String(replyTo.id).indexOf("-")>0?replyTo.id:null;
-    var cm={id:localId,userId:selfUserId,author:data.name,text:text,time:"maintenant",parentId:_parentId,replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
+    var cm={id:localId,userId:selfUserId,author:data.name,photo:selfPhoto,text:text,time:"maintenant",parentId:_parentId,replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm]),cmtCount:(p.cmtCount||p.comments.length)+1}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
-    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:data.name,body:text,parent_id:_parentId,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).select("id").then(function(r){
+    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:data.name,author_photo:selfPhotoUrl,body:text,parent_id:_parentId,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).select("id").then(function(r){
       if(r.data&&r.data[0]&&r.data[0].id){var dbId=r.data[0].id;setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.map(function(c){return c.id===localId?Object.assign({},c,{id:dbId}):c;})}):p;});});}
     }).catch(function(){});}}catch(e){}
     try{
@@ -2952,10 +2972,10 @@ function ProFeed(props){
   function _loadCmtsPro(id){
     if(_cmtLoadedPro.current[id]||!DataLayer._client)return;
     _cmtLoadedPro.current[id]=true;
-    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,body,created_at,parent_id,reply_to_author,reply_to_text").eq("post_id",id).order("created_at",{ascending:true}).limit(200)
+    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,author_photo,body,created_at,parent_id,reply_to_author,reply_to_text").eq("post_id",id).order("created_at",{ascending:true}).limit(200)
       .then(function(r3){
         if(r3.error||!r3.data||r3.data.length===0)return;
-        var cs=r3.data.map(function(c){return {id:c.id,userId:c.user_id,author:c.author||"Utilisateur",text:c.body,time:timeAgo(c.created_at),parentId:c.parent_id||null,replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null};});
+        var cs=r3.data.map(function(c){return {id:c.id,userId:c.user_id,author:c.author||"Utilisateur",photo:c.author_photo||null,text:c.body,time:timeAgo(c.created_at),parentId:c.parent_id||null,replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null};});
         setPosts(function(ps){return ps.map(function(p){if(p.id!==id)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
       }).catch(function(){});
   }
@@ -3004,7 +3024,7 @@ function ProFeed(props){
     if(!_cleanPost&&!mediaPreview)return;
     var newId="post-"+Date.now();
     var _doPublish=function(mediaUrl){
-      var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:_cleanPost,img:mediaType==="image"?mediaUrl:null,video:mediaType==="video"?mediaUrl:null,likes:0,shares:0,cmtCount:0,comments:[],showCmt:false,verified:data.verified};
+      var newObj={id:newId,author:data.name,type:proType,time:"maintenant",text:_cleanPost,img:mediaType==="image"?mediaUrl:null,video:mediaType==="video"?mediaUrl:null,likes:0,shares:0,cmtCount:0,comments:[],showCmt:false,verified:data.verified,isPremium:isPremium===true,estabId:data.id||null,ownerUid:selfUserId||null};
       setPosts(function(ps){return [newObj].concat(ps);});
       DataLayer._cache.feed=[newObj].concat(DataLayer.getFeed());
       if(DataLayer._onUpdate)DataLayer._onUpdate();
@@ -3106,11 +3126,11 @@ function ProFeed(props){
           <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pfi*50)+"ms"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 16px 14px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
-                <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{cursor:onProfile?"pointer":"default",flexShrink:0}}>
-                  <Av sz={52} letter={post.author[0]} img={function(){var _pe=DataLayer.getEstablishmentById(post.id);return _pe?_pe.img:null;}()} verified={post.verified}/>
+                <div onClick={function(){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}} style={{cursor:onProfile?"pointer":"default",flexShrink:0}}>
+                  <Av sz={52} letter={post.author[0]} img={function(){var _pe=_estabForPost(post);return _pe?_pe.img:null;}()} verified={post.verified}/>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div onClick={function(){if(onProfile)onProfile(post.id,post.type);}} style={{fontSize:15,fontWeight:800,color:DS.text,lineHeight:1.3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:onProfile?"pointer":"default",display:"inline-block",maxWidth:"100%"}}>{post.author}</div>
+                  <div onClick={function(){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}} style={{fontSize:15,fontWeight:800,color:DS.text,lineHeight:1.3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:onProfile?"pointer":"default",display:"inline-block",maxWidth:"100%"}}>{post.author}</div>
                   <div style={{display:"flex",flexWrap:"nowrap",alignItems:"center",gap:5,marginTop:2,overflow:"hidden"}}>
                     <span style={{fontSize:12,color:pc,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hôtel":"Restaurant"}</span>
                     {post.combined&&<span style={{fontSize:9,color:DS.primary,fontWeight:800,background:DS.primarySoft,borderRadius:8,padding:"1px 6px",flexShrink:0,whiteSpace:"nowrap"}}>+ Restaurant</span>}
@@ -3152,7 +3172,7 @@ function ProFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} selfUserId={selfUserId} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} selfUserId={selfUserId} selfPhoto={selfPhoto} onAddNotif={onAddNotif} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -4362,10 +4382,9 @@ export default function App() {
         var meta3 = session.user.user_metadata || {};
         var _storedType3;try{_storedType3=localStorage.getItem("hp_acc_type");}catch(e){}
         var quickType3 = meta3.account_type || _storedType3 || "client";
-        setAuth(function(prev){
-          if(prev&&prev.userId===session.user.id)return prev;
-          return AuthService.buildSession(quickType3,quickType3!=="client"?"pending":"active",session.user.email,session.user.id);
-        });
+        // Statut relu depuis profiles (source de verite) — plus de statut devine.
+        // Le resolveur conserve la session precedente si type/statut/uid sont identiques.
+        _resolveAuthFromProfiles(sb,session,quickType3,null);
       } else if(event==="SIGNED_OUT"){
         setAuth(null);
         setSessionLoading(false);
@@ -4406,6 +4425,8 @@ export default function App() {
   function _savePremiumToDB(pd){
     var sb=DataLayer._client;var uid=_authForUserData&&_authForUserData.userId;var atype=_authForUserData&&_authForUserData.type;
     if(sb&&uid){sb.from("profiles").update({premium_data:pd,is_premium:pd!==null,updated_at:new Date().toISOString()}).eq("user_id",uid).then(function(){});}
+    // Propagation aux AUTRES utilisateurs : c'est establishments.is_premium qu'ils lisent (tri du feed, avis)
+    if(sb&&uid&&atype&&atype!=="client"){sb.from("establishments").update({is_premium:pd!==null}).eq("owner_id",uid).then(function(){}).catch(function(){});}
     try{var _prem=pd!==null;var _cache=atype==="restaurant"?DataLayer._cache.restaurants:DataLayer._cache.hotels;var _idx=_cache.findIndex(function(h){return h.userId===uid;});if(_idx>=0){_cache[_idx]=Object.assign({},_cache[_idx],{isPremium:_prem});if(DataLayer._onUpdate)DataLayer._onUpdate();}}catch(ex){}
   }
   // Paiement Premium via Stripe : l'abonnement n'est active QU'APRES paiement reussi
@@ -4532,6 +4553,10 @@ export default function App() {
         if(d.premium_data&&typeof d.premium_data==="object"&&d.premium_data.expiresAt){
           setPremiumData(d.premium_data);
           try{localStorage.setItem(_lk("hp_premium"),JSON.stringify(d.premium_data));}catch(e){}
+        } else {
+          // La base fait foi : abonnement absent/annule cote serveur => pas de Premium local residuel
+          setPremiumData(null);
+          try{localStorage.removeItem(_lk("hp_premium"));}catch(e){}
         }
         if(d.privacy_settings&&typeof d.privacy_settings==="object"){
           setPrivacySettings(d.privacy_settings);
@@ -4822,8 +4847,11 @@ export default function App() {
   var unread = notifList.filter(function(n){return !n.read;}).length;
 
   function openProf(id,type){
+    // Recherche par identifiant dans la liste du type, puis toutes listes — JAMAIS de repli arbitraire (profil fantome)
     var l=type==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
-    setEstab(l.find(function(e){return e.id===id;})||l[0]);
+    var e=l.find(function(x){return x.id===id;})||DataLayer.getEstablishmentById(id);
+    if(e)setEstab(e);
+    else toastApp("Profil indisponible pour le moment","error");
   }
   function openChat(e){
     // Vérifier la permission de messagerie (réglage confidentialité Premium)
@@ -4832,7 +4860,8 @@ export default function App() {
       return;
     }
     if(!isPro&&privacySettings&&privacySettings.msgPermission==="booked"){
-      var _hasResa=(resaHistory||[]).some(function(r){return e&&r.estab===e.name;});
+      var _norm=function(s){return String(s||"").trim().toLowerCase();};
+      var _hasResa=(resaHistory||[]).some(function(r){return e&&_norm(r.estab)===_norm(e.name);});
       if(!_hasResa){
         toastApp("Messages limités aux établissements avec réservation. Réservez d'abord ou modifiez vos paramètres.","error");
         return;
@@ -4901,7 +4930,7 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif} isPremium={isPremium} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")}/></div>}
+          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto} onAddNotif={addNotif} isPremium={isPremium} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} initialConvImg={pendingConv&&pendingConv.img} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
           {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
@@ -4946,7 +4975,7 @@ export default function App() {
       {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onAddNotif={addNotif}/></div>}
+        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto} onAddNotif={addNotif}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} clientPrivacySettings={privacySettings} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
