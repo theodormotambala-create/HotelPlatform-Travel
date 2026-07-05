@@ -55,7 +55,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { amount, currency, resaId, estabName } = req.body;
+    const { amount, currency, resaId, estabName, type, plan, months, userId } = req.body;
+    const isPremiumPayment = type === "premium";
 
     // Validation stricte du montant (centimes) : 0.50 EUR min, 99 999.99 EUR max
     const amt = Math.round(Number(amount));
@@ -84,11 +85,15 @@ export default async function handler(req, res) {
         reservation_id: safeMeta(resaId),
         establishment:  safeMeta(estabName),
         platform:       "HotelPlatform Travel",
+        type:           isPremiumPayment ? "premium" : "reservation",
+        plan:           isPremiumPayment ? safeMeta(plan) : "",
+        months:         isPremiumPayment ? safeMeta(months) : "",
+        user_id:        isPremiumPayment ? safeMeta(userId) : "",
       },
     };
     try {
       const supa = serviceClient();
-      if (supa && estabName) {
+      if (supa && estabName && !isPremiumPayment) { // jamais de Connect pour un abonnement (100% plateforme)
         const e = await supa.from("establishments").select("stripe_account_id,type,is_premium").eq("name", String(estabName)).limit(1).maybeSingle();
         if (e.data && e.data.stripe_account_id) {
           const s = await supa.from("platform_settings").select("commission").eq("id", 1).maybeSingle();

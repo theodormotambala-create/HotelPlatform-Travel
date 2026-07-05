@@ -3544,10 +3544,44 @@ function VerifRequestModal(props){
   var DOC_LIST=accType==="hotel"
     ?["Registre de commerce","Patente ou licence hotelier","Document d'identité du gérant","Justificatif adresse etablissement"]
     :["Registre de commerce","Autorisation d'ouverture","Document d'identité du gérant","Justificatif adresse etablissement"];
-  function setDocFile(d,fileName){setDocs(function(prev){var next=Object.assign({},prev);next[d]=fileName;return next;});}
+  function setDocFile(d,file){setDocs(function(prev){var next=Object.assign({},prev);next[d]=file;return next;});}
   function removeDocFile(d){setDocs(function(prev){var next=Object.assign({},prev);delete next[d];return next;});}
   function docCount(){return Object.keys(docs).length;}
-  function submit(){if(onSubmit)onSubmit();setStep(4);}
+  var sSub=useState(false);var submitting=sSub[0];var setSubmitting=sSub[1];
+  var sSErr=useState("");var submitErr=sSErr[0];var setSubmitErr=sSErr[1];
+  var selfUserId=props.selfUserId||null;
+  // Soumission REELLE : upload des documents dans le bucket PRIVE verification-docs
+  // (lisible uniquement par le panel), puis demande enregistree en base (statut pending).
+  function submit(){
+    if(submitting)return;
+    setSubmitErr("");
+    if(!DataLayer._client||!selfUserId){setSubmitErr("Connexion requise pour soumettre la demande.");return;}
+    var keys=Object.keys(docs);
+    if(keys.length===0)return;
+    setSubmitting(true);
+    var paths={};var idx=0;
+    function uploadNext(){
+      if(idx>=keys.length){
+        DataLayer._client.from("verification_requests").insert([{user_id:selfUserId,biz_name:bizName,reg_num:regNum,country:country,contact:contact,doc_paths:paths,status:"pending"}])
+          .then(function(r){
+            setSubmitting(false);
+            if(r&&r.error){setSubmitErr("Envoi refusé : la soumission est réservée aux comptes Premium actifs.");return;}
+            if(onSubmit)onSubmit();setStep(4);
+          }).catch(function(){setSubmitting(false);setSubmitErr("Erreur réseau — réessayez.");});
+        return;
+      }
+      var k=keys[idx];var f=docs[k];idx++;
+      if(!f||typeof f==="string"){uploadNext();return;}
+      var ext=(f.name.split(".").pop()||"pdf").toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,5)||"pdf";
+      var path=selfUserId+"/"+Date.now()+"_"+idx+"."+ext;
+      DataLayer._client.storage.from("verification-docs").upload(path,f,{contentType:f.type||"application/pdf",upsert:false})
+        .then(function(r){
+          if(r&&r.error){setSubmitting(false);setSubmitErr("Échec de l'envoi de « "+k+" » — réessayez.");return;}
+          paths[k]=path;uploadNext();
+        }).catch(function(){setSubmitting(false);setSubmitErr("Erreur réseau pendant l'envoi — réessayez.");});
+    }
+    uploadNext();
+  }
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:1400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"94vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-slide-up 0.3s ease"}}>
@@ -3625,22 +3659,24 @@ function VerifRequestModal(props){
                   {has
                     ? <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,marginLeft:32}}>
                         <FileText size={13} color={DS.textMuted}/>
-                        <span style={{fontSize:11,color:DS.textMuted,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fileName}</span>
+                        <span style={{fontSize:11,color:DS.textMuted,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{fileName&&fileName.name?fileName.name:String(fileName)}</span>
                         <button onClick={function(){removeDocFile(d);}} style={{background:"none",border:"none",cursor:"pointer",padding:2,display:"flex"}}><X size={13} color={DS.error}/></button>
                       </div>
-                    : <button onClick={function(){var slug=d.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");setDocFile(d,slug+".pdf");}} style={{display:"flex",alignItems:"center",gap:6,marginTop:8,marginLeft:32,padding:"7px 12px",background:DS.surface,border:"1px dashed "+DS.border,borderRadius:8,cursor:"pointer",width:"fit-content"}}>
+                    : <label style={{display:"flex",alignItems:"center",gap:6,marginTop:8,marginLeft:32,padding:"7px 12px",background:DS.surface,border:"1px dashed "+DS.border,borderRadius:8,cursor:"pointer",width:"fit-content"}}>
+                        <input type="file" accept="application/pdf,image/jpeg,image/png" style={{display:"none"}} onChange={function(ev){var f=ev.target.files&&ev.target.files[0];ev.target.value="";if(!f)return;if(f.size>10*1024*1024){setSubmitErr("Fichier trop volumineux (maximum 10 Mo).");return;}setSubmitErr("");setDocFile(d,f);}}/>
                         <Plus size={12} color={DS.textMuted}/>
                         <span style={{fontSize:11,color:DS.textMuted,fontWeight:700}}>Joindre un fichier</span>
-                      </button>
+                      </label>
                   }
                 </div>
               );})}
+              {submitErr&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,marginTop:6,fontSize:12,color:DS.error}}>{submitErr}</div>}
               <div style={{background:DS.primarySoft,border:"1px solid "+DS.primary+"22",borderRadius:10,padding:"10px 14px",marginBottom:20,marginTop:8,fontSize:11,color:DS.textMuted}}>
                 Apres soumission, notre équipe vous contactera a : {contact||"votre email enregistre"}
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={function(){if((props.initialStep||1)>=3){if(onClose)onClose();}else{setStep(2);}}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>{(props.initialStep||1)>=3?"Annuler":"Retour"}</button>
-                <button onClick={submit} disabled={docCount()===0} style={{flex:2,padding:"11px",background:docCount()>0?color:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:docCount()>0?"pointer":"not-allowed",opacity:docCount()>0?1:.6}}>Soumettre la demande</button>
+                <button onClick={submit} disabled={docCount()===0||submitting} style={{flex:2,padding:"11px",background:docCount()>0&&!submitting?color:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:docCount()>0&&!submitting?"pointer":"not-allowed",opacity:docCount()>0&&!submitting?1:.6}}>{submitting?"Envoi des documents...":"Soumettre la demande"}</button>
               </div>
             </div>
           )}
@@ -4148,6 +4184,14 @@ function ProProf(props){
   var s2=useState(false);var showVerif=s2[0];var setShowVerif=s2[1];
   var _vfKey=_lk("hp_verif_status_"+(proType||"hotel"));
   var s3=useState(function(){try{return localStorage.getItem(_vfKey)||null;}catch(e){return null;}});var verifStatus=s3[0];var _setVerifStatusRaw=s3[1];
+  // Statut de verification : le SERVEUR fait foi (visible sur tous les appareils)
+  useEffect(function(){
+    if(!DataLayer._client||!props.authUserId)return;
+    DataLayer._client.from("verification_requests").select("status,created_at").eq("user_id",props.authUserId).order("created_at",{ascending:false}).limit(1).maybeSingle()
+      .then(function(r){
+        if(r&&r.data&&r.data.status){_setVerifStatusRaw(r.data.status);try{localStorage.setItem(_vfKey,r.data.status);}catch(e){}}
+      }).catch(function(){});
+  },[props.authUserId]);
   function setVerifStatus(v){_setVerifStatusRaw(v);try{if(v)localStorage.setItem(_vfKey,v);else localStorage.removeItem(_vfKey);}catch(e){}}
   useEffect(function(){
     if(!props.authUserId||!DataLayer._client)return;
@@ -4210,7 +4254,7 @@ function ProProf(props){
       <input id="hp-pro-photo-input" ref={_proUploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handleProPhotoFile}/>
       <input id="hp-pro-cover-input" ref={_proCoverUploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handleProCoverFile}/>
       <ToastP/>
-      {showVerif&&<VerifRequestModal isPremium={premiumActive} accType={proType} verifyStatus={verifStatus} initialStep={3} prefillName={data.name} prefillCountry={data.location} onClose={function(){setShowVerif(false);}} onSubmit={function(){setVerifStatus("pending");toastP("Demande de verification soumise - Examen sous 48-72h","success");}}/>}
+      {showVerif&&<VerifRequestModal isPremium={premiumActive} accType={proType} selfUserId={props.authUserId} verifyStatus={verifStatus} initialStep={3} prefillName={data.name} prefillCountry={data.location} onClose={function(){setShowVerif(false);}} onSubmit={function(){setVerifStatus("pending");toastP("Demande de verification soumise - Examen sous 48-72h","success");}}/>}
       {_ppMenu&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){_setPPMenu(false);_setPPPend(null);}}>
         <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:"20px 16px 32px",animation:"hp-slide-up 0.28s ease"}}>
           {_ppPend?(
@@ -4598,38 +4642,29 @@ export default function App() {
   var _sCDN=useState(function(){try{return localStorage.getItem(_lk("hp_client_display_name"))||"";}catch(e){return "";}});var clientDisplayName=_sCDN[0];var setClientDisplayName=_sCDN[1];
   function _onClientNameChange(nm){setClientDisplayName(nm);try{localStorage.setItem(_lk("hp_client_display_name"),nm);}catch(e){}try{var _uid=_authForUserData&&_authForUserData.userId;if(DataLayer._client&&_uid&&nm&&nm.trim()){DataLayer._client.from("profiles").update({display_name:nm.trim(),updated_at:new Date().toISOString()}).eq("user_id",_uid).then(function(){}).catch(function(){});}}catch(e){}}
   var isPremium=premiumData!==null && new Date(premiumData.expiresAt)>new Date();
-  function _savePremiumToDB(pd){
-    var sb=DataLayer._client;var uid=_authForUserData&&_authForUserData.userId;var atype=_authForUserData&&_authForUserData.type;
-    if(sb&&uid){sb.from("profiles").update({premium_data:pd,is_premium:pd!==null,updated_at:new Date().toISOString()}).eq("user_id",uid).then(function(){});}
-    // Propagation aux AUTRES utilisateurs : c'est establishments.is_premium qu'ils lisent (tri du feed, avis)
-    if(sb&&uid&&atype&&atype!=="client"){sb.from("establishments").update({is_premium:pd!==null}).eq("owner_id",uid).then(function(){}).catch(function(){});}
-    try{var _prem=pd!==null;var _cache=atype==="restaurant"?DataLayer._cache.restaurants:DataLayer._cache.hotels;var _idx=_cache.findIndex(function(h){return h.userId===uid;});if(_idx>=0){_cache[_idx]=Object.assign({},_cache[_idx],{isPremium:_prem});if(DataLayer._onUpdate)DataLayer._onUpdate();}}catch(ex){}
+  // L'activation/renouvellement Premium est faite PAR LE SERVEUR (webhook Stripe -> grant_premium).
+  // Ici on ne fait que RELIRE le profil jusqu'a voir l'activation (quelques secondes).
+  function _refreshPremiumFromServer(attempt){
+    var uid=_authForUserData&&_authForUserData.userId;
+    if(!DataLayer._client||!uid)return;
+    DataLayer._client.from("profiles").select("premium_data,is_premium").eq("user_id",uid).maybeSingle().then(function(r){
+      var d=r&&r.data;
+      var fresh=d&&d.premium_data&&d.premium_data.expiresAt&&new Date(d.premium_data.expiresAt)>new Date();
+      var known=premiumData&&premiumData.expiresAt;
+      if(fresh&&(!known||d.premium_data.expiresAt!==premiumData.expiresAt)){
+        setPremiumData(d.premium_data);
+        try{localStorage.setItem(_lk("hp_premium"),JSON.stringify(d.premium_data));}catch(e){}
+        tk.show("Premium actif jusqu'au "+new Date(d.premium_data.expiresAt).toLocaleDateString("fr-FR"),"success");
+        return;
+      }
+      if((attempt||0)<8){setTimeout(function(){_refreshPremiumFromServer((attempt||0)+1);},1500);}
+      else{tk.show("Paiement reçu — l'activation apparaîtra d'ici quelques minutes.","info");}
+    }).catch(function(){});
   }
   // Paiement Premium via Stripe : l'abonnement n'est active QU'APRES paiement reussi
   var sPPay=useState(null);var premiumPay=sPPay[0];var setPremiumPay=sPPay[1];
   var PREMIUM_PRICES={std:9.99,plus:19.99,biz:49.99};
   var PREMIUM_DISCOUNTS={1:0,3:0.10,6:0.20,12:0.30};
-  function _activatePremium(plan,durationMonths){
-    var now=new Date();
-    var exp=new Date(now);
-    exp.setMonth(exp.getMonth()+durationMonths);
-    var pd={plan:plan,durationMonths:durationMonths,startedAt:now.toISOString(),expiresAt:exp.toISOString()};
-    setPremiumData(pd);
-    try{localStorage.setItem(_lk("hp_premium"),JSON.stringify(pd));}catch(e){}
-    _savePremiumToDB(pd);
-    tk.show("Premium actif jusqu'au "+exp.toLocaleDateString("fr-FR"),"success");
-  }
-  function _renewPremiumNow(){
-    if(!premiumData)return;
-    var base=new Date(premiumData.expiresAt)>new Date()?new Date(premiumData.expiresAt):new Date();
-    var exp=new Date(base);
-    exp.setMonth(exp.getMonth()+premiumData.durationMonths);
-    var pd=Object.assign({},premiumData,{expiresAt:exp.toISOString()});
-    setPremiumData(pd);
-    try{localStorage.setItem(_lk("hp_premium"),JSON.stringify(pd));}catch(e){}
-    _savePremiumToDB(pd);
-    tk.show("Abonnement renouvelé jusqu'au "+exp.toLocaleDateString("fr-FR"),"success");
-  }
   // Cycle de vie Premium : rappel avant expiration (3 jours) et notification d'expiration — une seule fois chacun
   useEffect(function(){
     if(!premiumData||!premiumData.expiresAt||!auth)return;
@@ -4658,7 +4693,7 @@ export default function App() {
     fetch("/api/create-payment-intent",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({amount:cents,currency:"eur",resaId:"PREMIUM-"+plan+"-"+durationMonths+"M-"+Date.now(),estabName:"Abonnement Premium HotelPlatform"})
+      body:JSON.stringify({amount:cents,currency:"eur",type:"premium",plan:plan,months:durationMonths,userId:_authForUserData&&_authForUserData.userId,resaId:"PREMIUM-"+plan+"-"+durationMonths+"M-"+Date.now(),estabName:"Abonnement Premium HotelPlatform"})
     })
     .then(function(r){return r.json();})
     .then(function(data){
@@ -4677,7 +4712,6 @@ export default function App() {
   function cancelPremium(){
     setPremiumData(null);
     try{localStorage.removeItem(_lk("hp_premium"));}catch(e){}
-    _savePremiumToDB(null);
     tk.show("Abonnement Premium annulé","success");
   }
   var s11=useState(function(){try{return JSON.parse(localStorage.getItem(_lk("hp_resas"))||"[]");}catch(e){return[];}});
@@ -5133,7 +5167,7 @@ export default function App() {
   if(sett)       return <>
     <Ov onClose={function(){setSett(false);}}>{function(close){return <SettingsS onBack={close} accType={auth.type} onLogout={logout} onDeleteAccount={deleteAccount} onPremium={function(){setShowPremium(true);}} onPrivacy={function(){setShowPrivacy(true);}} isPremium={isPremium} premiumData={premiumData} onChangeEmail={function(){setShowChangeEmail(true);}} onChangePwd={function(){setShowChangePwd(true);}} notifPrefs={notifPrefs} onUpdateNotifPrefs={updateNotifPrefs}/>;}}</Ov>
     {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
-    {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){var pp=premiumPay;setPremiumPay(null);if(pp.renew)_renewPremiumNow();else _activatePremium(pp.plan,pp.durationMonths);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
+    {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){setPremiumPay(null);tk.show("Paiement reçu — activation automatique en cours...","success");_refreshPremiumFromServer(0);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
     {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
     {_accountOverlays}
   </>;
@@ -5189,7 +5223,7 @@ export default function App() {
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client"))}/>}
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {_accountOverlays}
-        {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){var pp=premiumPay;setPremiumPay(null);if(pp.renew)_renewPremiumNow();else _activatePremium(pp.plan,pp.durationMonths);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
+        {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){setPremiumPay(null);tk.show("Paiement reçu — activation automatique en cours...","success");_refreshPremiumFromServer(0);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
         {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={openNotifTarget}/>;}}</Ov>}
         {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}
@@ -5236,7 +5270,7 @@ export default function App() {
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId} selfName={proD.name||(auth&&auth.email?auth.email.split("@")[0]:"Pro")}/>}
       {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {_accountOverlays}
-      {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){var pp=premiumPay;setPremiumPay(null);if(pp.renew)_renewPremiumNow();else _activatePremium(pp.plan,pp.durationMonths);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
+      {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){setPremiumPay(null);tk.show("Paiement reçu — activation automatique en cours...","success");_refreshPremiumFromServer(0);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
       {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={openNotifTarget}/>;}}</Ov>}
       {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}

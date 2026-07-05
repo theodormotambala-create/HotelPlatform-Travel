@@ -63,6 +63,7 @@ export default async function handler(req, res) {
 
   const pi = event.data.object;
   const resaId = pi.metadata && pi.metadata.reservation_id;
+  const payKind = (pi.metadata && pi.metadata.type) || "reservation";
   const supa = serviceClient();
   if (!supa) {
     console.error("SUPABASE_SERVICE_ROLE_KEY manquante — confirmation impossible");
@@ -70,6 +71,34 @@ export default async function handler(req, res) {
   }
 
   try {
+    // ---------- CIRCUIT PLATEFORME : ABONNEMENT PREMIUM ----------
+    if (payKind === "premium") {
+      const plan = pi.metadata.plan;
+      const months = parseInt(pi.metadata.months, 10);
+      const userId = pi.metadata.user_id;
+      // Idempotence
+      const dupP = await supa.from("platform_revenues").select("id").eq("payment_intent_id", pi.id).maybeSingle();
+      if (dupP.data) return res.status(200).json({ received: true, duplicate: true });
+      // Validation du montant contre les TARIFS SERVEUR (le client ne fixe pas les prix)
+      const st = await supa.from("platform_settings").select("premium_prices,premium_discounts").eq("id", 1).maybeSingle();
+      const prices = (st.data && st.data.premium_prices) || {};
+      const discs = (st.data && st.data.premium_discounts) || {};
+      const price = Number(prices[plan]);
+      const disc = Number(discs[String(months)] || 0);
+      const expected = Math.round(price * months * (1 - disc) * 100);
+      const paid = pi.amount_received || pi.amount || 0;
+      if (!Number.isFinite(price) || ![1,3,6,12].includes(months) || !userId || paid !== expected) {
+        await supa.from("platform_revenues").insert([{ kind: "other", amount_cents: paid, currency: pi.currency || "eur", user_id: userId || null, payment_intent_id: pi.id, note: "ANOMALIE premium: montant/plan invalide (attendu " + expected + ")" }]);
+        return res.status(200).json({ received: true, anomaly: true });
+      }
+      // Attribution serveur (prolongation exacte geree en base) + notification
+      await supa.rpc("grant_premium", { p_user: userId, p_plan: plan, p_months: months });
+      // Revenu 100% plateforme, marque 'subscription' — JAMAIS dans le registre des etablissements
+      await supa.from("platform_revenues").insert([{ kind: "subscription", amount_cents: paid, currency: pi.currency || "eur", user_id: userId, plan: plan, duration_months: months, payment_intent_id: pi.id }]);
+      return res.status(200).json({ received: true, premium: true });
+    }
+
+    // ---------- CIRCUIT ETABLISSEMENTS : RESERVATIONS ----------
     // Idempotence : un même paiement ne produit jamais deux transactions
     const dup = await supa.from("transactions").select("id").eq("payment_intent_id", pi.id).maybeSingle();
     if (dup.data) return res.status(200).json({ received: true, duplicate: true });
@@ -125,7 +154,20 @@ export default async function handler(req, res) {
       net_estab_cents: net,
       stripe_fee_cents: stripeFee,
       currency: pi.currency || "eur",
-      status: "succeeded"
+      status: "succeeded",
+      kind: "reservation"
+    }]);
+
+    // La COMMISSION est un revenu PLATEFORME : tracee separement, marquee 'commission'
+    await supa.from("platform_revenues").insert([{
+      kind: "commission",
+      amount_cents: commission,
+      currency: pi.currency || "eur",
+      user_id: resa ? resa.client_id : null,
+      estab_owner_id: ownerId,
+      reservation_id: resa ? resa.id : (resaId || null),
+      payment_intent_id: pi.id,
+      note: pct + "% de " + total + " cts"
     }]);
 
     // 3) Notification de prélèvement de commission à l'établissement
