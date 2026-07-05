@@ -348,10 +348,11 @@ var DataLayer = {
             if(newRestos.length){DataLayer._cache.restaurants=DataLayer._cache.restaurants.filter(function(r){return!r.userId;}).concat(newRestos);}
             if(DataLayer._onUpdate)DataLayer._onUpdate();
             // Abonnes REELS : compte combien d'utilisateurs suivent chaque etablissement inscrit
-            supabase.from("profiles").select("following").then(function(fres){
+            supabase.from("profiles").select("user_id,following").then(function(fres){
               if(!fres||!fres.data)return;
               var fc={};
-              fres.data.forEach(function(p){(p.following||[]).forEach(function(fid){fc[fid]=(fc[fid]||0)+1;});});
+              // Exclut l'utilisateur courant : son propre suivi est ajoute en optimiste (+1) par l'ecran profil
+              fres.data.forEach(function(p){if(_HP_UID&&p.user_id===_HP_UID)return;(p.following||[]).forEach(function(fid){fc[fid]=(fc[fid]||0)+1;});});
               var _applyF=function(arr){return arr.map(function(x){return x.userId?Object.assign({},x,{followers:fc[x.id]||0}):x;});};
               DataLayer._cache.hotels=_applyF(DataLayer._cache.hotels);
               DataLayer._cache.restaurants=_applyF(DataLayer._cache.restaurants);
@@ -962,28 +963,6 @@ function Ov(props){
   return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:850,maxWidth:420,margin:"0 auto",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:(closing?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}>{typeof props.children==="function"?props.children(handleClose):props.children}</div>);
 }
 
-function AccountTypeScreen(props){
-  var onSelect=props.onSelect;
-  return(
-    <div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,animation:"hp-fade-up 0.28s ease"}}>
-      <div style={{textAlign:"center",marginBottom:32}}>
-        <div style={{fontSize:32,fontWeight:900,color:DS.text,letterSpacing:-1}}>HotelPlatform <span style={{color:DS.client}}>Travel</span></div>
-        <div style={{fontSize:13,color:DS.textMuted,marginTop:8}}>Choisissez votre type de compte</div>
-      </div>
-      <div style={{width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:14}}>
-        {[["client","Client","Voyageur · Réservations · Avis",User,DS.client],["hotel","Hotel","Gérez votre établissement hôtelier",Building2,DS.hotel],["restaurant","Restaurant","Gérez votre restaurant",Utensils,DS.restaurant]].map(function(item){
-          var t=item[0];var l=item[1];var desc=item[2];var Ic=item[3];var col=item[4];
-          return(
-            <button key={t} onClick={function(){onSelect(t);}} style={{width:"100%",padding:"18px 20px",borderRadius:16,border:"1px solid "+col+"44",background:DS.card,cursor:"pointer",display:"flex",alignItems:"center",gap:16,textAlign:"left"}}>
-              <div style={{width:48,height:48,borderRadius:14,background:col+"18",border:"1px solid "+col+"33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ic size={24} color={col}/></div>
-              <div><div style={{fontSize:15,fontWeight:800,color:DS.text,marginBottom:3}}>{l}</div><div style={{fontSize:12,color:DS.textMuted}}>{desc}</div></div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 function AuthScreen(props){
   var onAuth=props.onAuth;var onBack=props.onBack;
   var _initType=props.initialAccType||"client";
@@ -1913,7 +1892,9 @@ function ClientFeed(props){
     toast(wasFav?"Retiré des favoris":"Ajouté aux favoris","success");
   }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
-  function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
+  // Suivre depuis le feed = suivre l'ETABLISSEMENT (jamais l'identifiant du post)
+  function toggleFollowPost(post){var _pe=_estabForPost(post);if(props.onToggleFollow&&_pe)props.onToggleFollow(_pe.id);}
+  function _followKey(post){var _pe=_estabForPost(post);return _pe?_pe.id:post.id;}
   function toggleLike(id){
     var post=posts.find(function(p){return p.id===id;});
     var wasLiked=post?post.liked:false;
@@ -2004,7 +1985,7 @@ function ClientFeed(props){
                     <span style={{fontSize:12,color:color,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hôtel":"Restaurant"}</span>
                     {post.combined&&<span style={{fontSize:9,color:DS.primary,fontWeight:800,background:DS.primarySoft,borderRadius:8,padding:"1px 6px",flexShrink:0,whiteSpace:"nowrap"}}>+ Restaurant</span>}
                     <span style={{fontSize:12,color:DS.textMuted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}>{post.followers?"- "+fmtK(post.followers)+" abonnés":""}</span>
-                    <span onClick={function(ev){ev.stopPropagation();toggleFollowPost(post.id);}} style={{fontSize:12,fontWeight:800,color:followingPosts.indexOf(post.id)>=0?DS.textMuted:color,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>- {followingPosts.indexOf(post.id)>=0?"Suivi":"Suivre"}</span>
+                    <span onClick={function(ev){ev.stopPropagation();toggleFollowPost(post);}} style={{fontSize:12,fontWeight:800,color:followingPosts.indexOf(_followKey(post))>=0?DS.textMuted:color,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>- {followingPosts.indexOf(_followKey(post))>=0?"Suivi":"Suivre"}</span>
                   </div>
                   <div style={{fontSize:11,color:DS.textDim,marginTop:3}}>{post.time}</div>
                 </div>
@@ -2913,7 +2894,9 @@ function ProFeed(props){
   }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   var followingPosts=props.followingIds||[];
-  function toggleFollowPost(id){if(props.onToggleFollow)props.onToggleFollow(id);}
+  // Suivre depuis le feed = suivre l'ETABLISSEMENT (jamais l'identifiant du post)
+  function toggleFollowPost(post){var _pe=_estabForPost(post);if(props.onToggleFollow&&_pe)props.onToggleFollow(_pe.id);}
+  function _followKey(post){var _pe=_estabForPost(post);return _pe?_pe.id:post.id;}
   var sLoadPro=useState(true);var loadingPro=sLoadPro[0];var setLoadingPro=sLoadPro[1];
   useEffect(function(){var t=setTimeout(function(){setLoadingPro(false);},350);return function(){clearTimeout(t);};},[]);
   var _sbLikesLoadedPro=useRef(false);
@@ -3135,7 +3118,7 @@ function ProFeed(props){
                     <span style={{fontSize:12,color:pc,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hôtel":"Restaurant"}</span>
                     {post.combined&&<span style={{fontSize:9,color:DS.primary,fontWeight:800,background:DS.primarySoft,borderRadius:8,padding:"1px 6px",flexShrink:0,whiteSpace:"nowrap"}}>+ Restaurant</span>}
                     <span style={{fontSize:12,color:DS.textMuted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}}>{post.followers?"- "+fmtK(post.followers)+" abonnés":""}</span>
-                    <span onClick={function(ev){ev.stopPropagation();toggleFollowPost(post.id);}} style={{fontSize:12,fontWeight:800,color:followingPosts.indexOf(post.id)>=0?DS.textMuted:pc,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>- {followingPosts.indexOf(post.id)>=0?"Suivi":"Suivre"}</span>
+                    <span onClick={function(ev){ev.stopPropagation();toggleFollowPost(post);}} style={{fontSize:12,fontWeight:800,color:followingPosts.indexOf(_followKey(post))>=0?DS.textMuted:pc,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>- {followingPosts.indexOf(_followKey(post))>=0?"Suivi":"Suivre"}</span>
                   </div>
                   <div style={{fontSize:11,color:DS.textDim,marginTop:3}}>{post.time}</div>
                 </div>
@@ -4303,8 +4286,6 @@ export default function App() {
   },[]);
 
   var s0=useState(null);  var auth=s0[0];          var setAuth=s0[1];
-  var _initNeedsOB=(function(){try{return!localStorage.getItem("hp_acc_type");}catch(e){return true;}})();
-  var sOB=useState(_initNeedsOB);var needsOnboarding=sOB[0];var setNeedsOnboarding=sOB[1];
   // Ecran de chargement pendant que Supabase restaure la session (comme LinkedIn)
   var sSessLoad=useState(true);var sessionLoading=sSessLoad[0];var setSessionLoading=sSessLoad[1];
   // Persistance de session Supabase : restaure la session au rechargement + ecoute les changements
@@ -4357,7 +4338,6 @@ export default function App() {
         var _storedType;try{_storedType=localStorage.getItem("hp_acc_type");}catch(e){}
         var quickType = meta.account_type || _storedType || "client";
         _HP_UID=session.user.id;
-        setNeedsOnboarding(false);
         _resolveAuthFromProfiles(sb,session,quickType,function(){
           setSessionLoading(false);
           _applyCacheExtras(session.user.id);
@@ -4373,7 +4353,6 @@ export default function App() {
         var _storedType2;try{_storedType2=localStorage.getItem("hp_acc_type");}catch(e){}
         var quickType2 = meta.account_type || _storedType2 || "client";
         _HP_UID=session.user.id;
-        setNeedsOnboarding(false);
         _resolveAuthFromProfiles(sb,session,quickType2,function(){
           _applyCacheExtras(session.user.id);
         });
@@ -4730,7 +4709,6 @@ export default function App() {
     setAuth(null);setEstab(null);setBook(null);
     setSett(false);setNotifs(false);
     setCTab("feed");setPTab("feed");
-    setNeedsOnboarding(true);
     setCoverPhotoRaw(null);
   }
   // Suppression de compte RGPD Art. 17 : efface toutes les donnees locales + Supabase + Storage
@@ -4769,7 +4747,6 @@ export default function App() {
     setAuth(null);setEstab(null);setBook(null);
     setSett(false);setNotifs(false);
     setCTab("feed");setPTab("feed");
-    setNeedsOnboarding(true);
   }
 
   // Profil Pro : charge depuis Supabase apres connexion
@@ -4805,15 +4782,15 @@ export default function App() {
         <div style={{width:40,height:40,borderRadius:"50%",border:"3px solid "+DS.border,borderTopColor:DS.primary,animation:"hp-spin 0.8s linear infinite"}}/>
       </div>
     );
-    if(needsOnboarding){
-      return(<AccountTypeScreen onSelect={function(t){try{localStorage.setItem("hp_acc_type",t);}catch(e){}setNeedsOnboarding(false);}}/>);
-    }
+    // Standard mondial : la connexion d'abord. Le choix du type de compte n'existe QUE dans
+    // le formulaire d'inscription (AuthScreen mode "register") — jamais avant une connexion.
+    // A la connexion, le type reel est impose par le profil serveur (source de verite).
     var _storedAccType="client";try{_storedAccType=localStorage.getItem("hp_acc_type")||"client";}catch(e){}
     return(
       <AuthScreen initialAccType={_storedAccType} onAuth={function(t,status,email,userId){
         try{localStorage.setItem("hp_acc_type",t);}catch(e){}
         setAuth(AuthService.buildSession(t,status,email,userId));
-      }} onBack={function(){try{localStorage.removeItem("hp_acc_type");}catch(e){}setNeedsOnboarding(true);}}/>
+      }}/>
     );
   }
 
