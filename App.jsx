@@ -111,13 +111,8 @@ var _HP_UID=null;
 function _lk(k){return _HP_UID?(k.replace(/^hp_/,"hp_"+_HP_UID+"_")):k;}
 // Notifie le VRAI destinataire (proprietaire du post/etablissement) — jamais soi-meme.
 // Le destinataire la recevra via le chargement des notifications au login.
-function notifyUser(targetUserId,notif){
-  try{
-    if(!DataLayer._client||!targetUserId||!notif)return;
-    if(_HP_UID&&targetUserId===_HP_UID)return;
-    DataLayer._client.from("notifications").insert([{id:notif.id,user_id:targetUserId,icon:notif.icon||"Bell",color:notif.color||"#6366f1",title:notif.title,body:notif.body,time:notif.time||"maintenant",read:false,tab:notif.tab||"feed",pref_key:notif.prefKey||"reservation"}]).then(function(){}).catch(function(){});
-  }catch(e){}
-}
+// NOTE : les notifications croisees (like, commentaire, reponse, message, suivi, reservation)
+// sont generees COTE SERVEUR par triggers (pattern Facebook) — aucune emission client.
 // Resolution centrale post -> etablissement : par identifiant d'abord (estabId / ownerUid),
 // repli par nom uniquement pour les anciens posts sans reference. Jamais de repli arbitraire.
 function _estabForPost(post){
@@ -128,15 +123,6 @@ function _estabForPost(post){
     var byPid=all.find(function(x){return x.id===post.id;});if(byPid)return byPid;
     if(post.ownerUid){var byUid=all.find(function(x){return x.userId===post.ownerUid;});if(byUid)return byUid;}
     return all.find(function(x){return x.name===post.author;})||null;
-  }catch(e){return null;}
-}
-// Retrouve le userId du proprietaire d'un post (etablissement reel inscrit)
-function _postOwnerUid(post){
-  try{
-    if(!post)return null;
-    if(post.ownerUid)return post.ownerUid;
-    var own=_estabForPost(post);
-    return own&&own.userId?own.userId:null;
   }catch(e){return null;}
 }
 var DataLayer = {
@@ -1433,7 +1419,6 @@ function ChatUI(props){
         client.from("messages").insert([{conversation_id:convId,sender_id:myId,sender_name:myName,body:sentMsg,reply_to_body:sentReply?sentReply.t:null,reply_to_sender:sentReply?(sentReply.f==="me"?myId:null):null,deleted:false,read:false}]).then(function(){});
         client.from("conversations").update({last_message:sentMsg,updated_at:new Date().toISOString()}).eq("id",convId).then(function(){});
         // Notifie le destinataire du nouveau message (id = clientId_proId)
-        try{var _parts=convId.split("_");var _other=_parts.find(function(x){return x&&x!==myId&&x.length>=32;});if(_other)notifyUser(_other,{id:"notif_msg_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau message",body:(myName||"Un utilisateur")+" vous a envoyé un message.",time:"maintenant",read:false,tab:"chat",prefKey:"message"});}catch(e){}
       };
       // Vérifier si la conversation existe, sinon la créer
       client.from("conversations").select("id").eq("id",convId).maybeSingle().then(function(res){
@@ -1909,7 +1894,6 @@ function ClientFeed(props){
         else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}
       }
     }catch(e){}
-    if(!wasLiked&&post){var _ownUid=_postOwnerUid(post);if(_ownUid)notifyUser(_ownUid,{id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:selfName+" a aimé votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
@@ -1928,12 +1912,6 @@ function ClientFeed(props){
     try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:selfName,author_photo:selfPhotoUrl,body:text,parent_id:_parentId,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).select("id").then(function(r){
       if(r.data&&r.data[0]&&r.data[0].id){var dbId=r.data[0].id;setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.map(function(c){return c.id===localId?Object.assign({},c,{id:dbId}):c;})}):p;});});}
     }).catch(function(){});}}catch(e){}
-    try{
-      var _pC=posts.find(function(p){return p.id===id;});var _ownUidC=_postOwnerUid(_pC);
-      var _replyUid=replyTo&&replyTo.userId?replyTo.userId:null;
-      if(_ownUidC&&_ownUidC!==_replyUid)notifyUser(_ownUidC,{id:"notif_cmt_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau commentaire",body:selfName+" a commenté votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});
-      if(_replyUid&&_replyUid!==selfUserId)notifyUser(_replyUid,{id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:selfName+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});
-    }catch(e){}
     toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
@@ -2855,12 +2833,6 @@ function ProFeed(props){
     try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:data.name,author_photo:selfPhotoUrl,body:text,parent_id:_parentId,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).select("id").then(function(r){
       if(r.data&&r.data[0]&&r.data[0].id){var dbId=r.data[0].id;setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.map(function(c){return c.id===localId?Object.assign({},c,{id:dbId}):c;})}):p;});});}
     }).catch(function(){});}}catch(e){}
-    try{
-      var _pC2=posts.find(function(p){return p.id===id;});var _ownUidC2=_postOwnerUid(_pC2);
-      var _replyUid2=replyTo&&replyTo.userId?replyTo.userId:null;
-      if(_ownUidC2&&_ownUidC2!==_replyUid2)notifyUser(_ownUidC2,{id:"notif_cmt_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouveau commentaire",body:data.name+" a commenté votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});
-      if(_replyUid2&&_replyUid2!==selfUserId)notifyUser(_replyUid2,{id:"notif_reply_"+Date.now(),icon:"MessageCircle",color:DS.primary,title:"Nouvelle réponse",body:data.name+" a répondu à votre commentaire.",time:"maintenant",read:false,tab:"feed",prefKey:"message"});
-    }catch(e){}
     toast("Commentaire publié","neutral");
   }
   function delCmt(postId,cmId){
@@ -2977,7 +2949,6 @@ function ProFeed(props){
         else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}
       }
     }catch(e){}
-    if(!wasLiked&&post){var _ownUidP=_postOwnerUid(post);if(_ownUidP)notifyUser(_ownUidP,{id:"notif_like_"+id+"_"+Date.now(),icon:"Heart",color:DS.error,title:"Nouveau like",body:data.name+" a aimé votre publication.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
   }
   function toggleCmt(id){setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{showCmt:!p.showCmt}):p;});});}
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
@@ -3858,12 +3829,6 @@ function ProResa(props){
         setResas(rows);
       }).catch(function(){});
   },[estabName]);
-  function _notifyResaClient(id,title,body,col){
-    try{
-      var _r=resas.find(function(x){return x.id===id;});
-      if(_r&&_r.clientId)notifyUser(_r.clientId,{id:"notif_resast_"+Date.now(),icon:"Calendar",color:col,title:title,body:body+" (réf. "+id+")",time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});
-    }catch(e){}
-  }
   var s2=useState("all");var filter=s2[0];var setFilter=s2[1];
   var s3=useState(null);var scanTarget=s3[0];var setScanTarget=s3[1];
   var tkR=useToast();var toastR=tkR.show;var ToastR=tkR.Toast;
@@ -3873,9 +3838,9 @@ function ProResa(props){
   var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim};
   var sLabels={confirmed:"Confirmée",pending:"En attente",refused:"Refusée",consumed:"Consommée"};
   function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(updated));}catch(e){}try{if(patch&&patch.status)DataLayer.updateReservationStatus(id,patch.status);}catch(e2){}}
-  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});_notifyResaClient(id,"Réservation acceptée","Votre réservation a été acceptée par l'établissement.",DS.success);toastR("Réservation confirmée","success");}
-  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});_notifyResaClient(id,"Réservation refusée","Votre réservation a été refusée par l'établissement.",DS.error);toastR("Réservation refusée","info");}
-  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});_notifyResaClient(id,"Arrivée confirmée","Votre QR code a été scanné. Bon séjour !",DS.primary);setScanTarget(null);toastR("Arrivée confirmée · Client marqué présent","success");}
+  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Réservation confirmée","success");}
+  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Réservation refusée","info");}
+  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivée confirmée · Client marqué présent","success");}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
       <ToastR/>
@@ -4491,7 +4456,8 @@ export default function App() {
     DataLayer._client.from("notifications").select("id,icon,color,title,body,time,read,tab,pref_key,created_at").eq("user_id",_authForUserData.userId).order("created_at",{ascending:false}).limit(50)
       .then(function(res){
         if(res.error||!res.data||res.data.length===0)return;
-        var sbNotifs=res.data.map(function(n){return{id:n.id,icon:n.icon,color:n.color,title:n.title,body:n.body,time:n.created_at?timeAgo(n.created_at):n.time,createdAt:n.created_at||null,read:n.read,tab:n.tab,prefKey:n.pref_key};});
+        // Respect des preferences de notification du destinataire (categorie desactivee = masquee)
+        var sbNotifs=res.data.filter(function(n){return notifPrefs[n.pref_key||"reservation"]!==false;}).map(function(n){return{id:n.id,icon:n.icon,color:n.color,title:n.title,body:n.body,time:n.created_at?timeAgo(n.created_at):n.time,createdAt:n.created_at||null,read:n.read,tab:n.tab,prefKey:n.pref_key};});
         setNotifStored(sbNotifs);
         try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(sbNotifs));}catch(e){}
       }).catch(function(){});
@@ -4684,7 +4650,6 @@ export default function App() {
       }
       return next;
     });
-    if(!was){var _tgtEst=DataLayer.getEstablishmentById(id);if(_tgtEst&&_tgtEst.userId)notifyUser(_tgtEst.userId,{id:"notif_follow_"+Date.now(),icon:"Users",color:DS.hotel,title:"Nouvel abonné",body:"Un utilisateur suit maintenant votre établissement.",time:"maintenant",read:false,tab:"feed",prefKey:"follow"});}
     tk.show(was?"Vous ne suivez plus cet etablissement":"Vous suivez cet etablissement","success");
   }
   function toggleFavEstab(id){
@@ -4914,7 +4879,6 @@ export default function App() {
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client")}/>}
-        {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client")} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:resa.status==="confirmed"?DS.success:DS.warning,title:resa.status==="confirmed"?"Réservation confirmée":"Demande de réservation envoyée",body:resa.status==="confirmed"?("Votre réservation chez "+(resa.estab||"l'établissement")+" est confirmée."):("Votre demande chez "+(resa.estab||"l'établissement")+" est en attente de confirmation (24h)."),time:"maintenant",read:false,tab:"profile",prefKey:"reservation"});try{if(book&&book.userId)notifyUser(book.userId,{id:"notif_newresa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Nouvelle réservation",body:(resa.clientName||"Un client")+" a réservé : "+(resa.service||"")+(resa.dateIn?(" · "+resa.dateIn):""),time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});}catch(e){}setBook(null);}}/>}
         {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){var pp=premiumPay;setPremiumPay(null);if(pp.renew)_renewPremiumNow();else _activatePremium(pp.plan,pp.durationMonths);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
@@ -4961,7 +4925,6 @@ export default function App() {
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId} selfName={proD.name||(auth&&auth.email?auth.email.split("@")[0]:"Pro")}/>}
-      {book&&<BookM e={book} onClose={function(){setBook(null);}} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} onBooked={function(resa){setResaHistory(function(h){var next=BookingService.appendToHistory(h,resa);try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(next));}catch(e){}return next;});addNotif({id:"notif_resa_"+Date.now(),icon:"Calendar",color:resa.status==="confirmed"?DS.success:DS.warning,title:resa.status==="confirmed"?"Réservation confirmée":"Demande de réservation envoyée",body:resa.status==="confirmed"?("Votre réservation chez "+(resa.estab||"l'établissement")+" est confirmée."):("Votre demande chez "+(resa.estab||"l'établissement")+" est en attente de confirmation (24h)."),time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});try{if(book&&book.userId)notifyUser(book.userId,{id:"notif_newresa_"+Date.now(),icon:"Calendar",color:DS.primary,title:"Nouvelle réservation",body:(resa.clientName||"Un client")+" a réservé : "+(resa.service||"")+(resa.dateIn?(" · "+resa.dateIn):""),time:"maintenant",read:false,tab:"reservations",prefKey:"reservation"});}catch(e){}setBook(null);}}/>}
       {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
       {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){var pp=premiumPay;setPremiumPay(null);if(pp.renew)_renewPremiumNow();else _activatePremium(pp.plan,pp.durationMonths);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
