@@ -685,7 +685,7 @@ var AuthService = {
       var status = accType !== "client" ? "pending" : "active";
       var s = AuthService.buildSession(accType, status, (r.data.user&&r.data.user.email)||email, r.data.user&&r.data.user.id);
       s.needsEmailConfirm = !r.data.session;
-      if(r.data.user&&r.data.user.id){try{sb.from("profiles").upsert([{user_id:r.data.user.id,display_name:"",account_type:accType,svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){});}catch(e){}}
+      if(r.data.user&&r.data.user.id){try{sb.from("profiles").upsert([{user_id:r.data.user.id,display_name:"",account_type:accType,status:accType!=="client"?"pending":"active",svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){});}catch(e){}}
       return s;
     }
     var status = accType !== "client" ? "pending" : "active";
@@ -1132,7 +1132,7 @@ function AuthScreen(props){
 function AccountStatusScreen(props){
   var auth=props.auth;var onLogout=props.onLogout;
   var icon=null;var title="";var msg="";
-  if(auth.accountStatus==="pending"){icon=<AlertTriangle size={48} color={DS.warning} style={{margin:"0 auto 16px",display:"block"}}/>;title="Validation en attente";msg="Votre compte est en cours de validation (48-72h).";}
+  if(auth.accountStatus==="pending"){icon=<AlertTriangle size={48} color={DS.warning} style={{margin:"0 auto 16px",display:"block"}}/>;title="Compte en cours de vérification";msg="Votre compte est en cours de vérification. Il sera validé après vérification de l'existence réelle de votre établissement (48-72h).";}
   if(auth.accountStatus==="suspended"){icon=<Lock size={48} color={DS.error} style={{margin:"0 auto 16px",display:"block"}}/>;title="Compte suspendu";msg=auth.suspendReason||"Contactez le support.";}
   if(auth.accountStatus==="banned"){icon=<Shield size={48} color={DS.error} style={{margin:"0 auto 16px",display:"block"}}/>;title="Compte banni";msg=auth.banReason||"Banni définitivement.";}
   if(auth.accountStatus==="refused"){icon=<XCircle size={48} color={DS.error} style={{margin:"0 auto 16px",display:"block"}}/>;title="Demande refusee";msg="Votre demande a ete refusee.";}
@@ -1597,7 +1597,7 @@ function ActionSheet(props){
 function ShareSheet(props){
   var onClose=props.onClose;var post=props.post;var onShared=props.onShared;
   useBackClose(true,onClose);
-  var shareUrl="https://hotelplatform.travel/post/"+post.id;
+  var shareUrl=(typeof window!=="undefined"&&window.location&&window.location.origin?window.location.origin:"https://hotelplatform-travel.vercel.app")+"/?post="+encodeURIComponent(post.id);
   var shareText=post.author+" sur HotelPlatform Travel: "+(post.text||"");
   var full=shareText+" "+shareUrl;
   var sok=useState(false);var copied=sok[0];var setCopied=sok[1];
@@ -2165,6 +2165,21 @@ function ClientProf(props){
   var favEstabs=favEstabIds.map(function(id){return _allEstabs.find(function(x){return x.id===id;});}).filter(Boolean);
   var s1=useState("reservations");var tab=s1[0];var setTab=s1[1];
   var sq=useState(null);var activeQR=sq[0];var setActiveQR=sq[1];
+  // Publications enregistrees (favoris de posts) — chargees depuis le serveur
+  var sSaved=useState([]);var savedPostIds=sSaved[0];var setSavedPostIds=sSaved[1];
+  var onOpenPost=props.onOpenPost||null;
+  useEffect(function(){
+    if(!_authUidC||!DataLayer._client)return;
+    DataLayer._client.from("post_favorites").select("post_id").eq("user_id",_authUidC)
+      .then(function(r){if(!r.error&&r.data)setSavedPostIds(r.data.map(function(x){return x.post_id;}));})
+      .catch(function(){});
+  },[_authUidC]);
+  var savedPosts=savedPostIds.map(function(pid){return DataLayer.getFeed().find(function(p){return p.id===pid;});}).filter(Boolean);
+  function _removeSavedPost(pid){
+    setSavedPostIds(function(ids){return ids.filter(function(x){return x!==pid;});});
+    try{if(DataLayer._client&&_authUidC)DataLayer._client.from("post_favorites").delete().eq("post_id",pid).eq("user_id",_authUidC).then(function(){}).catch(function(){});}catch(e){}
+    try{var f=JSON.parse(localStorage.getItem(_lk("hp_favs"))||"[]");localStorage.setItem(_lk("hp_favs"),JSON.stringify(f.filter(function(x){return x!==pid;})));}catch(e){}
+  }
   // Ouverture directe d'une reservation (ticket) depuis une notification
   useEffect(function(){
     var fid=props.focusResaId;
@@ -2317,7 +2332,29 @@ function ClientProf(props){
           })
           : <Emp Icon={Calendar} title="Aucune réservation" sub="Vos réservations apparaîtront ici apres votre premiere reservation"/>
         )}
-        {tab==="favoris"&&(favEstabs.length>0?favEstabs.map(function(est){return(<div key={est.id} style={{background:DS.card,borderRadius:14,marginBottom:10,border:"1px solid "+DS.border,overflow:"hidden"}}><div style={{height:80,position:"relative"}}><img src={est.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{est.verified&&<div style={{position:"absolute",top:6,left:8}}><VBadge sz={16}/></div>}</div><div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:800,color:DS.text}}>{est.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{est.location}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><Stars r={est.rating} sz={10}/><span style={{fontSize:10,color:DS.textMuted}}>({est.reviewCount})</span></div></div><div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{est.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>à partir de</div></div></div></div>);}):<Emp Icon={Heart} title="Aucun favori" sub="Appuyez sur le cœur d'un établissement pour l'ajouter"/>)}
+        {tab==="favoris"&&(<div>
+          {(favEstabs.length===0&&savedPosts.length===0)&&<Emp Icon={Heart} title="Aucun favori" sub="Vos établissements suivis et publications enregistrées apparaîtront ici"/>}
+          {favEstabs.length>0&&<div style={{fontSize:11,fontWeight:800,color:DS.textDim,letterSpacing:1,margin:"2px 0 8px"}}>ÉTABLISSEMENTS</div>}
+          {favEstabs.map(function(est){return(<div key={est.id} style={{background:DS.card,borderRadius:14,marginBottom:10,border:"1px solid "+DS.border,overflow:"hidden"}}><div style={{height:80,position:"relative"}}><img src={est.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{est.verified&&<div style={{position:"absolute",top:6,left:8}}><VBadge sz={16}/></div>}</div><div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:800,color:DS.text}}>{est.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{est.location}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><Stars r={est.rating} sz={10}/><span style={{fontSize:10,color:DS.textMuted}}>({est.reviewCount})</span></div></div><div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{est.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>à partir de</div></div></div></div>);})}
+          {savedPosts.length>0&&<div style={{fontSize:11,fontWeight:800,color:DS.textDim,letterSpacing:1,margin:"10px 0 8px"}}>PUBLICATIONS ENREGISTRÉES</div>}
+          {savedPosts.map(function(sp){
+            var _spe=_estabForPost(sp);
+            return(<div key={sp.id} style={{background:DS.card,borderRadius:14,marginBottom:10,border:"1px solid "+DS.border,overflow:"hidden"}}>
+              <div onClick={function(){if(onOpenPost)onOpenPost(sp.id);}} style={{display:"flex",gap:10,padding:"10px 12px",cursor:"pointer"}}>
+                <Av sz={38} letter={(sp.author||"?")[0]} img={_spe?_spe.img:null} verified={sp.verified||false}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:800,color:DS.text}}>{sp.author}</div>
+                  <div style={{fontSize:11,color:DS.textMuted,marginTop:2,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{sp.text}</div>
+                </div>
+                {sp.img&&<img src={sp.img} alt="" style={{width:52,height:52,borderRadius:10,objectFit:"cover",flexShrink:0}}/>}
+              </div>
+              <div style={{display:"flex",borderTop:"1px solid "+DS.border+"30"}}>
+                <button onClick={function(){if(onOpenPost)onOpenPost(sp.id);}} style={{flex:1,padding:"9px 0",background:"none",border:"none",color:DS.primary,fontSize:12,fontWeight:700,cursor:"pointer"}}>Voir la publication</button>
+                <button onClick={function(){_removeSavedPost(sp.id);}} style={{flex:1,padding:"9px 0",background:"none",border:"none",borderLeft:"1px solid "+DS.border+"30",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Retirer</button>
+              </div>
+            </div>);
+          })}
+        </div>)}
         {tab==="statistiques"&&isPremium&&premiumData&&premiumData.plan==="plus"&&(<div>
           <div style={{background:DS.goldSoft,border:"1px solid "+DS.gold+"44",borderRadius:14,padding:"14px 16px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}><VBadge sz={18}/><div><div style={{fontSize:13,fontWeight:800,color:DS.gold}}>Premium Plus — Statistiques profil</div><div style={{fontSize:11,color:DS.textMuted}}>Actif jusqu'au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</div></div></div>
           {[[String(resaHistory.length),"Réservations totales",Calendar,DS.client],[String(favEstabs.length),"Établissements favoris",Heart,DS.error],[String(followingCount),"Abonnements actifs",Users,DS.primary],[premiumData.startedAt?new Date(premiumData.startedAt).toLocaleDateString("fr-FR"):"—","Membre Premium depuis",Star,DS.gold]].map(function(_i,idx){var val=_i[0];var lbl=_i[1];var Icon=_i[2];var col=_i[3];return(<div key={idx} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:14}}><div style={{width:40,height:40,borderRadius:12,background:col+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={col}/></div><div style={{flex:1}}><div style={{fontSize:11,color:DS.textMuted,fontWeight:600}}>{lbl}</div><div style={{fontSize:22,fontWeight:900,color:DS.text,marginTop:2}}>{val}</div></div></div>);})}
@@ -4421,7 +4458,7 @@ export default function App() {
           });
           if(!r||!r.data){
             var _dn=meta.full_name||meta.name||(session.user.email?session.user.email.split("@")[0]:"");
-            sb.from("profiles").upsert([{user_id:uid,display_name:_dn,account_type:accType,svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){}).catch(function(){});
+            sb.from("profiles").upsert([{user_id:uid,display_name:_dn,account_type:accType,status:accType!=="client"?"pending":"active",svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){}).catch(function(){});
             if(!meta.account_type){sb.auth.updateUser({data:{account_type:accType}}).catch(function(){});}
           } else if(!meta.account_type){
             sb.auth.updateUser({data:{account_type:accType}}).catch(function(){});
@@ -4969,6 +5006,19 @@ export default function App() {
   function addNotif(notif){if(!notifPrefs[notif.prefKey!==undefined?notif.prefKey:"reservation"])return;if(!notif.createdAt)notif=Object.assign({},notif,{createdAt:new Date().toISOString()});var next=[notif].concat(notifList);setNotifStored(next);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}try{if(DataLayer._client&&auth&&auth.userId){DataLayer._client.from("notifications").upsert([{id:notif.id,user_id:auth.userId,icon:notif.icon||"Bell",color:notif.color||"#6366f1",title:notif.title,body:notif.body,time:notif.time||"maintenant",read:false,tab:notif.tab||"feed",pref_key:notif.prefKey||"reservation"}],{onConflict:"id,user_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}}catch(e){}}
   var unread = notifList.filter(function(n){return !n.read;}).length;
 
+  // Lien partage (?post=...) -> ouvre directement la publication concernee
+  useEffect(function(){
+    if(!auth||!auth.userId)return;
+    try{
+      var sp=new URLSearchParams(window.location.search);
+      var pid=sp.get("post");
+      if(pid){
+        setPendingFeedPost(pid);
+        if(!isPro)setCTab("feed");else setPTab("feed");
+        try{window.history.replaceState({},"",window.location.pathname);}catch(e){}
+      }
+    }catch(e){}
+  },[auth&&auth.userId]);
   // Clic notification -> ouvre l'ELEMENT exact concerne (pattern Facebook)
   function openNotifTarget(t,notif){
     setNotifs(false);
@@ -5070,7 +5120,7 @@ export default function App() {
           {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} focusPostId={pendingFeedPost} onFocusConsumed={function(){setPendingFeedPost(null);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={privacySettings.locked?null:profilePhoto} isPremium={isPremium} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous"))}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} initialConvImg={pendingConv&&pendingConv.img} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
-          {cTab==="profile"  &&<ClientProf focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
+          {cTab==="profile"  &&<ClientProf focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onOpenPost={function(pid){setPendingFeedPost(pid);setCTab("feed");}} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client"))}/>}
