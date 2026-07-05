@@ -1383,6 +1383,30 @@ function ChatUI(props){
   },[myId,isClientChat]);
   // Charge les messages et souscrit au Realtime quand une conversation est ouverte
   var convId=active!==null&&thr[active]?thr[active].convId:null;
+  var tkC=useToast();var toastC=tkC.show;var ToastC=tkC.Toast;
+  // Blocage : identifiant de l'autre participant de la conversation active (paire uid_uid)
+  var otherUid=(function(){if(!convId||!myId)return null;var ps=String(convId).split("_");var o=ps.find(function(x){return x&&x!==myId&&x.length>=32;});return o||null;})();
+  var sBlk=useState(false);var iBlocked=sBlk[0];var setIBlocked=sBlk[1];
+  useEffect(function(){
+    if(!otherUid||!myId||!DataLayer._client){setIBlocked(false);return;}
+    DataLayer._client.from("blocked_users").select("blocked_id").eq("blocker_id",myId).eq("blocked_id",otherUid).maybeSingle().then(function(r){setIBlocked(!!(r&&r.data));}).catch(function(){});
+  },[otherUid,myId]);
+  function toggleBlock(){
+    if(!otherUid||!myId||!DataLayer._client)return;
+    if(iBlocked){DataLayer._client.from("blocked_users").delete().eq("blocker_id",myId).eq("blocked_id",otherUid).then(function(){setIBlocked(false);toastC("Compte débloqué","success");}).catch(function(){});}
+    else{DataLayer._client.from("blocked_users").insert([{blocker_id:myId,blocked_id:otherUid}]).then(function(r){if(!r||!r.error){setIBlocked(true);toastC("Compte bloqué — il ne peut plus vous écrire","success");}}).catch(function(){});}
+  }
+  // Cote Pro : clients reels (avec leur identifiant de compte) depuis les reservations en base
+  var estabName=props.estabName||null;
+  var sProCl=useState([]);var proClients=sProCl[0];var setProClients=sProCl[1];
+  useEffect(function(){
+    if(isClientChat||!estabName||!DataLayer._client)return;
+    DataLayer._client.from("reservations").select("client_id,data").eq("estab_id",estabName).then(function(r){
+      if(r.error||!r.data)return;var seen={};var list=[];
+      r.data.forEach(function(row){var cid=row.client_id;var nm=(row.data&&row.data.clientName)||"Client";if(!cid||seen[cid])return;seen[cid]=true;list.push({clientId:cid,clientName:nm,service:(row.data&&row.data.service)||"Réservation"});});
+      setProClients(list);
+    }).catch(function(){});
+  },[estabName,isClientChat]);
   useEffect(function(){
     var client=DataLayer._client;
     if(!convId||!myId||!client)return;
@@ -1416,7 +1440,13 @@ function ChatUI(props){
       var convId=curConv.convId;
       // S'assurer que la conversation existe en DB avant d'insérer le message
       var _insertMsg=function(){
-        client.from("messages").insert([{conversation_id:convId,sender_id:myId,sender_name:myName,body:sentMsg,reply_to_body:sentReply?sentReply.t:null,reply_to_sender:sentReply?(sentReply.f==="me"?myId:null):null,deleted:false,read:false}]).then(function(){});
+        client.from("messages").insert([{conversation_id:convId,sender_id:myId,sender_name:myName,body:sentMsg,reply_to_body:sentReply?sentReply.t:null,reply_to_sender:sentReply?(sentReply.f==="me"?myId:null):null,deleted:false,read:false}]).then(function(r){
+          if(r&&r.error){
+            // Refus serveur (blocage) : retirer le message local + prevenir
+            setThr(function(ts){return ts.map(function(c,i){return i===curActive?Object.assign({},c,{msgs:c.msgs.filter(function(m){return m!==nm;})}):c;});});
+            toastC("Message non envoyé — ce compte n'est pas joignable.","error");
+          }
+        });
         client.from("conversations").update({last_message:sentMsg,updated_at:new Date().toISOString()}).eq("id",convId).then(function(){});
         // Notifie le destinataire du nouveau message (id = clientId_proId)
       };
@@ -1443,12 +1473,18 @@ function ChatUI(props){
   var sComposeQ=useState("");var composeQ=sComposeQ[0];var setComposeQ=sComposeQ[1];
   var _composeList=isClientChat
     ? DataLayer.getEstablishments().filter(function(e){return !composeQ||(e.name||"").toLowerCase().includes(composeQ.toLowerCase());})
-    : (function(){var seen={};return BookingService.getAll().filter(function(r){if(!r.clientName||seen[r.clientName])return false;seen[r.clientName]=true;return !composeQ||(r.clientName||"").toLowerCase().includes(composeQ.toLowerCase());});})();
+    : proClients.filter(function(r){return !composeQ||(r.clientName||"").toLowerCase().includes(composeQ.toLowerCase());});
   function startConv(contact){
     var name=isClientChat?(contact.name||"Établissement"):(contact.clientName||"Client");
-    var cid=(isClientChat&&contact.userId&&myId)?[myId,contact.userId].sort().join("_"):("conv_"+(contact.id||contact.clientName||Date.now())+"_"+(myId||"me"));
+    var otherId=isClientChat?(contact.userId||null):(contact.clientId||null);
+    var cid=(otherId&&myId)?[myId,otherId].sort().join("_"):("conv_"+(contact.id||contact.clientName||Date.now())+"_"+(myId||"me"));
     var existing=thr.findIndex(function(t){return t.convId===cid;});
     if(existing>=0){setActive(existing);setShowCompose(false);setComposeQ("");return;}
+    // Creation serveur immediate : le filtre entrant (blocage / reglage Premium du destinataire) s'applique ici
+    if(otherId&&myId&&DataLayer._client){
+      DataLayer._client.from("conversations").upsert([{id:cid,client_id:isClientChat?myId:otherId,pro_id:isClientChat?otherId:myId,client_name:isClientChat?myName:(contact.clientName||""),pro_name:isClientChat?(contact.name||""):myName,pro_img:isClientChat?(contact.img||null):null,pro_verified:isClientChat?(contact.verified||false):false}],{onConflict:"id"})
+        .then(function(r){if(r&&r.error){toastC("Ce compte n'accepte pas les nouveaux messages.","error");}}).catch(function(){});
+    }
     var newC={convId:cid,msgs:[]};
     newC[nK]=name;
     if(iK)newC[iK]=isClientChat?(contact.img||null):null;
@@ -1456,7 +1492,7 @@ function ChatUI(props){
     setThr(function(ts){return [newC].concat(ts);});
     setActive(0);setShowCompose(false);setComposeQ("");
   }
-  if(showCompose){return(<div style={{background:DS.bg,minHeight:"100%",display:"flex",flexDirection:"column"}}>
+  if(showCompose){return(<div style={{background:DS.bg,minHeight:"100%",display:"flex",flexDirection:"column"}}><ToastC/>
     <div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}>
       <button onClick={function(){setShowCompose(false);setComposeQ("");}} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",padding:4}}><ArrowLeft size={20} color={DS.text}/></button>
       <div style={{fontSize:15,fontWeight:800,color:DS.text}}>Nouveau message</div>
@@ -1485,7 +1521,7 @@ function ChatUI(props){
   </div>);}
   if(active===null){return(<div style={{background:DS.bg,minHeight:"100%"}}><div style={{padding:"14px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}><MessageCircle size={18} color={myColor}/><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Messages</div><div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:11,color:DS.textMuted}}>{thr.length} conversation{thr.length>1?"s":""}</span><button onClick={function(){setShowCompose(true);}} style={{width:32,height:32,borderRadius:"50%",background:myColor,border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Plus size={16} color="#fff"/></button></div></div>{convErr&&<div style={{padding:"10px 16px",background:"#ff4d4d22",color:"#ff4d4d",fontSize:12,textAlign:"center"}}>{convErr}</div>}{(chatSkLoading||convLoading)?<ChatListSkeleton/>:(thr.length===0?<Emp Icon={MessageCircle} title="Aucun message" sub="Vos conversations apparaissent ici"/>:thr.map(function(t,i){var last=t.msgs[t.msgs.length-1];var unread=t.msgs.length?t.msgs.filter(function(m){return m.f!=="me"&&!m.read;}).length:(t.unreadCount||0);return(<div key={i} onClick={function(){setActive(i);markRead(i);}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",animation:"hp-item-in 0.3s ease both",animationDelay:(i*50)+"ms"}}><Av sz={46} letter={(t[nK]||"?")[0]} img={iK?t[iK]:null} verified={t[vK]||false} isClient={isClientChat}/><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{t[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>{last?last.time:""}</div></div><div style={{fontSize:12,color:unread>0?DS.text:DS.textMuted,fontWeight:unread>0?600:400,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{last?last.t:"Début de la conversation"}</div></div>{unread>0&&<div style={{width:18,height:18,borderRadius:"50%",background:myColor,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff",fontWeight:700,flexShrink:0}}>{unread}</div>}</div>);}))}</div>);}
   var msgs=conv?conv.msgs:[];
-  return(<div style={{display:"flex",flexDirection:"column",height:"100%",background:DS.bg}}><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false} isClient={isClientChat}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>Membre HotelPlatform</div></div></div><div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",animation:"hp-msg-in 0.3s ease both",animationDelay:Math.min(i*20,200)+"ms"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprimé]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoyé"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Répondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()} style={{width:40,height:40,borderRadius:"50%",background:msg.trim()?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
+  return(<div style={{display:"flex",flexDirection:"column",height:"100%",background:DS.bg}}><ToastC/><div style={{padding:"12px 16px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10,background:DS.surface,flexShrink:0}}><BackBtn onClick={function(){setActive(null);setReplyTo(null);}}/><Av sz={38} letter={(conv[nK]||"?")[0]} img={iK?conv[iK]:null} verified={conv[vK]||false} isClient={isClientChat}/><div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{conv[nK]}</div><div style={{fontSize:10,color:DS.textMuted}}>Membre HotelPlatform</div></div>{otherUid&&<button onClick={toggleBlock} style={{padding:"6px 12px",borderRadius:16,border:"1px solid "+(iBlocked?DS.border:DS.error+"55"),background:iBlocked?DS.card:DS.errorSoft,color:iBlocked?DS.textMuted:DS.error,fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>{iBlocked?"Débloquer":"Bloquer"}</button>}</div>{iBlocked&&<div style={{padding:"8px 16px",background:DS.warningSoft,borderBottom:"1px solid "+DS.warning+"33",fontSize:11,color:DS.warning,textAlign:"center",flexShrink:0}}>Vous avez bloqué ce compte — débloquez-le pour reprendre la conversation.</div>}<div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",padding:"12px 16px",display:"flex",flexDirection:"column",gap:6}}>{msgs.length===0&&<div style={{textAlign:"center",color:DS.textMuted,fontSize:12,marginTop:40}}>Debut de la conversation</div>}{msgs.map(function(m,i){var isMe=m.f==="me";return(<div key={m.id||i} style={{display:"flex",flexDirection:"column",alignItems:isMe?"flex-end":"flex-start",animation:"hp-msg-in 0.3s ease both",animationDelay:Math.min(i*20,200)+"ms"}}>{m.replyTo&&!m.deleted&&<div style={{padding:"4px 10px",background:DS.border,borderRadius:"8px 8px 0 0",fontSize:10,color:DS.textMuted,maxWidth:"75%",borderLeft:"3px solid "+myColor,marginBottom:-2}}><div style={{fontWeight:700,color:myColor}}>{m.replyTo.f==="me"?"Vous":conv[nK]}</div><div style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.replyTo.t}</div></div>}<div onDoubleClick={function(){if(!m.deleted)setReplyTo(m);}} onTouchStart={function(e){mlpStart(m,e);}} onTouchEnd={mlpCancel} onTouchMove={mlpCancel} onMouseDown={function(){mlpStart(m);}} onMouseUp={mlpCancel} onMouseLeave={mlpCancel} onContextMenu={function(e){e.preventDefault();if(isMe&&!m.deleted)setMenuMsg(m);}} style={{padding:"9px 13px",borderRadius:isMe?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.deleted?DS.border:isMe?myColor:DS.card,color:m.deleted?DS.textDim:isMe?"#fff":DS.text,fontSize:13,maxWidth:"75%",lineHeight:1.45,cursor:"pointer",fontStyle:m.deleted?"italic":"normal",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>{m.deleted?"[Message supprimé]":m.t}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><span style={{fontSize:9,color:DS.textDim}}>{m.time}</span>{isMe&&!m.deleted&&<span style={{fontSize:9,color:m.read?myColor:DS.textDim}}>{m.read?"Lu":"Envoyé"}</span>}</div></div>);})} </div>{replyTo&&<div style={{padding:"6px 16px",background:DS.surface,borderTop:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:8,flexShrink:0}}><div style={{flex:1,borderLeft:"3px solid "+myColor,paddingLeft:8}}><div style={{fontSize:10,color:myColor,fontWeight:700}}>Répondre</div><div style={{fontSize:11,color:DS.textMuted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{replyTo.t}</div></div><button onClick={function(){setReplyTo(null);}} style={{background:"none",border:"none",cursor:"pointer"}}><X size={14} color={DS.textMuted}/></button></div>}{qR&&msgs.length===0&&<div style={{padding:"6px 16px",display:"flex",gap:6,flexWrap:"wrap",flexShrink:0}}>{qR.map(function(q,i){return <button key={i} onClick={function(){setMsg(q);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+myColor+"44",background:myColor+"12",color:myColor,fontSize:11,cursor:"pointer"}}>{q}</button>;})} </div>}<div style={{padding:"10px 14px",borderTop:"1px solid "+DS.border,display:"flex",gap:8,alignItems:"center",background:DS.surface,flexShrink:0}}><input value={msg} onChange={function(e){setMsg(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&!e.shiftKey)send();}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder={replyTo?"Répondre...":"Message..."} style={{flex:1,background:DS.card,border:"1px solid "+DS.border,borderRadius:22,padding:"10px 16px",fontSize:13,color:DS.text,outline:"none"}}/><button onClick={send} disabled={!msg.trim()||iBlocked} style={{width:40,height:40,borderRadius:"50%",background:(msg.trim()&&!iBlocked)?myColor:DS.border,border:"none",cursor:msg.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Send size={16} color="#fff"/></button></div>{menuMsg&&<ActionSheet label="ce message" onClose={function(){setMenuMsg(null);}} onDelete={function(){delMsg(menuMsg.id);}}/>}</div>);
 }
 
 function useLongPress(onTrigger){
@@ -4825,19 +4861,8 @@ export default function App() {
     else toastApp("Profil indisponible pour le moment","error");
   }
   function openChat(e){
-    // Vérifier la permission de messagerie (réglage confidentialité Premium)
-    if(!isPro&&privacySettings&&privacySettings.msgPermission==="none"){
-      toastApp("Vous avez bloqué tous les messages. Modifiez vos paramètres de confidentialité.","error");
-      return;
-    }
-    if(!isPro&&privacySettings&&privacySettings.msgPermission==="booked"){
-      var _norm=function(s){return String(s||"").trim().toLowerCase();};
-      var _hasResa=(resaHistory||[]).some(function(r){return e&&_norm(r.estab)===_norm(e.name);});
-      if(!_hasResa){
-        toastApp("Messages limités aux établissements avec réservation. Réservez d'abord ou modifiez vos paramètres.","error");
-        return;
-      }
-    }
+    // Le reglage « qui peut m'ecrire » est un filtre ENTRANT applique par le serveur
+    // (blocage + permission du destinataire) — l'envoi sortant est toujours libre.
     // Creer la conversation en base si l'etablissement est un vrai Pro inscrit
     if(e&&e.userId&&auth&&auth.userId&&!isPro&&DataLayer._client){
       var convId=[auth.userId,e.userId].sort().join("_");
@@ -4949,7 +4974,7 @@ export default function App() {
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
-        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={auth&&(auth.email||"").split("@")[0]} onUnreadChange={setChatUnread}/>}
+        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={proD.name||(auth&&(auth.email||"").split("@")[0])} estabName={proD.name} onUnreadChange={setChatUnread}/>}
         {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
