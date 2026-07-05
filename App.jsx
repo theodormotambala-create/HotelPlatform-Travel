@@ -1210,7 +1210,7 @@ function NotifP(props){
   var title=isPro?"Notifications Pro":"Notifications";
   var snSk=useState(true);var notifSkLoading=snSk[0];var setNotifSkLoading=snSk[1];
   useEffect(function(){var t=setTimeout(function(){setNotifSkLoading(false);},300);return function(){clearTimeout(t);};},[]);
-  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>{title}</div>} right={null}/>{notifSkLoading?<NotifSkeleton/>:<>{notifs.length===0&&<Emp Icon={Bell} title="Aucune notification" sub="Vos notifications apparaîtront ici"/>}{notifs.map(function(n,_ni){var Icon=ICON_MAP[n.icon]||ICON_MAP[n.Icon&&n.Icon.displayName]||Bell;return(<div key={n.id} onClick={function(){handleMarkRead(n.id);if(onNavigate)onNavigate(n.tab);}} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",background:n.read?"transparent":n.color+"08",animation:"hp-item-in 0.3s ease both",animationDelay:(_ni*50)+"ms"}}><div style={{width:40,height:40,borderRadius:"50%",background:n.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={n.color}/></div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?600:800,color:DS.text,marginBottom:2}}>{n.title}</div><div style={{fontSize:12,color:DS.textMuted}}>{n.body}</div><div style={{fontSize:10,color:DS.textDim,marginTop:4}}>{n.createdAt?timeAgo(n.createdAt):n.time}</div></div>{!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:accent,marginTop:6,flexShrink:0}}/>}</div>);})}</>}</div>);
+  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>{title}</div>} right={null}/>{notifSkLoading?<NotifSkeleton/>:<>{notifs.length===0&&<Emp Icon={Bell} title="Aucune notification" sub="Vos notifications apparaîtront ici"/>}{notifs.map(function(n,_ni){var Icon=ICON_MAP[n.icon]||ICON_MAP[n.Icon&&n.Icon.displayName]||Bell;return(<div key={n.id} onClick={function(){handleMarkRead(n.id);if(onNavigate)onNavigate(n.tab,n);}} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer",background:n.read?"transparent":n.color+"08",animation:"hp-item-in 0.3s ease both",animationDelay:(_ni*50)+"ms"}}><div style={{width:40,height:40,borderRadius:"50%",background:n.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon size={18} color={n.color}/></div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:n.read?600:800,color:DS.text,marginBottom:2}}>{n.title}</div><div style={{fontSize:12,color:DS.textMuted}}>{n.body}</div><div style={{fontSize:10,color:DS.textDim,marginTop:4}}>{n.createdAt?timeAgo(n.createdAt):n.time}</div></div>{!n.read&&<div style={{width:8,height:8,borderRadius:"50%",background:accent,marginTop:6,flexShrink:0}}/>}</div>);})}</>}</div>);
 }
 
 function SettingsS(props){
@@ -2008,6 +2008,22 @@ function ClientFeed(props){
   // Resolution par identifiant a chaque rendu (cache toujours frais, photo de couverture a jour)
   function _openPostProfile(post){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}
   var postRefs=useRef({});
+  // Ouverture directe d'un post depuis une notification (defilement + commentaires)
+  useEffect(function(){
+    var fid=props.focusPostId;
+    if(!fid)return;
+    var idx=posts.findIndex(function(p){return p.id===fid;});
+    if(idx<0)return;
+    setVisibleCount(function(nb){return Math.max(nb,idx+1);});
+    var t=setTimeout(function(){
+      var el=postRefs.current[fid];
+      if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
+      _loadCmts(fid);
+      setPosts(function(ps){return ps.map(function(p){return p.id===fid?Object.assign({},p,{showCmt:true}):p;});});
+      if(props.onFocusConsumed)props.onFocusConsumed();
+    },380);
+    return function(){clearTimeout(t);};
+  },[props.focusPostId,posts.length]);
   function openCmt(id){
     _loadCmts(id);
     var el=postRefs.current[id];
@@ -2149,6 +2165,21 @@ function ClientProf(props){
   var favEstabs=favEstabIds.map(function(id){return _allEstabs.find(function(x){return x.id===id;});}).filter(Boolean);
   var s1=useState("reservations");var tab=s1[0];var setTab=s1[1];
   var sq=useState(null);var activeQR=sq[0];var setActiveQR=sq[1];
+  // Ouverture directe d'une reservation (ticket) depuis une notification
+  useEffect(function(){
+    var fid=props.focusResaId;
+    if(!fid||!resaHistory.length)return;
+    var idx=resaHistory.findIndex(function(r){return r.id===fid;});
+    if(idx<0)return;
+    setTab("reservations");
+    setActiveQR(idx);
+    var t=setTimeout(function(){
+      var el=document.getElementById("hp-cresa-"+fid);
+      if(el)el.scrollIntoView({behavior:"smooth",block:"center"});
+      if(props.onFocusConsumed)props.onFocusConsumed();
+    },380);
+    return function(){clearTimeout(t);};
+  },[props.focusResaId,resaHistory.length]);
   var sPSk=useState(true);var profSkLoading=sPSk[0];var setProfSkLoading=sPSk[1];
   useEffect(function(){var t=setTimeout(function(){setProfSkLoading(false);},350);return function(){clearTimeout(t);};},[]);
 
@@ -2220,7 +2251,7 @@ function ClientProf(props){
             var stColor={pending:DS.warning,refused:DS.error,confirmed:DS.success,consumed:DS.textDim}[st]||DS.warning;
             var hasTicket=st!=="refused";
             return(
-              <div key={i} style={{background:DS.card,borderRadius:14,marginBottom:12,border:"1px solid "+DS.border,overflow:"hidden",opacity:st==="refused"?0.65:1}}>
+              <div key={i} id={"hp-cresa-"+r.id} style={{background:DS.card,borderRadius:14,marginBottom:12,border:"1px solid "+DS.border,overflow:"hidden",opacity:st==="refused"?0.65:1}}>
                 <div style={{padding:"12px 14px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
                     <div style={{flex:1}}>
@@ -2997,6 +3028,22 @@ function ProFeed(props){
   },[selfUserId]);
   // Rendu progressif : lots de 8 publications via sentinelle
   var sVisPro=useState(8);var visibleCountPro=sVisPro[0];var setVisibleCountPro=sVisPro[1];
+  var postRefsPro=useRef({});
+  useEffect(function(){
+    var fid=props.focusPostId;
+    if(!fid)return;
+    var idx=posts.findIndex(function(p){return p.id===fid;});
+    if(idx<0)return;
+    setVisibleCountPro(function(nb){return Math.max(nb,idx+1);});
+    var t=setTimeout(function(){
+      var el=postRefsPro.current[fid];
+      if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
+      _loadCmtsPro(fid);
+      setPosts(function(ps){return ps.map(function(p){return p.id===fid?Object.assign({},p,{showCmt:true}):p;});});
+      if(props.onFocusConsumed)props.onFocusConsumed();
+    },380);
+    return function(){clearTimeout(t);};
+  },[props.focusPostId,posts.length]);
   var sentinelRefPro=useRef(null);
   useEffect(function(){
     var el=sentinelRefPro.current;
@@ -3162,7 +3209,7 @@ function ProFeed(props){
       {posts.slice(0,visibleCountPro).map(function(post,_pfi){
         var pc=rC(post.type);
         return(
-          <div key={post.id} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pfi*50)+"ms"}}>
+          <div key={post.id} ref={function(el){postRefsPro.current[post.id]=el;}} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pfi*50)+"ms"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 16px 14px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
                 <div onClick={function(){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}} style={{cursor:onProfile?"pointer":"default",flexShrink:0}}>
@@ -3917,6 +3964,18 @@ function ProResa(props){
   },[estabName]);
   var s2=useState("all");var filter=s2[0];var setFilter=s2[1];
   var s3=useState(null);var scanTarget=s3[0];var setScanTarget=s3[1];
+  // Ouverture directe d'une reservation depuis une notification
+  useEffect(function(){
+    var fid=props.focusResaId;
+    if(!fid||!resas.some(function(r){return r.id===fid;}))return;
+    setFilter("all");
+    var t=setTimeout(function(){
+      var el=document.getElementById("hp-resa-"+fid);
+      if(el)el.scrollIntoView({behavior:"smooth",block:"center"});
+      if(props.onFocusConsumed)props.onFocusConsumed();
+    },380);
+    return function(){clearTimeout(t);};
+  },[props.focusResaId,resas.length]);
   var tkR=useToast();var toastR=tkR.show;var ToastR=tkR.Toast;
   var sRSk=useState(true);var resaSkLoading=sRSk[0];var setResaSkLoading=sRSk[1];
   useEffect(function(){var t=setTimeout(function(){setResaSkLoading(false);},350);return function(){clearTimeout(t);};},[]);
@@ -3967,7 +4026,7 @@ function ProResa(props){
       </div>
       <div style={{padding:"0 14px"}}>
         {resaSkLoading?<ResaSkeleton/>:<>{filtered.map(function(r,_ri){return(
-          <div key={r.id} style={{background:DS.card,borderRadius:14,padding:"14px",marginBottom:12,border:"1px solid "+(r.qrScanned?DS.textDim+"44":DS.border),opacity:r.status==="consumed"?0.7:1,animation:"hp-item-in 0.32s ease both",animationDelay:(_ri*55)+"ms"}}>
+          <div key={r.id} id={"hp-resa-"+r.id} style={{background:DS.card,borderRadius:14,padding:"14px",marginBottom:12,border:"1px solid "+(r.qrScanned?DS.textDim+"44":DS.border),opacity:r.status==="consumed"?0.7:1,animation:"hp-item-in 0.32s ease both",animationDelay:(_ri*55)+"ms"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:14,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",gap:6}}>
@@ -4422,6 +4481,8 @@ export default function App() {
   var s2=useState("feed");var cTab=s2[0];           var setCTab=s2[1];
   var s3=useState("feed");var pTab=s3[0];           var setPTab=s3[1];
   var s4=useState(false); var notifsOpen=s4[0];     var setNotifs=s4[1];
+  var sFP=useState(null); var pendingFeedPost=sFP[0]; var setPendingFeedPost=sFP[1];
+  var sFR=useState(null); var pendingResaFocus=sFR[0]; var setPendingResaFocus=sFR[1];
   var s5=useState(false); var sett=s5[0];           var setSett=s5[1];
   var s6=useState(null);  var estab=s6[0];          var setEstab=s6[1];
   var s7=useState(null);  var book=s7[0];           var setBook=s7[1];
@@ -4554,11 +4615,11 @@ export default function App() {
   var _authForUserData=s0[0];
   useEffect(function(){
     if(!_authForUserData||!_authForUserData.userId||!DataLayer._client)return;
-    DataLayer._client.from("notifications").select("id,icon,color,title,body,time,read,tab,pref_key,created_at").eq("user_id",_authForUserData.userId).order("created_at",{ascending:false}).limit(50)
+    DataLayer._client.from("notifications").select("id,icon,color,title,body,time,read,tab,pref_key,target_id,created_at").eq("user_id",_authForUserData.userId).order("created_at",{ascending:false}).limit(50)
       .then(function(res){
         if(res.error||!res.data||res.data.length===0)return;
         // Respect des preferences de notification du destinataire (categorie desactivee = masquee)
-        var sbNotifs=res.data.filter(function(n){return notifPrefs[n.pref_key||"reservation"]!==false;}).map(function(n){return{id:n.id,icon:n.icon,color:n.color,title:n.title,body:n.body,time:n.created_at?timeAgo(n.created_at):n.time,createdAt:n.created_at||null,read:n.read,tab:n.tab,prefKey:n.pref_key};});
+        var sbNotifs=res.data.filter(function(n){return notifPrefs[n.pref_key||"reservation"]!==false;}).map(function(n){return{id:n.id,icon:n.icon,color:n.color,title:n.title,body:n.body,time:n.created_at?timeAgo(n.created_at):n.time,createdAt:n.created_at||null,read:n.read,tab:n.tab,prefKey:n.pref_key,targetId:n.target_id||null};});
         setNotifStored(sbNotifs);
         try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(sbNotifs));}catch(e){}
       }).catch(function(){});
@@ -4570,7 +4631,7 @@ export default function App() {
           .on("postgres_changes",{event:"INSERT",schema:"public",table:"notifications",filter:"user_id=eq."+_authForUserData.userId},function(payload){
             var n=payload&&payload.new;if(!n||!n.id)return;
             if(notifPrefs[n.pref_key||"reservation"]===false)return;
-            var notif={id:n.id,icon:n.icon,color:n.color,title:n.title,body:n.body,time:n.created_at?timeAgo(n.created_at):"maintenant",createdAt:n.created_at||null,read:n.read,tab:n.tab,prefKey:n.pref_key};
+            var notif={id:n.id,icon:n.icon,color:n.color,title:n.title,body:n.body,time:n.created_at?timeAgo(n.created_at):"maintenant",createdAt:n.created_at||null,read:n.read,tab:n.tab,prefKey:n.pref_key,targetId:n.target_id||null};
             setNotifStored(function(list){if(list.some(function(x){return x.id===notif.id;}))return list;var next=[notif].concat(list);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}return next;});
           })
           .subscribe();
@@ -4908,6 +4969,23 @@ export default function App() {
   function addNotif(notif){if(!notifPrefs[notif.prefKey!==undefined?notif.prefKey:"reservation"])return;if(!notif.createdAt)notif=Object.assign({},notif,{createdAt:new Date().toISOString()});var next=[notif].concat(notifList);setNotifStored(next);try{localStorage.setItem(_lk("hp_notifs"),JSON.stringify(next));}catch(e){}try{if(DataLayer._client&&auth&&auth.userId){DataLayer._client.from("notifications").upsert([{id:notif.id,user_id:auth.userId,icon:notif.icon||"Bell",color:notif.color||"#6366f1",title:notif.title,body:notif.body,time:notif.time||"maintenant",read:false,tab:notif.tab||"feed",pref_key:notif.prefKey||"reservation"}],{onConflict:"id,user_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}}catch(e){}}
   var unread = notifList.filter(function(n){return !n.read;}).length;
 
+  // Clic notification -> ouvre l'ELEMENT exact concerne (pattern Facebook)
+  function openNotifTarget(t,notif){
+    setNotifs(false);
+    var tid=notif&&notif.targetId;
+    if(t==="chat"&&tid&&DataLayer._client&&auth&&auth.userId){
+      DataLayer._client.from("conversations").select("id,client_name,pro_name,pro_img,client_id,pro_id").eq("id",tid).maybeSingle().then(function(r){
+        var d=r&&r.data;var isMeClient=d&&d.client_id===auth.userId;
+        setPendingConv({id:tid,name:d?((isMeClient?d.pro_name:d.client_name)||"Conversation"):"Conversation",img:d&&isMeClient?d.pro_img:null});
+        if(!isPro)setCTab("chat");else setPTab("chat");
+      }).catch(function(){if(!isPro)setCTab("chat");else setPTab("chat");});
+      return;
+    }
+    if(t==="feed"&&tid)setPendingFeedPost(tid);
+    if((t==="reservations"||t==="profile")&&tid)setPendingResaFocus(tid);
+    if(!isPro)setCTab(t==="reservations"?"profile":t);
+    else setPTab(t==="profile"?"reservations":t);
+  }
   function openProf(id,type){
     // Recherche par identifiant dans la liste du type, puis toutes listes — JAMAIS de repli arbitraire (profil fantome)
     var l=type==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
@@ -4989,10 +5067,10 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={privacySettings.locked?null:profilePhoto} isPremium={isPremium} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous"))}/></div>}
+          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} focusPostId={pendingFeedPost} onFocusConsumed={function(){setPendingFeedPost(null);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={privacySettings.locked?null:profilePhoto} isPremium={isPremium} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous"))}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} initialConvImg={pendingConv&&pendingConv.img} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
-          {cTab==="profile"  &&<ClientProf onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
+          {cTab==="profile"  &&<ClientProf focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client"))}/>}
@@ -5000,7 +5078,7 @@ export default function App() {
         {_accountOverlays}
         {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){var pp=premiumPay;setPremiumPay(null);if(pp.renew)_renewPremiumNow();else _activatePremium(pp.plan,pp.durationMonths);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
-        {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setCTab(t);}}/>;}}</Ov>}
+        {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={openNotifTarget}/>;}}</Ov>}
         {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}
         <Toast/>
       </div>
@@ -5034,11 +5112,11 @@ export default function App() {
       {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto}/></div>}
+        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} focusPostId={pendingFeedPost} onFocusConsumed={function(){setPendingFeedPost(null);}} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
-        {pTab==="reservations" &&<ProResa proType={auth.type} onOpenChat={function(){setPTab("chat");}} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
-        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={proD.name||(auth&&(auth.email||"").split("@")[0])} estabName={proD.name} onUnreadChange={setChatUnread}/>}
+        {pTab==="reservations" &&<ProResa proType={auth.type} focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onOpenChat={function(){setPTab("chat");}} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
+        {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={proD.name||(auth&&(auth.email||"").split("@")[0])} estabName={proD.name} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
         {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
@@ -5047,7 +5125,7 @@ export default function App() {
         {_accountOverlays}
       {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){var pp=premiumPay;setPremiumPay(null);if(pp.renew)_renewPremiumNow();else _activatePremium(pp.plan,pp.durationMonths);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
-      {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={function(t){setNotifs(false);setPTab(t);}}/>;}}</Ov>}
+      {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={openNotifTarget}/>;}}</Ov>}
       {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}
       <Toast/>
     </div>
