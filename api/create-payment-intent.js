@@ -1,8 +1,25 @@
 import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2024-06-20",
 });
+
+// Client service : compte Connect de l'etablissement + taux de commission (platform_settings)
+function serviceClient() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+function commissionPct(settings, estabType, isPremium) {
+  const c = (settings && settings.commission) || {};
+  const key = estabType ? estabType + (isPremium ? "_premium" : "") : null;
+  const v = (key && c[key] != null) ? c[key] : (estabType && c[estabType] != null ? c[estabType] : c.default);
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n <= 50 ? n : 10;
+}
 
 // Origines autorisées — jamais de wildcard en production
 const ALLOWED_ORIGINS = (process.env.APP_URL || "")
@@ -56,7 +73,10 @@ export default async function handler(req, res) {
     // Nettoyage des métadonnées (max 500 chars chacune, conformité Stripe)
     const safeMeta = (v) => String(v || "").slice(0, 500);
 
-    const paymentIntent = await stripe.paymentIntents.create({
+    // Marketplace (Stripe Connect) : si l'etablissement a un compte branche,
+    // la repartition est AUTOMATIQUE — l'argent part chez lui, la plateforme
+    // ne garde que sa commission (taux configurable via le panel admin).
+    const piParams = {
       amount: amt,
       currency: cur,
       automatic_payment_methods: { enabled: true },
@@ -65,7 +85,21 @@ export default async function handler(req, res) {
         establishment:  safeMeta(estabName),
         platform:       "HotelPlatform Travel",
       },
-    });
+    };
+    try {
+      const supa = serviceClient();
+      if (supa && estabName) {
+        const e = await supa.from("establishments").select("stripe_account_id,type,is_premium").eq("name", String(estabName)).limit(1).maybeSingle();
+        if (e.data && e.data.stripe_account_id) {
+          const s = await supa.from("platform_settings").select("commission").eq("id", 1).maybeSingle();
+          const pct = commissionPct(s.data, e.data.type, e.data.is_premium === true);
+          piParams.application_fee_amount = Math.round(amt * pct / 100);
+          piParams.transfer_data = { destination: e.data.stripe_account_id };
+        }
+      }
+    } catch (e) { /* repli : encaissement plateforme, repartition tracee par le webhook */ }
+
+    const paymentIntent = await stripe.paymentIntents.create(piParams);
 
     return res.status(200).json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {

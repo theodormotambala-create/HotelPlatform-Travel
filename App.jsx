@@ -458,6 +458,7 @@ var DataLayer = {
     return DataLayer.create("reservations", [{
       id: resa.id, client_id: clientId || null,
       estab_id: resa.estab||resa.id||null, estab_type: resa.estabType||resa.type||null,
+      estab_owner_id: resa.estabOwnerId||null,
       status: resa.status||"pending", data: resa
     }]);
   },
@@ -2180,6 +2181,7 @@ function ClientProf(props){
   var favEstabs=favEstabIds.map(function(id){return _allEstabs.find(function(x){return x.id===id;});}).filter(Boolean);
   var s1=useState("reservations");var tab=s1[0];var setTab=s1[1];
   var sq=useState(null);var activeQR=sq[0];var setActiveQR=sq[1];
+  var sCA=useState(null);var _cancelAsk=sCA[0];var _setCancelAsk=sCA[1];
   // Publications enregistrees (favoris de posts) — chargees depuis le serveur
   var sSaved=useState([]);var savedPostIds=sSaved[0];var setSavedPostIds=sSaved[1];
   var onOpenPost=props.onOpenPost||null;
@@ -2277,9 +2279,9 @@ function ClientProf(props){
           (resaHistory&&resaHistory.length>0)?resaHistory.map(function(r,i){
             var showQR=activeQR===i;
             var st=r.status||"pending";
-            var stLabel={pending:"En attente",refused:"Refusée",confirmed:"Acceptée",consumed:"Consommée"}[st]||"En attente";
-            var stColor={pending:DS.warning,refused:DS.error,confirmed:DS.success,consumed:DS.textDim}[st]||DS.warning;
-            var hasTicket=st!=="refused";
+            var stLabel={pending:"En attente",refused:"Refusée",confirmed:"Acceptée",consumed:"Consommée",cancelled:"Annulée"}[st]||"En attente";
+            var stColor={pending:DS.warning,refused:DS.error,confirmed:DS.success,consumed:DS.textDim,cancelled:DS.textDim}[st]||DS.warning;
+            var hasTicket=st!=="refused"&&st!=="cancelled";
             return(
               <div key={i} id={"hp-cresa-"+r.id} style={{background:DS.card,borderRadius:14,marginBottom:12,border:"1px solid "+DS.border,overflow:"hidden",opacity:st==="refused"?0.65:1}}>
                 <div style={{padding:"12px 14px"}}>
@@ -2310,6 +2312,15 @@ function ClientProf(props){
                   )}
                   {st==="pending"&&<div style={{fontSize:11,color:DS.warning,textAlign:"center",padding:"6px 0"}}>En attente de confirmation de l'établissement</div>}
                   {st==="refused"&&<div style={{fontSize:11,color:DS.error,textAlign:"center",padding:"6px 0"}}>Cette réservation a été refusée</div>}
+                  {st==="cancelled"&&<div style={{fontSize:11,color:DS.textDim,textAlign:"center",padding:"6px 0"}}>Réservation annulée</div>}
+                  {(st==="pending"||st==="confirmed")&&props.onCancelResa&&(
+                    _cancelAsk===r.id
+                      ?<div style={{display:"flex",gap:8,marginTop:8}}>
+                        <button onClick={function(){_setCancelAsk(null);}} style={{flex:1,padding:"9px",background:"transparent",border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Non, garder</button>
+                        <button onClick={function(){_setCancelAsk(null);props.onCancelResa(r.id);}} style={{flex:1,padding:"9px",background:DS.error,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}>Oui, annuler</button>
+                      </div>
+                      :<button onClick={function(){_setCancelAsk(r.id);}} style={{width:"100%",padding:"9px",marginTop:8,background:"transparent",border:"1px solid "+DS.error+"44",borderRadius:10,color:DS.error,fontSize:12,fontWeight:700,cursor:"pointer"}}>Annuler la réservation</button>
+                  )}
                 </div>
                 {showQR&&hasTicket&&(
                   <div style={{borderTop:"1px solid "+DS.border,background:DS.surface,padding:"16px",textAlign:"center"}}>
@@ -2636,12 +2647,13 @@ function BookM(props){
   var spay=useState(false);var paying=spay[0];var setPaying=spay[1];
   var sSCS=useState(null);var stripeClientSecret=sSCS[0];var setStripeClientSecret=sSCS[1];
   var sSM=useState(false);var showStripeModal=sSM[0];var setShowStripeModal=sSM[1];
+  var _pendingPaidResa=useRef(null);
   var sC=useState(false);var closing=sC[0];var setClosing=sC[1];
   var cT=useRef(null);
   function handleClose(){if(closing)return;setClosing(true);cT.current=setTimeout(function(){onClose();},260);}
   useEffect(function(){return function(){if(cT.current)clearTimeout(cT.current);};},[]);
   var tk=useToast();var toast=tk.show;var Toast=tk.Toast;
-  var _ridRef=useRef(null);if(!_ridRef.current){_ridRef.current="HP-"+Math.floor(100000+Math.random()*900000);}
+  var _ridRef=useRef(null);if(!_ridRef.current){_ridRef.current="HP-"+Math.floor(100000+Math.random()*900000)+Date.now().toString().slice(-4);}
   var resaId=_ridRef.current;
   var _today=new Date().toISOString().slice(0,10);
   var selfEmail=props.selfEmail||"";
@@ -2668,13 +2680,22 @@ function BookM(props){
             amount={totalPrice.toFixed(0)}
             color={color}
             DS={DS}
-            onClose={function(){setShowStripeModal(false);setStripeClientSecret(null);}}
+            onClose={function(){
+              setShowStripeModal(false);setStripeClientSecret(null);
+              if(_pendingPaidResa.current&&_pendingPaidResa.current!=="paid"){
+                DataLayer.updateReservationStatus(resaId,"cancelled");
+                try{var all=BookingService.getAll().map(function(r){return r.id===resaId?Object.assign({},r,{status:"cancelled"}):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(all));BookingService._all=all;}catch(ex){}
+                _pendingPaidResa.current=null;
+                _ridRef.current="HP-"+Math.floor(100000+Math.random()*900000)+Date.now().toString().slice(-4);
+                toast("Paiement abandonné — la réservation a été annulée","info");
+              }
+            }}
             onSuccess={function(){
               setShowStripeModal(false);setStripeClientSecret(null);
-              var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"confirmed",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+              var _r=_pendingPaidResa.current;_pendingPaidResa.current="paid";
               setStep(3);
-              toast("Paiement Stripe confirmé !","success");
-              if(props.onBooked)props.onBooked(BookingService.createBooking(resa,selfUserId));
+              toast("Paiement reçu — confirmation automatique en cours","success");
+              if(props.onBooked&&_r&&_r!=="paid")props.onBooked(_r);
             }}
             onError={function(msg){toast(msg||"Échec du paiement","error");}}
           />
@@ -2825,10 +2846,10 @@ function BookM(props){
                     var delay=500;
                     setTimeout(function(){
                       var initStatus=payMode==="avec"?"confirmed":"pending";
-                      var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                      var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
                       setPaying(false);
                       setStep(3);
-                      toast(payMode==="avec"?"Paiement Mobile Money confirmé !":"Demande envoyée à l'établissement !","success");
+                      toast("Demande envoyée à l'établissement !","success");
                       if(props.onBooked)props.onBooked(BookingService.createBooking(resa,selfUserId));
                     },delay);
                     return;
@@ -2839,6 +2860,12 @@ function BookM(props){
                     var _amtCents=Math.round(totalPrice*100);
                     if(!_amtCents||_amtCents<50){toast("Montant invalide pour le paiement","error");return;}
                     setPaying(true);
+                    // La reservation nait 'pending' AVANT le paiement : le webhook Stripe (preuve
+                    // de paiement signee) la confirmera cote serveur. Abandon = annulation propre.
+                    if(!_pendingPaidResa.current){
+                      var resaPre={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                      _pendingPaidResa.current=BookingService.createBooking(resaPre,selfUserId);
+                    }
                     fetch("/api/create-payment-intent",{
                       method:"POST",
                       headers:{"Content-Type":"application/json"},
@@ -2869,8 +2896,8 @@ function BookM(props){
             <div>
               <div style={{textAlign:"center",marginBottom:20}}>
                 <div style={{width:64,height:64,borderRadius:"50%",background:payMode==="avec"?DS.successSoft:DS.warningSoft,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",animation:"hp-bounce-in 0.55s cubic-bezier(0.22,1,0.36,1)"}}>{payMode==="avec"?<CheckCircle size={32} color={DS.success}/>:<Clock size={32} color={DS.warning}/>}</div>
-                <div style={{fontSize:17,fontWeight:900,color:payMode==="avec"?DS.success:DS.warning}}>{payMode==="avec"?"Réservation confirmée !":"Demande envoyée !"}</div>
-                <div style={{fontSize:12,color:DS.textMuted,marginTop:4}}>{payMode==="avec"?"Votre ticket numérique est prêt":"En attente de confirmation de l'établissement (24h)"}</div>
+                <div style={{fontSize:17,fontWeight:900,color:payMode==="avec"?DS.success:DS.warning}}>{payMode==="avec"?"Paiement reçu !":"Demande envoyée !"}</div>
+                <div style={{fontSize:12,color:DS.textMuted,marginTop:4}}>{payMode==="avec"?"Confirmation automatique en cours — votre ticket sera activé dans quelques instants.":"En attente de confirmation de l'établissement (24h)"}</div>
               </div>
               <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:16,overflow:"hidden",marginBottom:16}}>
                 <div style={{background:color+"18",padding:"14px 16px",borderBottom:"1px solid "+DS.border+"40"}}>
@@ -4004,7 +4031,10 @@ function ProResa(props){
   // Source de verite : les reservations de CET etablissement depuis Supabase (pas celles de tout le monde)
   useEffect(function(){
     if(!DataLayer._client||!estabName)return;
-    DataLayer._client.from("reservations").select("*").eq("estab_id",estabName).order("created_at",{ascending:false})
+    var _q=props.selfUserId
+      ?DataLayer._client.from("reservations").select("*").or("estab_owner_id.eq."+props.selfUserId+",estab_id.eq."+JSON.stringify(estabName).slice(1,-1)).order("created_at",{ascending:false})
+      :DataLayer._client.from("reservations").select("*").eq("estab_id",estabName).order("created_at",{ascending:false});
+    _q
       .then(function(res){
         if(res.error||!res.data)return;
         var rows=res.data.map(function(row){
@@ -4032,8 +4062,8 @@ function ProResa(props){
   var sRSk=useState(true);var resaSkLoading=sRSk[0];var setResaSkLoading=sRSk[1];
   useEffect(function(){var t=setTimeout(function(){setResaSkLoading(false);},350);return function(){clearTimeout(t);};},[]);
   var filtered=filter==="all"?resas:resas.filter(function(r){return r.status===filter;});
-  var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim};
-  var sLabels={confirmed:"Confirmée",pending:"En attente",refused:"Refusée",consumed:"Consommée"};
+  var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim,cancelled:DS.warning};
+  var sLabels={confirmed:"Confirmée",pending:"En attente",refused:"Refusée",consumed:"Consommée",cancelled:"Annulée par le client"};
   function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(updated));}catch(e){}try{if(patch&&patch.status)DataLayer.updateReservationStatus(id,patch.status);}catch(e2){}}
   function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Réservation confirmée","success");}
   function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Réservation refusée","info");}
@@ -4074,7 +4104,7 @@ function ProResa(props){
         {[[resas.filter(function(r){return r.status==="pending";}).length,"En attente",DS.warning],[resas.filter(function(r){return r.status==="confirmed";}).length,"Confirmées",DS.success],[resas.reduce(function(a,r){return a+(r.payMode==="avec"&&(r.status==="confirmed"||r.status==="consumed")?r.total:0);},0)+" EUR","Revenus",DS.gold]].map(function(_i,i){var n=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{background:DS.card,borderRadius:10,padding:"10px 6px",border:"1px solid "+DS.border,textAlign:"center"}}><div style={{fontSize:16,fontWeight:900,color:col}}>{n}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
       </div>
       <div style={{display:"flex",gap:5,padding:"0 14px",marginBottom:12,overflowX:"auto"}}>
-        {[["all","Toutes"],["pending","En attente"],["confirmed","Confirmées"],["consumed","Consommées"],["refused","Refusées"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=filter===v;return <button key={v} onClick={function(){setFilter(v);}} style={{padding:"6px 12px",borderRadius:20,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{l}</button>;})}
+        {[["all","Toutes"],["pending","En attente"],["confirmed","Confirmées"],["consumed","Consommées"],["refused","Refusées"],["cancelled","Annulées"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=filter===v;return <button key={v} onClick={function(){setFilter(v);}} style={{padding:"6px 12px",borderRadius:20,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{l}</button>;})}
       </div>
       <div style={{padding:"0 14px"}}>
         {resaSkLoading?<ResaSkeleton/>:<>{filtered.map(function(r,_ri){return(
@@ -4099,7 +4129,7 @@ function ProResa(props){
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {r.status==="pending"&&<button onClick={function(){confirmResa(r.id);}} style={{padding:"7px 14px",background:DS.successSoft,border:"1px solid "+DS.success+"33",borderRadius:8,color:DS.success,fontSize:11,fontWeight:700,cursor:"pointer"}}>Confirmer</button>}
               {r.status==="pending"&&<button onClick={function(){refuseResa(r.id);}} style={{padding:"7px 14px",background:DS.errorSoft,border:"1px solid "+DS.error+"33",borderRadius:8,color:DS.error,fontSize:11,fontWeight:700,cursor:"pointer"}}>Refuser</button>}
-              {r.status==="confirmed"&&!r.qrScanned&&<button onClick={function(){setScanTarget(r);}} style={{padding:"7px 14px",background:color+"18",border:"1px solid "+color+"44",borderRadius:8,color:color,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Eye size={12}/>Scanner QR</button>}
+              {r.status==="confirmed"&&!r.qrScanned&&<button onClick={function(){setScanTarget(r);}} style={{padding:"7px 14px",background:color+"18",border:"1px solid "+color+"44",borderRadius:8,color:color,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><Camera size={12}/>Scanner le ticket</button>}
               <button onClick={onOpenChat} style={{padding:"7px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:8,color:DS.textMuted,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><MessageCircle size={12}/>Chat</button>
             </div>
           </div>
@@ -5058,6 +5088,17 @@ export default function App() {
     if(!isPro)setCTab(t==="reservations"?"profile":t);
     else setPTab(t==="profile"?"reservations":t);
   }
+  // P4 : annulation par le client — statut serveur (verrou : uniquement pending/confirmed), notification automatique a l'etablissement
+  function cancelResaClient(id){
+    DataLayer.updateReservationStatus(id,"cancelled");
+    setResaHistory(function(h){
+      var next=(h||[]).map(function(r){return r.id===id?Object.assign({},r,{status:"cancelled"}):r;});
+      try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(next));}catch(e){}
+      return next;
+    });
+    try{var all=BookingService.getAll().map(function(r){return r.id===id?Object.assign({},r,{status:"cancelled"}):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(all));BookingService._all=all;}catch(e){}
+    toastApp("Réservation annulée — l'établissement a été prévenu","success");
+  }
   function openProf(id,type){
     // Recherche par identifiant dans la liste du type, puis toutes listes — JAMAIS de repli arbitraire (profil fantome)
     var l=type==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
@@ -5142,7 +5183,7 @@ export default function App() {
           {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} focusPostId={pendingFeedPost} onFocusConsumed={function(){setPendingFeedPost(null);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={privacySettings.locked?null:profilePhoto} isPremium={isPremium} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous"))}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} myId={auth&&auth.userId} myName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} initialConvImg={pendingConv&&pendingConv.img} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
-          {cTab==="profile"  &&<ClientProf focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onOpenPost={function(pid){setPendingFeedPost(pid);setCTab("feed");}} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
+          {cTab==="profile"  &&<ClientProf focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onCancelResa={cancelResaClient} onOpenPost={function(pid){setPendingFeedPost(pid);setCTab("feed");}} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client"))}/>}
