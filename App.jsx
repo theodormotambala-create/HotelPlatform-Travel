@@ -703,7 +703,12 @@ var AuthService = {
       var status = accType !== "client" ? "pending" : "active";
       var s = AuthService.buildSession(accType, status, (r.data.user&&r.data.user.email)||email, r.data.user&&r.data.user.id);
       s.needsEmailConfirm = !r.data.session;
-      if(r.data.user&&r.data.user.id){try{sb.from("profiles").upsert([{user_id:r.data.user.id,display_name:"",account_type:accType,status:accType!=="client"?"pending":"active",svc_mode:accType==="client"?"client":accType,location:""}]).then(function(){});}catch(e){}}
+      // Le profil est cree cote serveur par le declencheur handle_new_user. On ne fait un
+      // filet de securite (upsert) QUE si une session existe (utilisateur authentifie) — sinon
+      // l'ecriture serait bloquee par la securite RLS et ne sert a rien.
+      if(r.data.session && r.data.user && r.data.user.id){
+        try{sb.from("profiles").upsert([{user_id:r.data.user.id,account_type:accType,svc_mode:accType==="client"?"client":accType}],{onConflict:"user_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}catch(e){}
+      }
       return s;
     }
     var status = accType !== "client" ? "pending" : "active";
@@ -994,6 +999,7 @@ function AuthScreen(props){
   var s11=useState("");var authErr=s11[0];var setAuthErr=s11[1];
   var s12=useState("");var confirmPass=s12[0];var setConfirmPass=s12[1];
   var s13=useState(false);var emailPending=s13[0];var setEmailPending=s13[1];
+  var sRS=useState("");var resendState=sRS[0];var setResendState=sRS[1];
   var s14=useState("");var formErr=s14[0];var setFormErr=s14[1];
   var sGLoad=useState(false);var gLoading=sGLoad[0];var setGLoading=sGLoad[1];
   function handleAuthError(e){
@@ -1010,8 +1016,14 @@ function AuthScreen(props){
       setAuthErr("Le mot de passe doit contenir entre 6 et 72 caractères.");
     } else if(msg.includes("Email not confirmed")){
       setAuthErr("Confirmez votre email avant de vous connecter. Vérifiez vos spams.");
+    } else if(msg.includes("email rate limit")||msg.includes("over_email_send")){
+      setAuthErr("Trop d'emails envoyés. Patientez quelques minutes avant de réessayer.");
     } else if(msg.includes("rate limit")||msg.includes("too many")){
       setAuthErr("Trop de tentatives. Attendez quelques minutes avant de réessayer.");
+    } else if(msg.includes("Database error")||msg.includes("saving new user")||msg.includes("unexpected_failure")){
+      setAuthErr("Un problème technique empêche la création du compte. Réessayez dans un instant.");
+    } else if(msg.includes("Signups not allowed")||msg.includes("signup is disabled")||msg.includes("signups")){
+      setAuthErr("Les inscriptions sont temporairement indisponibles. Réessayez plus tard.");
     } else {
       setAuthErr(msg||"Erreur de connexion. Veuillez réessayer.");
     }
@@ -1072,6 +1084,16 @@ function AuthScreen(props){
       setAuthErr("Connexion LinkedIn impossible. Vérifiez que le service est configuré.");
     }finally{setLLoading(false);}
   }
+  async function resendConfirmEmail(){
+    if(resendState==="sending")return;
+    setResendState("sending");
+    try{
+      var sbR=(typeof window!=="undefined"&&window.__supabase)||null;
+      if(!sbR){setResendState("error");return;}
+      var rr=await sbR.auth.resend({type:"signup",email:email.trim()});
+      setResendState(rr&&rr.error?"error":"sent");
+    }catch(e){setResendState("error");}
+  }
   if(emailPending){
     return(
       <div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,animation:"hp-fade-up 0.28s ease"}}>
@@ -1079,11 +1101,16 @@ function AuthScreen(props){
           <div style={{width:72,height:72,borderRadius:"50%",background:DS.primarySoft,border:"2px solid "+DS.primary,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px"}}><Mail size={32} color={DS.primary}/></div>
           <div style={{fontSize:22,fontWeight:900,color:DS.text,marginBottom:10}}>Confirmez votre email</div>
           <div style={{fontSize:14,color:DS.textMuted,lineHeight:1.7,marginBottom:24}}>Un lien de confirmation a été envoyé à <span style={{color:DS.primary,fontWeight:700}}>{email}</span>.<br/>Cliquez sur le lien pour activer votre compte.</div>
-          <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 16px",marginBottom:20,fontSize:12,color:DS.textMuted,textAlign:"left"}}>
+          <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 16px",marginBottom:16,fontSize:12,color:DS.textMuted,textAlign:"left"}}>
             <div style={{fontWeight:700,color:DS.text,marginBottom:4}}>Vous ne trouvez pas l'email ?</div>
             <div>Vérifiez vos spams ou dossier promotions. Le lien expire dans 24h.</div>
           </div>
-          <button onClick={function(){setEmailPending(false);setMode("login");setPass("");setConfirmPass("");}} style={{width:"100%",padding:"13px",background:DS.primary,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Se connecter</button>
+          {resendState==="sent"
+            ? <div style={{fontSize:12,color:DS.success,fontWeight:700,marginBottom:16}}>Email renvoyé — vérifiez votre boîte de réception.</div>
+            : <button onClick={resendConfirmEmail} disabled={resendState==="sending"} style={{width:"100%",padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:resendState==="sending"?"default":"pointer",marginBottom:10}}>{resendState==="sending"?"Envoi...":"Renvoyer l'email de confirmation"}</button>
+          }
+          {resendState==="error"&&<div style={{fontSize:12,color:DS.error,marginBottom:12}}>Impossible de renvoyer l'email pour le moment. Réessayez dans quelques minutes.</div>}
+          <button onClick={function(){setEmailPending(false);setMode("login");setPass("");setConfirmPass("");setResendState("");}} style={{width:"100%",padding:"13px",background:DS.primary,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Se connecter</button>
         </div>
       </div>
     );
@@ -1120,6 +1147,16 @@ function AuthScreen(props){
             <button onClick={function(){setShowP(!showP);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",display:"flex"}}>{showP?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button>
           </div>
         )}
+        {mode==="register"&&pass.length>0&&(function(){
+          var _sc=(pass.length>=6?1:0)+(pass.length>=10?1:0)+(/[A-Z]/.test(pass)&&/[a-z]/.test(pass)?1:0)+(/[0-9]/.test(pass)||/[^A-Za-z0-9]/.test(pass)?1:0);
+          var _lvl=pass.length<6?0:Math.max(1,_sc);
+          var _cols=[DS.error,DS.error,DS.warning,DS.success,DS.success];
+          var _lbls=["Trop court","Faible","Moyen","Bon","Fort"];
+          return(<div style={{marginTop:-4,marginBottom:10}}>
+            <div style={{display:"flex",gap:4,marginBottom:4}}>{[0,1,2,3].map(function(i){return <div key={i} style={{flex:1,height:3,borderRadius:2,background:i<_lvl?_cols[_lvl]:DS.border}}/>;})}</div>
+            <div style={{fontSize:10,color:_cols[_lvl],fontWeight:700}}>{_lbls[_lvl]}{pass.length<6?" — 6 caractères minimum":""}</div>
+          </div>);
+        })()}
         {mode==="register"&&(
           <div style={{position:"relative",marginBottom:12}}>
             <Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/>
