@@ -2529,7 +2529,16 @@ function EstabM(props){
   function toggleFavEstab(){if(props.onToggleFavEstab)props.onToggleFavEstab(e.id);}
   var color=rC(e.type);var isHotel=e.type==="hotel";
   var isCombinedEstab=isHotel&&e.svcMode==="combined";
-  var comboMealsTotal=(e.meals||[]).filter(function(m){return comboMeals.indexOf(m.id)>=0;}).reduce(function(s,m){return s+m.price;},0);
+  // Repas inclus dans une reservation combinee : source unique de verite.
+  // Pour un VRAI etablissement, on derive les repas du menu configure
+  // (establishment_dishes -> e.menu). e.meals (packages) n'existe que sur la
+  // donnee demo : on le garde en priorite pour ne rien casser, sinon on
+  // bascule automatiquement sur le menu reel. Chaque option a un id stable.
+  var comboMealOptions=(e.meals&&e.meals.length>0)
+    ? e.meals
+    : allItems.filter(function(it){return it.available!==false&&(it.price||0)>0;})
+              .map(function(it){return{id:it.cat+"-"+it.name,name:it.name,price:it.price||0};});
+  var comboMealsTotal=comboMealOptions.filter(function(m){return comboMeals.indexOf(m.id)>=0;}).reduce(function(s,m){return s+(m.price||0);},0);
   var comboTotal=(comboRoom?comboRoom.price:0)+comboMealsTotal;
   var _sEV=useState(null);var _eViewer=_sEV[0];var _setEViewer=_sEV[1];
   if(!e)return null;
@@ -2551,7 +2560,8 @@ function EstabM(props){
                 );
               })}
               <div style={{fontSize:12,fontWeight:800,color:color,letterSpacing:1.5,marginTop:18,marginBottom:10}}>REPAS INCLUS</div>
-              {(e.meals||[]).map(function(m){
+              {comboMealOptions.length===0&&<div style={{fontSize:12,color:DS.textMuted,padding:"6px 0 4px",fontStyle:"italic"}}>Aucun repas disponible pour le moment</div>}
+              {comboMealOptions.map(function(m){
                 var isSel=comboMeals.indexOf(m.id)>=0;
                 return(
                   <div key={m.id} onClick={function(){toggleComboMeal(m.id);}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",marginBottom:6,borderRadius:12,border:"1.5px solid "+(isSel?color+"66":DS.border+"40"),background:isSel?color+"0C":DS.card,cursor:"pointer"}}>
@@ -2571,7 +2581,7 @@ function EstabM(props){
                     <div style={{fontSize:12,color:DS.textMuted}}>{comboRoom?"1 chambre":"Aucune chambre"} + {comboMeals.length} repas{comboTable?" + table":""}</div>
                     <div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{comboTotal.toFixed(0)} EUR / nuit</div>
                   </div>
-                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboTable:comboTable,comboTotal:comboTotal,isCombo:true}));else toast("Sélectionnez d'abord une chambre","error");}} style={{width:"100%",padding:"11px",background:comboRoom?color:DS.textDim,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:comboRoom?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:comboRoom?1:0.6,transition:"background .2s,opacity .2s"}}>
+                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboMealDetails:comboMealOptions.filter(function(m){return comboMeals.indexOf(m.id)>=0;}),comboTable:comboTable,comboTotal:comboTotal,isCombo:true}));else toast("Sélectionnez d'abord une chambre","error");}} style={{width:"100%",padding:"11px",background:comboRoom?color:DS.textDim,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:comboRoom?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:comboRoom?1:0.6,transition:"background .2s,opacity .2s"}}>
                     <Calendar size={14}/>Réserver le séjour combiné
                   </button>
                 </div>
@@ -2856,7 +2866,26 @@ function BookM(props){
                 <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 14px",marginBottom:14}}>
                   <div style={{fontSize:11,color:DS.textMuted,marginBottom:2}}>SERVICE SELECTIONNE</div>
                   <div style={{fontSize:13,fontWeight:700,color:DS.text}}>{serviceLabel}</div>
-                  {isCombo&&<div style={{fontSize:11,color:DS.textMuted,marginTop:4}}>{e.comboMeals.length} repas inclus{e.comboTable?" - Table au restaurant":""}</div>}
+                  {isCombo&&(
+                    <div style={{marginTop:8,borderTop:"1px solid "+DS.border+"40",paddingTop:8}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                        <span style={{fontSize:11,color:DS.textMuted}}>Chambre - {e.selectedRoom.name}</span>
+                        <span style={{fontSize:11,fontWeight:700,color:DS.text}}>{e.selectedRoom.price} EUR</span>
+                      </div>
+                      {(e.comboMealDetails||[]).map(function(m,mi){return(
+                        <div key={mi} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                          <span style={{fontSize:11,color:DS.textMuted}}>Repas - {m.name}</span>
+                          <span style={{fontSize:11,fontWeight:700,color:DS.text}}>{m.price} EUR</span>
+                        </div>
+                      );})}
+                      {(!e.comboMealDetails||e.comboMealDetails.length===0)&&<div style={{fontSize:11,color:DS.textMuted,marginBottom:3}}>Aucun repas inclus</div>}
+                      {e.comboTable&&<div style={{fontSize:11,color:DS.textMuted,marginBottom:3}}>Table au restaurant incluse</div>}
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:5,paddingTop:5,borderTop:"1px solid "+DS.border+"40"}}>
+                        <span style={{fontSize:11,fontWeight:700,color:DS.text}}>Total / nuit</span>
+                        <span style={{fontSize:12,fontWeight:900,color:DS.gold}}>{Number(e.comboTotal).toFixed(0)} EUR</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               <div style={{background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:12,padding:"12px 14px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -4002,6 +4031,8 @@ function RestOff(props){
   var s4b=useState("");var newOfferName=s4b[0];var setNewOfferName=s4b[1];
   var s4c=useState("");var newOfferPrice=s4c[0];var setNewOfferPrice=s4c[1];
   var s5=useState("menu");var tab=s5[0];var setTab=s5[1];
+  var s5a=useState(null);var confirmDeleteItem=s5a[0];var setConfirmDeleteItem=s5a[1];
+  var s5b=useState(null);var confirmDeleteOffer=s5b[0];var setConfirmDeleteOffer=s5b[1];
   var _rEstabId=data&&data.id?data.id:null;
   useEffect(function(){
     if(!_rEstabId||!DataLayer._client)return;
@@ -4070,7 +4101,14 @@ function RestOff(props){
                         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:8,borderTop:"1px solid "+DS.border+"20"}}>
                           <div style={{display:"flex",gap:6}}>
                             <button onClick={function(){setEditItem(item);setShowAdd(false);}} style={{padding:"5px 12px",background:DS.primarySoft,border:"none",borderRadius:8,color:DS.primary,fontSize:11,fontWeight:700,cursor:"pointer"}}>Modifier</button>
-                            <button onClick={function(){deleteItem(item.id);}} style={{padding:"5px 12px",background:DS.errorSoft,border:"none",borderRadius:8,color:DS.error,fontSize:11,fontWeight:700,cursor:"pointer"}}>Supprimer</button>
+                            {confirmDeleteItem===item.id?(
+                              <span style={{display:"flex",gap:4,alignItems:"center"}}>
+                                <button onClick={function(){setConfirmDeleteItem(null);}} style={{padding:"5px 10px",background:DS.border,border:"none",borderRadius:8,color:DS.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+                                <button onClick={function(){deleteItem(item.id);setConfirmDeleteItem(null);}} style={{padding:"5px 10px",background:DS.error,border:"none",borderRadius:8,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>Confirmer</button>
+                              </span>
+                            ):(
+                              <button onClick={function(){setConfirmDeleteItem(item.id);}} style={{padding:"5px 12px",background:DS.errorSoft,border:"none",borderRadius:8,color:DS.error,fontSize:11,fontWeight:700,cursor:"pointer"}}>Supprimer</button>
+                            )}
                           </div>
                           <div style={{display:"flex",alignItems:"center",gap:6}}>
                             <span style={{fontSize:11,color:item.available?DS.success:DS.error,fontWeight:700}}>{item.available?"Dispo":"Indispo"}</span>
@@ -4102,7 +4140,14 @@ function RestOff(props){
               <div key={o.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:10,border:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:36,height:36,borderRadius:10,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Tag size={16} color={color}/></div>
                 <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:DS.text}}>{o.name}</div>{o.price&&<div style={{fontSize:12,color:DS.gold,fontWeight:700}}>{o.price} EUR</div>}</div>
-                <button onClick={function(){deleteOffer(o.id);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,color:DS.error}}><X size={14} color={DS.error}/></button>
+                {confirmDeleteOffer===o.id?(
+                  <span style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
+                    <button onClick={function(){setConfirmDeleteOffer(null);}} style={{padding:"5px 10px",background:DS.border,border:"none",borderRadius:8,color:DS.text,fontSize:11,fontWeight:700,cursor:"pointer"}}>Annuler</button>
+                    <button onClick={function(){deleteOffer(o.id);setConfirmDeleteOffer(null);}} style={{padding:"5px 10px",background:DS.error,border:"none",borderRadius:8,color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>Confirmer</button>
+                  </span>
+                ):(
+                  <button onClick={function(){setConfirmDeleteOffer(o.id);}} style={{background:"none",border:"none",cursor:"pointer",padding:4,color:DS.error,flexShrink:0}} title="Supprimer"><X size={14} color={DS.error}/></button>
+                )}
               </div>
             );})}
             {offers.length===0&&<Emp Icon={Tag} title="Aucune offre" sub="Ajoutez vos offres spéciales"/>}
