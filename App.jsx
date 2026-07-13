@@ -1366,7 +1366,7 @@ function PrivacyModal(props){
   var cT=useRef(null);
   function handleClose(){if(closing)return;setClosing(true);cT.current=setTimeout(function(){onClose();},260);}
   useEffect(function(){return function(){if(cT.current)clearTimeout(cT.current);};},[]);
-  var settings=props.settings||{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};
+  var settings=props.settings||{locked:false,pseudo:false,msgPermission:"everyone"};
   var onUpdate=props.onUpdate||function(){};
   var locked=settings.locked;var pseudo=settings.pseudo;var msgPermission=settings.msgPermission||"everyone";
   function handleToggle(setter,val){
@@ -2262,7 +2262,7 @@ function ClientDisc(props){
 
 function ClientProf(props){
   var onSettings=props.onSettings;var onPremium=props.onPremium;var isPremium=props.isPremium||false;var onPrivacy=props.onPrivacy;var resaHistory=props.resaHistory||[];var premiumData=props.premiumData||null;var onRenewPremium=props.onRenewPremium;var followingCount=props.followingCount||0;var profilePhoto=props.profilePhoto||null;var onPhotoChange=props.onPhotoChange||null;var onNameChange=props.onNameChange||null;
-  var privacySettings=props.privacySettings||{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};
+  var privacySettings=props.privacySettings||{locked:false,pseudo:false,msgPermission:"everyone"};
   var selfEmail=props.selfEmail||"";
   var _authUidC=props.authUserId||null;
   var _sClientName=useState(function(){try{return localStorage.getItem(_lk("hp_client_display_name"))||"";}catch(e){return "";}});
@@ -4781,7 +4781,7 @@ export default function App() {
   var sSplash=useState(!_splashSeen);var showSplashAd=sSplash[0];var setShowSplashAd=sSplash[1];
   function closeSplashAd(){try{sessionStorage.setItem("hp_splash_seen","1");}catch(e){}setShowSplashAd(false);}
   var s9=useState(false); var showPrivacy=s9[0];    var setShowPrivacy=s9[1];
-  var s9b=useState(function(){try{var v=localStorage.getItem(_lk("hp_privacy"));return v?JSON.parse(v):{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};}catch(e){return{locked:false,pseudo:false,vis:"public",msgPermission:"everyone"};}});var privacySettings=s9b[0];var setPrivacySettings=s9b[1];
+  var s9b=useState(function(){try{var v=localStorage.getItem(_lk("hp_privacy"));return v?JSON.parse(v):{locked:false,pseudo:false,msgPermission:"everyone"};}catch(e){return{locked:false,pseudo:false,msgPermission:"everyone"};}});var privacySettings=s9b[0];var setPrivacySettings=s9b[1];
   function updatePrivacy(patch){
     if(!isPremium){setShowPremium(true);return;}
     setPrivacySettings(function(prev){
