@@ -1209,23 +1209,50 @@ function AccountStatusScreen(props){
   return(<div style={{minHeight:"100vh",background:DS.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24}}><div style={{width:"100%",maxWidth:360,textAlign:"center"}}>{icon}<div style={{fontSize:20,fontWeight:800,color:DS.text,marginBottom:8}}>{title}</div><div style={{fontSize:14,color:DS.textMuted,lineHeight:1.6,marginBottom:24}}>{msg}</div><a href="mailto:support@hotelplatform.com" style={{display:"block",padding:"12px",background:DS.primarySoft,border:"1px solid "+DS.primary+"33",borderRadius:12,color:DS.primary,fontSize:13,fontWeight:700,textDecoration:"none",textAlign:"center",marginBottom:12}}>Contacter le support</a><button onClick={onLogout} style={{padding:"12px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer",width:"100%"}}>Se déconnecter</button></div></div>);
 }
 
+// Traduit les messages d'erreur Supabase Auth en francais (reutilisable hors AuthScreen).
+function authErrorFr(msg){
+  msg=msg||"";
+  if(msg.includes("fetch")||msg.includes("network")||msg.includes("ERR_")||msg.includes("Failed to fetch"))return "Connexion impossible. Vérifiez votre connexion internet.";
+  if(msg.includes("invalid_credentials")||msg.includes("Invalid login"))return "Mot de passe actuel incorrect.";
+  if(msg.includes("already been registered")||msg.includes("already registered")||msg.includes("already exists")||msg.includes("email_exists"))return "Cet email est déjà utilisé par un autre compte.";
+  if(msg.includes("should be different")||(msg.includes("same")&&msg.includes("email")))return "C'est déjà votre adresse email actuelle.";
+  if(msg.includes("email rate limit")||msg.includes("over_email_send")||msg.includes("rate limit")||msg.includes("too many"))return "Trop d'emails envoyés. Patientez quelques minutes avant de réessayer.";
+  if(msg.includes("valid email")||(msg.includes("invalid")&&msg.includes("email")))return "Adresse email invalide.";
+  if(msg.includes("reauthentication")||msg.includes("session")||msg.includes("JWT"))return "Session expirée. Reconnectez-vous puis réessayez.";
+  return msg||"Une erreur est survenue. Réessayez.";
+}
 function ChangeEmailModal(props){
   var onClose=props.onClose;var accent=props.accent||DS.primary;
   var se=useState("");var email=se[0];var setEmail=se[1];
+  var scp=useState("");var curPwd=scp[0];var setCurPwd=scp[1];
+  var ssc=useState(false);var showCur=ssc[0];var setShowCur=ssc[1];
   var sl=useState(false);var loading=sl[0];var setLoading=sl[1];
   var serr=useState("");var err=serr[0];var setErr=serr[1];
   var sok=useState(false);var ok=sok[0];var setOk=sok[1];
+  var canSubmit=email.trim().length>0&&curPwd.length>0;
   async function submit(){
     if(!email.trim()||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())){setErr("Adresse email invalide.");return;}
+    if(!curPwd){setErr("Veuillez saisir votre mot de passe actuel.");return;}
     setLoading(true);setErr("");
     try{
       var sb=(typeof window!=="undefined"&&window.__supabase)||null;
-      if(sb){var r=await sb.auth.updateUser({email:email.trim()});if(r.error){setErr(r.error.message||"Erreur lors de la mise à jour.");setLoading(false);return;}}
+      if(sb){
+        // Re-authentification (niveau Facebook) : verifie le mot de passe actuel avant tout changement.
+        var sess=await sb.auth.getSession();
+        var curEmail=sess&&sess.data&&sess.data.session?sess.data.session.user.email:"";
+        if(curEmail&&email.trim().toLowerCase()===curEmail.toLowerCase()){setErr("C'est déjà votre adresse email actuelle.");setLoading(false);return;}
+        if(curEmail){
+          var verif=await sb.auth.signInWithPassword({email:curEmail,password:curPwd});
+          if(verif.error){setErr("Mot de passe actuel incorrect.");setLoading(false);return;}
+        }
+        var r=await sb.auth.updateUser({email:email.trim()});
+        if(r.error){setErr(authErrorFr(r.error.message));setLoading(false);return;}
+      }
       setOk(true);
     }catch(e){setErr("Erreur de connexion.");}
     setLoading(false);
   }
-  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:20,animation:"hp-slide-up 0.28s ease"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Changer d'email</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div>{ok?(<div style={{textAlign:"center",padding:"20px 0"}}><CheckCircle size={40} color={DS.success} style={{margin:"0 auto 12px",display:"block"}}/><div style={{fontSize:14,color:DS.text,fontWeight:700,marginBottom:6}}>Email mis à jour</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:16}}>Un lien de confirmation a été envoyé à {email}.</div><button onClick={onClose} style={{width:"100%",padding:"11px",background:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div>):(<div><div style={{marginBottom:10,position:"relative"}}><Mail size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type="email" value={email} onChange={function(ev){setEmail(ev.target.value);}} placeholder="Nouvel email" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/></div>{err&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error}}>{err}</div>}<div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button><button onClick={submit} disabled={loading||!email.trim()} style={{flex:2,padding:"11px",background:loading||!email.trim()?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:loading||!email.trim()?"not-allowed":"pointer",opacity:loading||!email.trim()?.6:1}}>{loading?"Mise à jour...":"Confirmer"}</button></div></div>)}</div></div>);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:20,animation:"hp-slide-up 0.28s ease"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>Changer d'email</div><button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div>{ok?(<div style={{textAlign:"center",padding:"20px 0"}}><CheckCircle size={40} color={DS.success} style={{margin:"0 auto 12px",display:"block"}}/><div style={{fontSize:14,color:DS.text,fontWeight:700,marginBottom:6}}>Confirmation envoyée</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:16}}>Un lien de confirmation a été envoyé à {email}. Votre adresse ne sera modifiée qu'après avoir cliqué ce lien.</div><button onClick={onClose} style={{width:"100%",padding:"11px",background:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button></div>):(<div><div style={{marginBottom:6,fontSize:11,color:DS.textMuted,paddingLeft:2}}>Nouvel email</div><div style={{marginBottom:14,position:"relative"}}><Mail size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type="email" value={email} onChange={function(ev){setEmail(ev.target.value);}} placeholder="Nouvelle adresse email" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 16px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/></div><div style={{marginBottom:6,fontSize:11,color:DS.textMuted,paddingLeft:2}}>Mot de passe actuel</div><div style={{marginBottom:14,position:"relative"}}><Lock size={14} color={DS.textMuted} style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)"}}/><input type={showCur?"text":"password"} value={curPwd} onChange={function(ev){setCurPwd(ev.target.value);}} placeholder="Confirmez avec votre mot de passe" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"13px 40px 13px 38px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/><button onClick={function(){setShowCur(!showCur);}} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer"}}>{showCur?<Eye size={14} color={DS.textMuted}/>:<EyeOff size={14} color={DS.textMuted}/>}</button></div>{err&&<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:10,padding:"9px 14px",marginBottom:10,fontSize:12,color:DS.error}}>{err}</div>}<div style={{display:"flex",gap:8}}><button onClick={onClose} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button><button onClick={submit} disabled={loading||!canSubmit} style={{flex:2,padding:"11px",background:loading||!canSubmit?DS.textDim:accent,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:loading||!canSubmit?"not-allowed":"pointer",opacity:loading||!canSubmit?.6:1}}>{loading?"Vérification...":"Confirmer"}</button></div></div>)}</div></div>);
 }
 
 function ChangePwdModal(props){
