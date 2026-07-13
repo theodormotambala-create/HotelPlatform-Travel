@@ -4550,7 +4550,7 @@ function ProProf(props){
 }
 // == NOTIFICATION DATA (NC = client, NP = pro) — defaults avant persistance ==
 // ICON_MAP : cle string → composant React (serialisable en JSON)
-var ICON_MAP={Calendar:Calendar,MessageCircle:MessageCircle,Star:Star,Users:Users,Heart:Heart,Bell:Bell};
+var ICON_MAP={Calendar:Calendar,MessageCircle:MessageCircle,Star:Star,Users:Users,Heart:Heart,Bell:Bell,Share2:Share2};
 var NC_DATA = [];
 var NP_DATA = [];
 
