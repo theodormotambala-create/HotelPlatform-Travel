@@ -1310,14 +1310,18 @@ function PremiumModal(props){
   function handleClose(){if(closing)return;setClosing(true);cT.current=setTimeout(function(){onClose();},260);}
   useEffect(function(){return function(){if(cT.current)clearTimeout(cT.current);};},[]);
   var isClient=accType==="client";
+  // Tarifs/remises pilotes par le panel admin (fournis en props), avec repli sur les defauts.
+  var _PP=props.prices||{};var _PD=props.discounts||{};
+  function _price(id,def){var v=_PP[id];return v!=null&&!isNaN(Number(v))?Number(v):def;}
+  function _disc(m,def){var v=_PD[m];return v!=null&&!isNaN(Number(v))?Number(v):def;}
   var PLANS=isClient
-    ?[{id:"std",name:"Premium Essentiel",price:9.99,color:DS.client,features:["Sans publicité","Confidentialité avancée","Verrouillage de profil","Support prioritaire"]},
-      {id:"plus",name:"Premium Plus",price:19.99,color:DS.gold,features:["Tout Essentiel","Badge eligible verification","Mode pseudonyme","Statistiques profil"]}]
-    :[{id:"std",name:"Premium Standard",price:9.99,color:DS.primary,features:["Publications video","Sans publicité","Éligible badge vérification","Éligible aux avis clients"]},
-      {id:"plus",name:"Premium Plus",price:19.99,color:DS.gold,features:["Tout Standard","Mise en avant boostée","Visibilite prioritaire","Statistiques avancées"]},
-      {id:"biz",name:"Premium Boosté Avancé",price:49.99,color:DS.hotel,features:["Tout Plus","Avantages exclusifs","Manager dédié","API access"]}];
+    ?[{id:"std",name:"Premium Essentiel",price:_price("std",9.99),color:DS.client,features:["Sans publicité","Confidentialité avancée","Verrouillage de profil","Support prioritaire"]},
+      {id:"plus",name:"Premium Plus",price:_price("plus",19.99),color:DS.gold,features:["Tout Essentiel","Badge eligible verification","Mode pseudonyme","Statistiques profil"]}]
+    :[{id:"std",name:"Premium Standard",price:_price("std",9.99),color:DS.primary,features:["Publications video","Sans publicité","Éligible badge vérification","Éligible aux avis clients"]},
+      {id:"plus",name:"Premium Plus",price:_price("plus",19.99),color:DS.gold,features:["Tout Standard","Mise en avant boostée","Visibilite prioritaire","Statistiques avancées"]},
+      {id:"biz",name:"Premium Boosté Avancé",price:_price("biz",49.99),color:DS.hotel,features:["Tout Plus","Avantages exclusifs","Manager dédié","API access"]}];
   var sel=PLANS.find(function(p){return p.id===plan;})||PLANS[0];
-  var DURATIONS=[{months:1,label:"1 mois",discount:0},{months:3,label:"3 mois",discount:0.10},{months:6,label:"6 mois",discount:0.20},{months:12,label:"12 mois",discount:0.30}];
+  var DURATIONS=[{months:1,label:"1 mois",discount:_disc(1,0)},{months:3,label:"3 mois",discount:_disc(3,0.10)},{months:6,label:"6 mois",discount:_disc(6,0.20)},{months:12,label:"12 mois",discount:_disc(12,0.30)}];
   var selDur=DURATIONS.find(function(d){return d.months===duration;})||DURATIONS[0];
   var rawTotal=sel.price*selDur.months;
   var finalTotal=rawTotal*(1-selDur.discount);
@@ -4802,8 +4806,24 @@ export default function App() {
   }
   // Paiement Premium via Stripe : l'abonnement n'est active QU'APRES paiement reussi
   var sPPay=useState(null);var premiumPay=sPPay[0];var setPremiumPay=sPPay[1];
-  var PREMIUM_PRICES={std:9.99,plus:19.99,biz:49.99};
-  var PREMIUM_DISCOUNTS={1:0,3:0.10,6:0.20,12:0.30};
+  // Tarifs premium CONFIGURABLES par le panel admin (table platform_settings).
+  // Valeurs par defaut = repli si la RPC est indisponible (ne jamais bloquer l'achat).
+  // Ainsi affichage, montant preleve et validation serveur (webhook) utilisent la MEME source.
+  var _defPremPrices={std:9.99,plus:19.99,biz:49.99};
+  var _defPremDiscounts={1:0,3:0.10,6:0.20,12:0.30};
+  var sPPricing=useState({prices:_defPremPrices,discounts:_defPremDiscounts});
+  var premiumPricing=sPPricing[0];var setPremiumPricing=sPPricing[1];
+  var PREMIUM_PRICES=premiumPricing.prices;
+  var PREMIUM_DISCOUNTS=premiumPricing.discounts;
+  useEffect(function(){
+    if(!DataLayer._client)return;
+    DataLayer._client.rpc("get_premium_pricing").then(function(r){
+      var d=r&&r.data;
+      if(d&&d.prices&&typeof d.prices==="object"&&Object.keys(d.prices).length&&d.discounts&&typeof d.discounts==="object"){
+        setPremiumPricing({prices:d.prices,discounts:d.discounts});
+      }
+    }).catch(function(){});
+  },[_authForUserData&&_authForUserData.userId]);
   // Cycle de vie Premium : rappel avant expiration (3 jours) et notification d'expiration — une seule fois chacun
   useEffect(function(){
     if(!premiumData||!premiumData.expiresAt||!auth)return;
@@ -4847,11 +4867,6 @@ export default function App() {
   function renewPremium(){
     if(!premiumData)return;
     _startPremiumPayment(premiumData.plan,premiumData.durationMonths,true);
-  }
-  function cancelPremium(){
-    setPremiumData(null);
-    try{localStorage.removeItem(_lk("hp_premium"));}catch(e){}
-    tk.show("Abonnement Premium annulé","success");
   }
   var s11=useState(function(){try{return JSON.parse(localStorage.getItem(_lk("hp_resas"))||"[]");}catch(e){return[];}});
   var resaHistory=s11[0];   var setResaHistory=s11[1];
@@ -5306,7 +5321,7 @@ export default function App() {
   </>);
   if(sett)       return <>
     <Ov onClose={function(){setSett(false);}}>{function(close){return <SettingsS onBack={close} accType={auth.type} onLogout={logout} onDeleteAccount={deleteAccount} onPremium={function(){setShowPremium(true);}} onPrivacy={function(){setShowPrivacy(true);}} isPremium={isPremium} premiumData={premiumData} onChangeEmail={function(){setShowChangeEmail(true);}} onChangePwd={function(){setShowChangePwd(true);}} notifPrefs={notifPrefs} onUpdateNotifPrefs={updateNotifPrefs}/>;}}</Ov>
-    {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
+    {showPremium&&<PremiumModal accType={auth.type} prices={PREMIUM_PRICES} discounts={PREMIUM_DISCOUNTS} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
     {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){setPremiumPay(null);tk.show("Paiement reçu — activation automatique en cours...","success");_refreshPremiumFromServer(0);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
     {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
     {_accountOverlays}
@@ -5361,7 +5376,7 @@ export default function App() {
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client"))}/>}
-        {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
+        {showPremium&&<PremiumModal accType={auth.type} prices={PREMIUM_PRICES} discounts={PREMIUM_DISCOUNTS} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {_accountOverlays}
         {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){setPremiumPay(null);tk.show("Paiement reçu — activation automatique en cours...","success");_refreshPremiumFromServer(0);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
@@ -5408,7 +5423,7 @@ export default function App() {
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId} selfName={proD.name||(auth&&auth.email?auth.email.split("@")[0]:"Pro")}/>}
-      {showPremium&&<PremiumModal accType={auth.type} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
+      {showPremium&&<PremiumModal accType={auth.type} prices={PREMIUM_PRICES} discounts={PREMIUM_DISCOUNTS} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {_accountOverlays}
       {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){setPremiumPay(null);tk.show("Paiement reçu — activation automatique en cours...","success");_refreshPremiumFromServer(0);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
