@@ -3305,7 +3305,9 @@ function ProFeed(props){
     };
     if(mediaFile&&DataLayer._client){
       var ext=mediaFile.name.split(".").pop()||"jpg";
-      var path="posts/"+newId+"."+ext;
+      // Chemin cloisonne par utilisateur (<uid>/posts/...) : chaque compte n'ecrit que
+      // dans son propre dossier, aligne sur les policies Storage du bucket media.
+      var path=(selfUserId?selfUserId+"/":"")+"posts/"+newId+"."+ext;
       DataLayer._client.storage.from("media").upload(path,mediaFile,{contentType:mediaFile.type,upsert:false})
         .then(function(res){
           if(res.data){
