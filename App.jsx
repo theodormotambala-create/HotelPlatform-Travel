@@ -5152,7 +5152,21 @@ export default function App() {
     var sb = (typeof window!=="undefined" && window.__supabase) ? window.__supabase : null;
     var userId = auth && auth.userId;
 
-    // 1. Suppression Storage : dossier photo profil — on attend la fin avant de continuer
+    // 1. Suppression serveur (RPC RGPD, SECURITY DEFINER) EN PREMIER.
+    //    Efface toutes les donnees personnelles (feed, messages, avis, reservations,
+    //    profil, etablissement en cascade) et anonymise les registres financiers.
+    //    Si elle echoue, on n'efface RIEN d'autre et on garde l'utilisateur connecte.
+    if(sb){
+      var _delRes=null;
+      try{ _delRes = await sb.rpc("delete_user_account"); }catch(e){ _delRes={error:e}; }
+      if(_delRes && _delRes.error){
+        console.warn("[RGPD] RPC error:", _delRes.error);
+        try{ toastApp("Échec de la suppression du compte. Vérifiez votre connexion et réessayez.","error"); }catch(e){}
+        return;
+      }
+    }
+
+    // 2. Suppression Storage : dossier photo profil (uniquement apres suppression serveur reussie)
     if(sb && userId){
       try{
         var listRes = await sb.storage.from("profile-photos").list(userId+"/");
@@ -5161,12 +5175,6 @@ export default function App() {
           await sb.storage.from("profile-photos").remove(paths);
         }
       }catch(e){ console.warn("[RGPD] Storage cleanup error:", e); }
-    }
-
-    // 2. Suppression Supabase via RPC delete_user_account() (SECURITY DEFINER)
-    //    Efface en cascade : reviews, reservations, profiles, posts, messages, auth.users
-    if(sb){
-      try{ await sb.rpc("delete_user_account"); }catch(e){ console.warn("[RGPD] RPC error:", e); }
     }
 
     // 3. Efface TOUTES les cles localStorage prefixees "hp_" (robuste aux futures features)
