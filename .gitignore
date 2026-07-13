@@ -17,3 +17,6 @@ dist-ssr/
 # Logs
 *.log
 npm-debug.log*
+
+# Playwright smoke-test artifact
+register.png
