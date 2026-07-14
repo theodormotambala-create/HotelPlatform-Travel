@@ -4371,6 +4371,10 @@ function ProProf(props){
   var _allProD=proType==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
   var data=(props.authUserId&&_allProD.find(function(h){return h.userId===props.authUserId;}))||_allProD[0];
   var color=rC(proType);
+  // Favoris de l'etablissement : memes donnees/serveur que le client (fav_estabs), affichage cote Pro.
+  var favEstabIds=props.favEstabIds||[];var onToggleFavEstab=props.onToggleFavEstab||null;
+  var _allEstabsFav=DataLayer.getHotels().concat(DataLayer.getRestaurants());
+  var favEstabs=favEstabIds.map(function(id){return _allEstabsFav.find(function(x){return x.id===id;});}).filter(Boolean);
   var s1=useState("about");var tab=s1[0];var setTab=s1[1];
   var s2=useState(false);var showVerif=s2[0];var setShowVerif=s2[1];
   var _vfKey=_lk("hp_verif_status_"+(proType||"hotel"));
@@ -4576,7 +4580,7 @@ function ProProf(props){
           {[[fmtK(data.followers),"Abonnés"],[null,"Note"],[fmtK(data.reviewCount),"Avis"],[data.priceFrom?(data.priceFrom+" EUR"):"—","Depuis"]].map(function(_i,i){var v=_i[0];var l=_i[1];return <div key={i} style={{flex:1,background:DS.card,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:12,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>{l==="Note"?<><Stars r={Math.round(data.rating||0)} sz={10}/><span style={{fontSize:10,color:DS.gold,fontWeight:800,marginLeft:2}}>{data.rating||"—"}</span></>:v}</div><div style={{fontSize:9,color:DS.textMuted}}>{l}</div></div>;})}
         </div>
         <div style={{display:"flex",gap:4,marginBottom:14}}>
-          {[["about","À propos"],["services","Services"],["stats","Stats"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})}
+          {[["about","À propos"],["services","Services"],["stats","Stats"],["favoris","Favoris"]].map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",textAlign:"center"}}>{l}</button>;})}
         </div>
         {tab==="about"&&(
           editingAbout?(
@@ -4615,6 +4619,11 @@ function ProProf(props){
           var _revenue=_resas.filter(function(r){return r.payMode==="avec"&&(r.status==="confirmed"||r.status==="consumed");}).reduce(function(s,r){return s+(r.total||0);},0);
           return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>{[["Réservations",String(_nbResas),color],[_revenue>0?_revenue.toFixed(0)+" EUR":"—","Revenus",DS.gold],[_conversion+"%","Conversion",DS.success],[String(_nbAvis),"Avis reçus",DS.primary]].map(function(_i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={l} style={{background:DS.card,borderRadius:10,padding:"10px",border:"1px solid "+DS.border}}><div style={{fontSize:16,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted}}>{l}</div></div>;})} </div>);
         })()}
+        {tab==="favoris"&&(<div>
+          {favEstabs.length===0&&<Emp Icon={Heart} title="Aucun favori" sub="Les établissements que vous ajoutez en favori apparaîtront ici"/>}
+          {favEstabs.length>0&&<div style={{fontSize:11,fontWeight:800,color:DS.textDim,letterSpacing:1,margin:"2px 0 8px"}}>ÉTABLISSEMENTS ({favEstabs.length})</div>}
+          {favEstabs.map(function(est){return(<div key={est.id} style={{background:DS.card,borderRadius:14,marginBottom:10,border:"1px solid "+DS.border,overflow:"hidden"}}><div style={{height:80,position:"relative"}}><img src={est.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>{est.verified&&<div style={{position:"absolute",top:6,left:8}}><VBadge sz={16}/></div>}{onToggleFavEstab&&<button onClick={function(){onToggleFavEstab(est.id);}} style={{position:"absolute",top:6,right:8,width:30,height:30,borderRadius:"50%",background:"rgba(0,0,0,.5)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} title="Retirer des favoris"><Heart size={15} color={DS.error} fill={DS.error}/></button>}</div><div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontSize:13,fontWeight:800,color:DS.text}}>{est.name}</div><div style={{fontSize:11,color:DS.textMuted}}>{est.location}</div><div style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}><Stars r={est.rating} sz={10}/><span style={{fontSize:10,color:DS.textMuted}}>({est.reviewCount})</span></div></div><div style={{textAlign:"right"}}>{est.priceFrom?<><div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{est.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>à partir de</div></>:null}</div></div></div>);})}
+        </div>)}
       </div>
     </div>
   );
@@ -5493,7 +5502,7 @@ export default function App() {
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onOpenChat={function(){setPTab("chat");}} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
         {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={proD.name||(auth&&(auth.email||"").split("@")[0])} estabName={proD.name} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
-        {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto}/>}
+        {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId} selfName={proD.name||(auth&&auth.email?auth.email.split("@")[0]:"Pro")}/>}
