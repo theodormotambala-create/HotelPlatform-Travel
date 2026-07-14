@@ -4694,15 +4694,10 @@ export default function App() {
       var uid=session.user.id;
       sb.from("profiles").select("account_type,status").eq("user_id",uid).maybeSingle()
         .then(function(r){
+          // STRICT : le type de compte est fixe a l'inscription et IMMUABLE (aucune conversion,
+          // aucun double role). Le type affiche est toujours celui reellement enregistre en base.
           var accType=(r&&r.data&&r.data.account_type)||quickType;
           var status=(r&&r.data&&r.data.status)||(accType!=="client"?"pending":"active");
-          // Premier retour OAuth (LinkedIn/Google) : le profil est ne 'client' car les metadonnees
-          // ne portaient pas encore le choix -> on applique le type choisi avant la redirection.
-          // Le serveur force 'pending' pour hotel/restaurant (validation obligatoire).
-          if(r&&r.data&&r.data.account_type==="client"&&!meta.account_type&&quickType!=="client"&&(quickType==="hotel"||quickType==="restaurant")){
-            accType=quickType;status="pending";
-            sb.from("profiles").update({account_type:quickType,svc_mode:quickType,status:"pending",updated_at:new Date().toISOString()}).eq("user_id",uid).then(function(){}).catch(function(){});
-          }
           try{localStorage.setItem("hp_acc_type",accType);}catch(e){}
           setAuth(function(prev){
             if(prev&&prev.type===accType&&prev.accountStatus===status&&prev.userId===uid)return prev;
