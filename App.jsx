@@ -1693,21 +1693,23 @@ function useLongPress(onTrigger){
   };
 }
 function ActionSheet(props){
-  var onClose=props.onClose;var onDelete=props.onDelete;var onReply=props.onReply;var label=props.label||"cet element";
-  // canDelete par defaut vrai pour rester compatible avec les usages existants (commentaires).
+  var onClose=props.onClose;var onDelete=props.onDelete;var onReply=props.onReply;var onReport=props.onReport;var label=props.label||"cet element";
+  // canDelete par defaut vrai pour rester compatible avec les usages existants (commentaires, messages).
   var canDelete=props.canDelete!==undefined?props.canDelete:true;
   var scd=useState(false);var confirmDel=scd[0];var setConfirmDel=scd[1];
   useBackClose(true,onClose);
+  // Chaque option est un bloc distinct nettement espace (marginBottom) pour eviter tout faux clic
+  // entre deux actions (standard LinkedIn / Facebook) — plus de boutons colles par un simple trait.
+  var block={width:"100%",padding:"16px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:9,fontSize:15,fontWeight:700,marginBottom:8};
   return(<div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",zIndex:1400,display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"hp-fade 0.15s ease",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
     <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:440,margin:"0 8px 8px",animation:"hp-slide-up 0.22s ease"}}>
-      <div style={{background:DS.surface,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border,marginBottom:8}}>
-        <div style={{padding:"12px 16px",textAlign:"center",fontSize:11,color:DS.textDim,borderBottom:"1px solid "+DS.border+"60"}}>{confirmDel?"Supprimer "+label+" ?":"Actions sur "+label}</div>
-        {!confirmDel&&onReply&&<button onClick={function(){if(onReply)onReply();if(onClose)onClose();}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",borderBottom:canDelete?"1px solid "+DS.border+"60":"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:DS.text,fontSize:15,fontWeight:700}}><MessageCircle size={17} color={DS.primary}/>Répondre</button>}
-        {!confirmDel&&canDelete&&<button onClick={function(){setConfirmDel(true);}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:DS.error,fontSize:15,fontWeight:700}}><Trash2 size={17} color={DS.error}/>Supprimer</button>}
-        {confirmDel&&<div style={{padding:"10px 16px 4px",textAlign:"center",fontSize:11,color:DS.textMuted}}>Cette action est irréversible.</div>}
-        {confirmDel&&<button onClick={function(){if(onDelete)onDelete();if(onClose)onClose();}} style={{width:"100%",padding:"15px 16px",background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:DS.error,fontSize:15,fontWeight:800}}><Trash2 size={17} color={DS.error}/>Confirmer la suppression</button>}
-      </div>
-      <button onClick={function(){if(confirmDel)setConfirmDel(false);else onClose();}} style={{width:"100%",padding:"15px 16px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:16,cursor:"pointer",color:DS.text,fontSize:15,fontWeight:800}}>Annuler</button>
+      <div style={{background:DS.surface,border:"1px solid "+DS.border,borderRadius:14,padding:"13px 16px",textAlign:"center",fontSize:11,color:DS.textDim,marginBottom:8}}>{confirmDel?"Supprimer "+label+" ?":"Actions sur "+label}</div>
+      {!confirmDel&&onReply&&<button onClick={function(){if(onReply)onReply();if(onClose)onClose();}} style={Object.assign({},block,{color:DS.text})}><MessageCircle size={17} color={DS.primary}/>Répondre</button>}
+      {!confirmDel&&onReport&&<button onClick={function(){if(onReport)onReport();if(onClose)onClose();}} style={Object.assign({},block,{color:DS.error})}><Flag size={17} color={DS.error}/>Signaler</button>}
+      {!confirmDel&&canDelete&&<button onClick={function(){setConfirmDel(true);}} style={Object.assign({},block,{color:DS.error})}><Trash2 size={17} color={DS.error}/>Supprimer</button>}
+      {confirmDel&&<div style={{background:DS.surface,border:"1px solid "+DS.border,borderRadius:14,padding:"13px 16px",textAlign:"center",fontSize:11,color:DS.textMuted,marginBottom:8}}>Cette action est irréversible.</div>}
+      {confirmDel&&<button onClick={function(){if(onDelete)onDelete();if(onClose)onClose();}} style={Object.assign({},block,{color:DS.error,fontWeight:800})}><Trash2 size={17} color={DS.error}/>Confirmer la suppression</button>}
+      <button onClick={function(){if(confirmDel)setConfirmDel(false);else onClose();}} style={{width:"100%",padding:"16px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:14,cursor:"pointer",color:DS.text,fontSize:15,fontWeight:800}}>Annuler</button>
     </div>
   </div>);
 }
@@ -1803,13 +1805,15 @@ function CommentsSheet(props){
   var post=props.post;var cmtText=props.cmtText;var setCmtText=props.setCmtText;var addCmt=props.addCmt;var delCmt=props.delCmt;var onClose=props.onClose;var selfLetter=props.selfLetter||"V";
   var selfName=props.selfName||"Vous";var selfVerified=props.selfVerified||false;
   var selfUserId=props.selfUserId||null;
+  var onReportComment=props.onReportComment||null;
   // Propriete d'un commentaire : par identifiant de compte (le nom seul permet des collisions)
   function isMine(cm){return cm.userId!=null&&selfUserId!=null?String(cm.userId)===String(selfUserId):cm.author===selfName;}
   var sReply=useState(null);var replyTo=sReply[0];var setReplyTo=sReply[1];
   var menuC=useState(null);var menuCm=menuC[0];var setMenuCm=menuC[1];
   var sExp=useState({});var expandedReplies=sExp[0];var setExpandedReplies=sExp[1];
   var lpTimer=useRef(null);
-  function lpStart(cm,e){if(!isMine(cm))return;lpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuCm(cm);},480);}
+  // Appui long ouvre le menu sur TOUS les commentaires : le sien (Supprimer) ou celui d'un autre (Signaler).
+  function lpStart(cm,e){lpTimer.current=setTimeout(function(){if(e&&e.cancelable)e.preventDefault();setMenuCm(cm);},480);}
   function lpCancel(){if(lpTimer.current){clearTimeout(lpTimer.current);lpTimer.current=null;}}
   // Closing animation
   var sClosing=useState(false);var closing=sClosing[0];var setClosing=sClosing[1];
@@ -1894,14 +1898,14 @@ function CommentsSheet(props){
                 <div style={{display:"flex",gap:10}}>
                   <Av sz={34} letter={cm.author[0]} img={cm.photo||null}/>
                   <div style={{flex:1}}>
-                    <div onTouchStart={function(e){lpStart(cm,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(cm);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(mine)setMenuCm(cm);}} style={{background:DS.card,borderRadius:"0 16px 16px 16px",padding:"9px 13px",cursor:mine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>
+                    <div onTouchStart={function(e){lpStart(cm,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(cm);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();setMenuCm(cm);}} style={{background:DS.card,borderRadius:"0 16px 16px 16px",padding:"9px 13px",cursor:"pointer",userSelect:"none",WebkitUserSelect:"none",MozUserSelect:"none",msUserSelect:"none",WebkitTouchCallout:"none"}}>
                       <div style={{fontSize:13,fontWeight:800,color:DS.text,marginBottom:3}}>{cm.author}</div>
                       <div style={{fontSize:13,color:DS.text,lineHeight:1.55,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{cm.text}</div>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:12,marginTop:4,paddingLeft:4}}>
+                    <div style={{display:"flex",alignItems:"center",gap:14,marginTop:8,paddingLeft:4}}>
                       <span style={{fontSize:11,color:DS.textDim,fontWeight:600}}>{cm.time}</span>
                       <button onClick={function(){setReplyTo(cm);}} style={{fontSize:12,fontWeight:700,color:DS.textMuted,background:"none",border:"none",cursor:"pointer",padding:0}}>Répondre</button>
-                      {mine&&<span style={{fontSize:10,color:DS.textDim}}>· maintenir pour supprimer</span>}
+                      <span style={{fontSize:10,color:DS.textDim}}>· maintenir pour {mine?"supprimer":"signaler"}</span>
                     </div>
                     {/* Bouton "Afficher X réponses" — Facebook style */}
                     {repCount>0&&!expanded&&(
@@ -1924,14 +1928,14 @@ function CommentsSheet(props){
                             <div key={rep.id||("r"+gi+ri)} style={{display:"flex",gap:8,marginBottom:10,paddingLeft:4,animation:repIsNew?"hp-item-in 0.25s ease both":"none"}}>
                               <Av sz={28} letter={rep.author[0]} img={rep.photo||null}/>
                               <div style={{flex:1}}>
-                                <div onTouchStart={function(e){lpStart(rep,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(rep);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();if(repMine)setMenuCm(rep);}} style={{background:DS.card,borderRadius:"0 14px 14px 14px",padding:"8px 12px",cursor:repMine?"pointer":"default",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
+                                <div onTouchStart={function(e){lpStart(rep,e);}} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseDown={function(){lpStart(rep);}} onMouseUp={lpCancel} onMouseLeave={lpCancel} onContextMenu={function(e){e.preventDefault();setMenuCm(rep);}} style={{background:DS.card,borderRadius:"0 14px 14px 14px",padding:"8px 12px",cursor:"pointer",userSelect:"none",WebkitUserSelect:"none",WebkitTouchCallout:"none"}}>
                                   <div style={{fontSize:12,fontWeight:800,color:DS.text,marginBottom:3}}>{rep.author}</div>
                                   <div style={{fontSize:13,color:DS.text,lineHeight:1.55,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{rep.text}</div>
                                 </div>
-                                <div style={{display:"flex",alignItems:"center",gap:12,marginTop:3,paddingLeft:3}}>
+                                <div style={{display:"flex",alignItems:"center",gap:14,marginTop:7,paddingLeft:3}}>
                                   <span style={{fontSize:11,color:DS.textDim,fontWeight:600}}>{rep.time}</span>
                                   <button onClick={function(){setReplyTo(cm);}} style={{fontSize:12,fontWeight:700,color:DS.textMuted,background:"none",border:"none",cursor:"pointer",padding:0}}>Répondre</button>
-                                  {repMine&&<span style={{fontSize:10,color:DS.textDim}}>· maintenir pour supprimer</span>}
+                                  <span style={{fontSize:10,color:DS.textDim}}>· maintenir pour {repMine?"supprimer":"signaler"}</span>
                                 </div>
                               </div>
                             </div>
@@ -1960,7 +1964,7 @@ function CommentsSheet(props){
         </div>
       </div>
     </div>
-    {menuCm&&<ActionSheet label="ce commentaire" onClose={function(){setMenuCm(null);}} onDelete={function(){if(delCmt)delCmt(post.id,menuCm.id);}}/>}
+    {menuCm&&<ActionSheet label="ce commentaire" canDelete={isMine(menuCm)} onClose={function(){setMenuCm(null);}} onDelete={isMine(menuCm)?function(){if(delCmt)delCmt(post.id,menuCm.id);}:undefined} onReport={isMine(menuCm)?undefined:function(){if(onReportComment)onReportComment(menuCm);}}/>}
   </div>);
 }
 
@@ -2086,6 +2090,7 @@ function ClientFeed(props){
       });
   },[selfUserId]);
   var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
+  var srC=useState(null);var reportCmt=srC[0];var setReportCmt=srC[1];
   var followingPosts=props.followingIds||[];
   function toggleFav(id){
     var wasFav=favPosts.indexOf(id)>=0;
@@ -2184,6 +2189,7 @@ function ClientFeed(props){
       <Toast/>
       {loading&&<FeedSkeleton/>}
       {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} targetType="post" targetOwnerId={reportTarget.ownerUid||null} targetOwnerName={reportTarget.author} reporterId={selfUserId} onClose={function(){setReportTarget(null);}}/>}
+      {reportCmt&&<ReportM targetName={"le commentaire de "+reportCmt.author} targetId={reportCmt.id} targetType="comment" allowProfile={false} targetOwnerId={reportCmt.userId||null} targetOwnerName={reportCmt.author} reporterId={selfUserId} onClose={function(){setReportCmt(null);}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       {posts.length===0&&<Emp Icon={Home} title="Aucune publication" sub="Les publications des établissements apparaîtront ici"/>}
       {posts.slice(0,visibleCount).map(function(post,_pi){
@@ -2241,7 +2247,7 @@ function ClientFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfUserId={selfUserId} selfPhoto={selfPhoto} selfVerified={isPremium} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfUserId={selfUserId} selfPhoto={selfPhoto} selfVerified={isPremium} onReportComment={function(cm){setReportCmt(cm);}} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -3224,6 +3230,7 @@ function ProFeed(props){
       });
   },[selfUserId]);
   var sr=useState(null);var reportTarget=sr[0];var setReportTarget=sr[1];
+  var srC=useState(null);var reportCmt=srC[0];var setReportCmt=srC[1];
   // Fix #2 : toast favoris dans le bon sens
   function toggleFav(id){
     var wasFav=favPosts.indexOf(id)>=0;
@@ -3418,6 +3425,7 @@ function ProFeed(props){
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
       {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} targetType="post" targetOwnerId={reportTarget.ownerUid||null} targetOwnerName={reportTarget.author} reporterId={selfUserId} onClose={function(){setReportTarget(null);}}/>}
+      {reportCmt&&<ReportM targetName={"le commentaire de "+reportCmt.author} targetId={reportCmt.id} targetType="comment" allowProfile={false} targetOwnerId={reportCmt.userId||null} targetOwnerName={reportCmt.author} reporterId={selfUserId} onClose={function(){setReportCmt(null);}}/>}
       {delSheet&&<ActionSheet label="cette publication" onClose={function(){setDelSheet(null);}} onDelete={function(){delPost(delSheet.id);}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",background:DS.surface,borderBottom:"1px solid "+DS.border,marginBottom:10}}>
@@ -3535,7 +3543,7 @@ function ProFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} selfUserId={selfUserId} selfPhoto={selfPhoto} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} selfUserId={selfUserId} selfPhoto={selfPhoto} onReportComment={function(cm){setReportCmt(cm);}} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
         );
@@ -3558,8 +3566,11 @@ function ReportM(props){
   var targetOwnerId=props.targetOwnerId||null;
   var targetOwnerName=props.targetOwnerName||"cet établissement";
   useBackClose(true,onClose);
-  // On ne propose "signaler le profil" que si le compte auteur est connu (sinon rien a router vers le panel).
-  var hasProfile=!!targetOwnerId;
+  // "signaler le profil" seulement si autorise (allowProfile) ET si le compte auteur est connu.
+  // Pour un commentaire, on signale directement le commentaire (pas de sous-choix contenu/profil),
+  // tout en gardant le lien vers le compte de l'auteur (target_owner_id).
+  var allowProfile=props.allowProfile!==undefined?props.allowProfile:true;
+  var hasProfile=allowProfile&&!!targetOwnerId;
   var s0=useState(hasProfile?"target":"reason");var step=s0[0];var setStep=s0[1];
   var sk=useState(hasProfile?null:"content");var kind=sk[0];var setKind=sk[1];
   var s2=useState(null);var reason=s2[0];var setReason=s2[1];
