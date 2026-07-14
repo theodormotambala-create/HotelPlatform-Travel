@@ -5145,7 +5145,19 @@ export default function App() {
     setAuth(null);setEstab(null);setBook(null);
     setSett(false);setNotifs(false);
     setCTab("feed");setPTab("feed");
+    // Reset COMPLET des etats par-utilisateur : le composant racine ne se demonte pas,
+    // il faut donc effacer toute donnee du compte precedent pour eviter toute fuite
+    // inter-comptes sur un appareil partage (photo, premium, notifs, confidentialite...).
     setCoverPhotoRaw(null);
+    setProfilePhotoRaw(null);
+    setPremiumData(null);
+    setNotifStored(null);
+    setPrivacySettings({locked:false,pseudo:false,msgPermission:"everyone"});
+    setResaHistory([]);
+    setFollowingIds([]);
+    setFavEstabIds([]);
+    setNotifPrefs({reservation:true,message:true,comment:true,reaction:true,promo:true,follow:true});
+    setClientDisplayName("");
   }
   // Suppression de compte RGPD Art. 17 : efface toutes les donnees locales + Supabase + Storage
   async function deleteAccount(){
