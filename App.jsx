@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -1356,6 +1356,178 @@ function PremiumModal(props){
   var finalTotal=rawTotal*(1-selDur.discount);
   var savings=rawTotal-finalTotal;
   return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}><div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"92vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.32s ease"}}><div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>HotelPlatform Premium</div><button onClick={handleClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button></div><div style={{padding:"0 20px",display:"flex",gap:4,marginTop:14}}>{[1,2,3].map(function(s){return <div key={s} style={{flex:1,height:3,borderRadius:2,background:s<=step?DS.gold:DS.border}}/>;})}</div><div style={{padding:20}}>{step===1&&<div>{PLANS.map(function(p){var isS=plan===p.id;return(<button key={p.id} onClick={function(){setPlan(p.id);}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?p.color+"88":DS.border),background:isS?p.color+"14":DS.card,cursor:"pointer",textAlign:"left"}}><div><div style={{fontSize:13,fontWeight:800,color:isS?p.color:DS.text}}>{p.name}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{p.features.slice(0,2).join(" - ")}</div></div><div style={{fontSize:16,fontWeight:900,color:p.color}}>{p.price} EUR<span style={{fontSize:9,color:DS.textMuted,fontWeight:600}}>/mois</span></div></button>);})}  <button onClick={function(){setStep(2);}} style={{width:"100%",padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginTop:8}}>Continuer</button></div>}{step===2&&<div><div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:4}}>Choisissez votre duree</div><div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>{sel.name} - plus la duree est longue, plus la reduction est importante</div>{DURATIONS.map(function(d){var isS=duration===d.months;var dTotal=sel.price*d.months*(1-d.discount);return(<button key={d.months} onClick={function(){setDuration(d.months);}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?DS.gold+"88":DS.border),background:isS?DS.gold+"14":DS.card,cursor:"pointer",textAlign:"left"}}><div><div style={{fontSize:13,fontWeight:800,color:isS?DS.gold:DS.text}}>{d.label}</div>{d.discount>0&&<div style={{fontSize:10,color:DS.success,marginTop:2,fontWeight:700}}>Économisez {Math.round(d.discount*100)}%</div>}</div><div style={{textAlign:"right"}}><div style={{fontSize:15,fontWeight:900,color:isS?DS.gold:DS.text}}>{dTotal.toFixed(2)} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>{(dTotal/d.months).toFixed(2)} EUR/mois</div></div></button>);})}<div style={{display:"flex",gap:8,marginTop:8}}><button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button><button onClick={function(){setStep(3);}} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer"}}>Continuer</button></div></div>}{step===3&&<div style={{textAlign:"center",paddingBottom:10}}><div style={{width:72,height:72,borderRadius:"50%",background:DS.goldSoft,border:"2px solid "+DS.gold,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><VBadge sz={40}/></div><div style={{fontSize:18,fontWeight:900,color:DS.gold,marginBottom:6}}>{sel.name}</div><div style={{fontSize:13,color:DS.textMuted,marginBottom:16}}>{selDur.label} - {finalTotal.toFixed(2)} EUR{savings>0&&<span style={{color:DS.success}}> (économie de {savings.toFixed(2)} EUR)</span>}</div><div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:20,textAlign:"left"}}>{sel.features.map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<sel.features.length-1?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}</div><div style={{display:"flex",gap:8}}><button onClick={function(){setStep(2);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button><button onClick={function(){if(onSubscribe)onSubscribe(plan,duration);}} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:13,fontWeight:900,cursor:"pointer"}}>Confirmer l'abonnement</button></div></div>}</div></div></div>);
+}
+
+// == SponsorHub : parcours Sponsor & Boost pour un etablissement (etape A) ==
+// Serveur qui fait foi : get_ad_plans (prix officiels) + insert ad_campaigns
+// (le trigger impose prix/propriete/statut). Double confirmation avant creation.
+function _durLabel(days){ if(days===7)return"7 jours"; if(days===30)return"1 mois"; if(days===14)return"2 semaines"; if(days===90)return"3 mois"; return days+" jours"; }
+function SponsorHub(props){
+  var onClose=props.onClose;
+  var advertiserId=props.advertiserId||null;
+  var estab=props.estab||{};
+  var color=props.color||DS.gold;
+  var onGoToFeed=props.onGoToFeed||null;
+  useBackClose(true,onClose);
+  var PARCOURS=[
+    {kind:"sponsor_profile",     icon:Star,          title:"Sponsoriser mon profil",     sub:"Mettez votre établissement en avant"},
+    {kind:"sponsor_post",        icon:MessageCircle, title:"Sponsoriser une publication", sub:"Boostez un de vos contenus"},
+    {kind:"sponsor_reservation", icon:Calendar,      title:"Sponsoriser une offre",       sub:"Chambre, plat ou offre en avant"},
+    {kind:"boost_profile",       icon:Eye,           title:"Booster mon profil",          sub:"Plus de visibilité dans le feed"}
+  ];
+  var s0=useState("hub");var view=s0[0];var setView=s0[1];
+  var sk=useState(null);var kind=sk[0];var setKind=sk[1];
+  var st=useState(null);var target=st[0];var setTarget=st[1];
+  var sp=useState(null);var plans=sp[0];var setPlans=sp[1];
+  var sd=useState(null);var dur=sd[0];var setDur=sd[1];
+  var soff=useState(null);var offers=soff[0];var setOffers=soff[1];
+  var ss=useState(false);var sending=ss[0];var setSending=ss[1];
+  var se=useState(null);var err=se[0];var setErr=se[1];
+  useEffect(function(){
+    if(!DataLayer._client)return;
+    DataLayer._client.rpc("get_ad_plans").then(function(r){if(r&&r.data)setPlans(r.data);}).catch(function(){});
+  },[]);
+  var _cur=(plans&&plans.currency)||"EUR";
+  var _parc=PARCOURS.find(function(p){return p.kind===kind;})||null;
+  var myPosts=(DataLayer.getFeed()||[]).filter(function(p){return p.ownerUid&&advertiserId&&String(p.ownerUid)===String(advertiserId);});
+  function loadOffers(){
+    if(offers!==null||!DataLayer._client||!estab.id)return;
+    var eid=estab.id;
+    Promise.all([
+      DataLayer._client.from("establishment_rooms").select("id,name,price").eq("establishment_id",eid),
+      DataLayer._client.from("establishment_dishes").select("id,name,price").eq("establishment_id",eid),
+      DataLayer._client.from("establishment_offers").select("id,name,price").eq("establishment_id",eid)
+    ]).then(function(rs){var all=[];rs.forEach(function(r){if(r&&r.data)r.data.forEach(function(o){all.push(o);});});setOffers(all);})
+      .catch(function(){setOffers([]);});
+  }
+  function startKind(k){
+    setKind(k);setErr(null);setDur(null);
+    if(k==="sponsor_profile"||k==="boost_profile"){setTarget({id:estab.id,label:estab.name||"Mon établissement"});setView("plan");}
+    else if(k==="sponsor_post"){setView("pickPost");}
+    else{loadOffers();setView("pickOffer");}
+  }
+  function confirmCreate(){
+    if(sending||!kind||!dur)return;
+    if(!DataLayer._client){setErr("Connexion requise.");return;}
+    setSending(true);setErr(null);
+    var row={advertiser_id:advertiserId,kind:kind,target_id:target?target.id:null,plan_type:kind,duration_days:dur.days};
+    DataLayer._client.from("ad_campaigns").insert([row]).then(function(r){
+      setSending(false);
+      if(r&&r.error){setErr("Création impossible pour le moment. Réessaie.");return;}
+      setView("done");
+    }).catch(function(){setSending(false);setErr("Création impossible pour le moment. Réessaie.");});
+  }
+  var durations=(plans&&kind&&plans[kind]&&plans[kind].durations)||[];
+  function card(inner,onClick,key){return <button key={key} onClick={onClick} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"14px 16px",marginBottom:10,borderRadius:14,border:"1px solid "+DS.border,background:DS.card,cursor:"pointer",textAlign:"left"}}>{inner}</button>;}
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+      <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"90vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-slide-up 0.3s ease"}}>
+        <div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}>
+          <Tag size={16} color={DS.gold}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:15,fontWeight:900,color:DS.gold}}>Sponsoriser &amp; Booster</div>
+            <div style={{fontSize:11,color:DS.textMuted,marginTop:2}}>Mettez votre établissement en avant</div>
+          </div>
+          <button onClick={onClose} aria-label="Fermer" style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><X size={14} color={DS.textMuted}/></button>
+        </div>
+        <div style={{padding:20}}>
+          {view==="hub"&&(
+            <div>
+              <div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>Choisissez ce que vous voulez mettre en avant.</div>
+              {PARCOURS.map(function(pc){var Ic=pc.icon;return card(
+                <Fragment key={pc.kind}>
+                  <div style={{width:40,height:40,borderRadius:12,background:DS.goldSoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Ic size={18} color={DS.gold}/></div>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{pc.title}</div><div style={{fontSize:11,color:DS.textMuted,marginTop:2}}>{pc.sub}</div></div>
+                  <ChevronRight size={16} color={DS.textMuted}/>
+                </Fragment>,
+                function(){startKind(pc.kind);}, pc.kind
+              );})}
+            </div>
+          )}
+          {view==="pickPost"&&(
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:DS.text,marginBottom:4}}>Quelle publication sponsoriser ?</div>
+              <div style={{fontSize:11,color:DS.textMuted,marginBottom:14}}>Choisissez un contenu existant ou créez-en un.</div>
+              {myPosts.length===0&&<div style={{fontSize:12,color:DS.textMuted,textAlign:"center",padding:"14px 0"}}>Vous n'avez pas encore de publication.</div>}
+              {myPosts.slice(0,20).map(function(p){return card(
+                <Fragment key={p.id}>
+                  <div style={{width:38,height:38,borderRadius:9,background:DS.card,border:"1px solid "+DS.border,overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{p.img?<img src={p.img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<MessageCircle size={15} color={DS.textMuted}/>}</div>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,color:DS.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.text||"Publication"}</div><div style={{fontSize:10,color:DS.textDim,marginTop:2}}>{p.time||""}</div></div>
+                  <ChevronRight size={15} color={DS.textMuted}/>
+                </Fragment>,
+                function(){setTarget({id:p.id,label:(p.text||"Publication").slice(0,42)});setView("plan");}, p.id
+              );})}
+              <button onClick={function(){onClose();if(onGoToFeed)onGoToFeed();}} style={{width:"100%",padding:"12px",marginTop:6,background:DS.goldSoft,border:"1px dashed "+DS.gold,borderRadius:12,color:DS.gold,fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><Plus size={15}/>Créer un contenu sponsorisé</button>
+              <button onClick={function(){setView("hub");}} style={{width:"100%",padding:"11px",marginTop:8,background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
+            </div>
+          )}
+          {view==="pickOffer"&&(
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:DS.text,marginBottom:4}}>Quelle offre sponsoriser ?</div>
+              <div style={{fontSize:11,color:DS.textMuted,marginBottom:14}}>Chambre, plat ou offre de votre établissement.</div>
+              {offers===null&&<div style={{fontSize:12,color:DS.textMuted,textAlign:"center",padding:"14px 0"}}>Chargement…</div>}
+              {offers!==null&&offers.length===0&&<div style={{fontSize:12,color:DS.textMuted,textAlign:"center",padding:"14px 0"}}>Aucune offre à sponsoriser pour l'instant.</div>}
+              {(offers||[]).map(function(o){return card(
+                <Fragment key={o.id}>
+                  <div style={{width:38,height:38,borderRadius:9,background:DS.goldSoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Tag size={15} color={DS.gold}/></div>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:700,color:DS.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.name}</div><div style={{fontSize:11,color:DS.textMuted,marginTop:2}}>{o.price!=null?o.price+" "+_cur:""}</div></div>
+                  <ChevronRight size={15} color={DS.textMuted}/>
+                </Fragment>,
+                function(){setTarget({id:o.id,label:o.name});setView("plan");}, o.id
+              );})}
+              <button onClick={function(){setView("hub");}} style={{width:"100%",padding:"11px",marginTop:8,background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
+            </div>
+          )}
+          {view==="plan"&&(
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:DS.text,marginBottom:4}}>{_parc?_parc.title:"Durée"}</div>
+              <div style={{fontSize:11,color:DS.textMuted,marginBottom:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{target?target.label:""}</div>
+              {durations.length===0&&<div style={{fontSize:12,color:DS.textMuted,textAlign:"center",padding:"14px 0"}}>Plans indisponibles.</div>}
+              {durations.map(function(d,i){var isS=dur&&dur.days===d.days;return(
+                <button key={i} onClick={function(){setDur({days:d.days,price:d.price});}} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"13px 16px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isS?DS.gold+"88":DS.border),background:isS?DS.gold+"14":DS.card,cursor:"pointer"}}>
+                  <span style={{fontSize:14,fontWeight:800,color:isS?DS.gold:DS.text}}>{_durLabel(d.days)}</span>
+                  <span style={{fontSize:15,fontWeight:900,color:DS.gold}}>{d.price} {_cur}</span>
+                </button>
+              );})}
+              <div style={{display:"flex",gap:8,marginTop:8}}>
+                <button onClick={function(){setView(kind==="sponsor_post"?"pickPost":(kind==="sponsor_reservation"?"pickOffer":"hub"));}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
+                <button onClick={function(){if(dur)setView("confirm");}} disabled={!dur} style={{flex:2,padding:"11px",background:dur?DS.gold:DS.textDim,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:dur?"pointer":"not-allowed",opacity:dur?1:.6}}>Continuer</button>
+              </div>
+            </div>
+          )}
+          {view==="confirm"&&(
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:DS.text,marginBottom:12}}>Confirmer la campagne</div>
+              <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:14}}>
+                <div style={{fontSize:11,color:DS.textMuted}}>Type</div>
+                <div style={{fontSize:14,fontWeight:800,color:DS.text,marginBottom:10}}>{_parc?_parc.title:""}</div>
+                <div style={{fontSize:11,color:DS.textMuted}}>Cible</div>
+                <div style={{fontSize:13,color:DS.text,marginBottom:10,wordBreak:"break-word"}}>{target?target.label:""}</div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div><div style={{fontSize:11,color:DS.textMuted}}>Durée</div><div style={{fontSize:14,fontWeight:800,color:DS.text}}>{dur?_durLabel(dur.days):""}</div></div>
+                  <div style={{textAlign:"right"}}><div style={{fontSize:11,color:DS.textMuted}}>Prix</div><div style={{fontSize:18,fontWeight:900,color:DS.gold}}>{dur?dur.price:""} {_cur}</div></div>
+                </div>
+              </div>
+              <div style={{fontSize:12,color:DS.textMuted,lineHeight:1.6,marginBottom:14}}>Le paiement sera demandé à l'étape suivante. Confirmez-vous cette campagne ?</div>
+              {err&&<div style={{background:DS.error+"12",border:"1px solid "+DS.error+"44",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:DS.error}}>{err}</div>}
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={function(){setView("plan");setErr(null);}} disabled={sending} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:sending?"not-allowed":"pointer",opacity:sending?.6:1}}>Retour</button>
+                <button onClick={confirmCreate} disabled={sending} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:sending?"not-allowed":"pointer",opacity:sending?.7:1}}>{sending?"Création…":"Confirmer la campagne"}</button>
+              </div>
+            </div>
+          )}
+          {view==="done"&&(
+            <div style={{textAlign:"center",paddingTop:8,paddingBottom:10}}>
+              <div style={{width:64,height:64,borderRadius:"50%",background:DS.goldSoft,border:"2px solid "+DS.gold,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><CheckCircle size={30} color={DS.gold}/></div>
+              <div style={{fontSize:16,fontWeight:900,color:DS.gold,marginBottom:8}}>Campagne enregistrée</div>
+              <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Votre campagne est créée et en attente de paiement. L'activation et la mise en avant se feront après le paiement.</div>
+              <button onClick={onClose} style={{width:"100%",padding:"12px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer"}}>Fermer</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function PrivacyModal(props){
@@ -4481,6 +4653,7 @@ function ProProf(props){
   var _allEstabsFav=DataLayer.getHotels().concat(DataLayer.getRestaurants());
   var favEstabs=favEstabIds.map(function(id){return _allEstabsFav.find(function(x){return x.id===id;});}).filter(Boolean);
   var s1=useState("about");var tab=s1[0];var setTab=s1[1];
+  var sSpon=useState(false);var showSponsor=sSpon[0];var setShowSponsor=sSpon[1];
   var s2=useState(false);var showVerif=s2[0];var setShowVerif=s2[1];
   var _vfKey=_lk("hp_verif_status_"+(proType||"hotel"));
   var s3=useState(function(){try{return localStorage.getItem(_vfKey)||null;}catch(e){return null;}});var verifStatus=s3[0];var _setVerifStatusRaw=s3[1];
@@ -4681,6 +4854,8 @@ function ProProf(props){
             <button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 12px",background:DS.gold,border:"none",borderRadius:8,color:"#000",fontSize:11,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>Renouveler</button>
           </div>
         )}
+        <button onClick={function(){setShowSponsor(true);}} style={{width:"100%",padding:"11px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"55",borderRadius:12,color:DS.gold,fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}><Tag size={15} color={DS.gold}/>Sponsoriser &amp; Booster</button>
+        {showSponsor&&<SponsorHub advertiserId={props.authUserId} estab={data} color={color} onGoToFeed={props.onGoToFeed} onClose={function(){setShowSponsor(false);}}/>}
         <div style={{display:"flex",gap:7,marginBottom:12}}>
           {[[fmtK(data.followers),"Abonnés"],[null,"Note"],[fmtK(data.reviewCount),"Avis"],[data.priceFrom?(data.priceFrom+" EUR"):"—","Depuis"]].map(function(_i,i){var v=_i[0];var l=_i[1];return <div key={i} style={{flex:1,background:DS.card,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:12,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>{l==="Note"?<><Stars r={Math.round(data.rating||0)} sz={10}/><span style={{fontSize:10,color:DS.gold,fontWeight:800,marginLeft:2}}>{data.rating||"—"}</span></>:v}</div><div style={{fontSize:9,color:DS.textMuted}}>{l}</div></div>;})}
         </div>
@@ -5607,7 +5782,7 @@ export default function App() {
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onOpenChat={function(){setPTab("chat");}} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
         {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={proD.name||(auth&&(auth.email||"").split("@")[0])} estabName={proD.name} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
-        {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab}/>}
+        {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} onGoToFeed={function(){setPTab("feed");}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId} selfName={proD.name||(auth&&auth.email?auth.email.split("@")[0]:"Pro")}/>}
