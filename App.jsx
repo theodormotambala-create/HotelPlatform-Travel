@@ -2183,7 +2183,7 @@ function ClientFeed(props){
     <div style={{background:DS.bg,paddingBottom:24,WebkitOverflowScrolling:"touch"}}>
       <Toast/>
       {loading&&<FeedSkeleton/>}
-      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} reporterId={selfUserId} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoyé · Merci pour votre contribution","success");}}/>}
+      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} targetType="post" targetOwnerId={reportTarget.ownerUid||null} targetOwnerName={reportTarget.author} reporterId={selfUserId} onClose={function(){setReportTarget(null);}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       {posts.length===0&&<Emp Icon={Home} title="Aucune publication" sub="Les publications des établissements apparaîtront ici"/>}
       {posts.slice(0,visibleCount).map(function(post,_pi){
@@ -3417,7 +3417,7 @@ function ProFeed(props){
   return(
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
-      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} reporterId={selfUserId} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoyé · Merci pour votre contribution","success");}}/>}
+      {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} targetType="post" targetOwnerId={reportTarget.ownerUid||null} targetOwnerName={reportTarget.author} reporterId={selfUserId} onClose={function(){setReportTarget(null);}}/>}
       {delSheet&&<ActionSheet label="cette publication" onClose={function(){setDelSheet(null);}} onDelete={function(){delPost(delSheet.id);}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",background:DS.surface,borderBottom:"1px solid "+DS.border,marginBottom:10}}>
@@ -3546,14 +3546,26 @@ function ProFeed(props){
   );
 }
 
-// == ReportM : procedure complete de signalement de contenu ==
+// == ReportM : procedure complete de signalement (contenu OU profil), niveau LinkedIn ==
+// Flux dans un SEUL panneau, navigation par Retour : cible -> motif -> details -> CONFIRMATION -> envoye.
+// Circuit serveur : table reports (reporter_id, target_type, target_id, target_owner_id, reason, details)
+// -> panel admin. Double confirmation obligatoire avant l'envoi reel.
 function ReportM(props){
-  var onClose=props.onClose;var onSubmit=props.onSubmit;var targetName=props.targetName||"ce contenu";
-  useBackClose(true,onClose);
+  var onClose=props.onClose;
+  var targetName=props.targetName||"ce contenu";
   var targetId=props.targetId||null;var reporterId=props.reporterId||null;
-  var s1=useState(1);var step=s1[0];var setStep=s1[1];
+  var targetType=props.targetType||"post";
+  var targetOwnerId=props.targetOwnerId||null;
+  var targetOwnerName=props.targetOwnerName||"cet établissement";
+  useBackClose(true,onClose);
+  // On ne propose "signaler le profil" que si le compte auteur est connu (sinon rien a router vers le panel).
+  var hasProfile=!!targetOwnerId;
+  var s0=useState(hasProfile?"target":"reason");var step=s0[0];var setStep=s0[1];
+  var sk=useState(hasProfile?null:"content");var kind=sk[0];var setKind=sk[1];
   var s2=useState(null);var reason=s2[0];var setReason=s2[1];
   var s3=useState("");var details=s3[0];var setDetails=s3[1];
+  var s4=useState(false);var sending=s4[0];var setSending=s4[1];
+  var s5=useState(null);var err=s5[0];var setErr=s5[1];
   var REASONS=[
     ["spam","Spam ou contenu trompeur"],
     ["inappropriate","Contenu inapproprié ou choquant"],
@@ -3562,26 +3574,76 @@ function ReportM(props){
     ["scam","Escroquerie ou arnaque"],
     ["other","Autre raison"],
   ];
-  function submit(){
-    var report={id:"rpt"+Date.now(),target:targetName,reason:reason,details:details,date:new Date().toISOString()};
-    try{var existing=JSON.parse(localStorage.getItem(_lk("hp_reports"))||"[]");localStorage.setItem(_lk("hp_reports"),JSON.stringify(existing.concat([report])));}catch(ex){}
-    try{if(DataLayer._client&&reporterId){DataLayer._client.from("reports").insert([{reporter_id:reporterId,target_id:targetId||targetName,target_type:"post",reason:reason+(details?(" : "+details):""),}]).then(function(){}).catch(function(){});}}catch(ex2){}
-    if(onSubmit)onSubmit(reason,details);setStep(3);
+  var isProfile=kind==="profile";
+  var whatName=isProfile?("le profil de "+targetOwnerName):targetName;
+  var reasonLabel=(function(){for(var i=0;i<REASONS.length;i++){if(REASONS[i][0]===reason)return REASONS[i][1];}return "";})();
+  function goBack(){
+    setErr(null);
+    if(step==="reason"){if(hasProfile){setStep("target");}else{onClose();}}
+    else if(step==="details"){setStep("reason");}
+    else if(step==="confirm"){setStep("details");}
+    else{onClose();}
   }
+  function submit(){
+    if(sending)return;
+    var effType=isProfile?"establishment":targetType;
+    var effId=isProfile?(targetOwnerId||targetId):targetId;
+    if(!effId){setErr("Cible introuvable, réessaie.");return;}
+    setSending(true);setErr(null);
+    var _det=sanitizeText(details,600)||null;
+    var row={reporter_id:reporterId,target_type:effType,target_id:String(effId),target_owner_id:targetOwnerId||null,reason:reason,details:_det};
+    // Echo local secondaire (jamais la source de verite : le panel lit la base).
+    try{var ex=JSON.parse(localStorage.getItem(_lk("hp_reports"))||"[]");localStorage.setItem(_lk("hp_reports"),JSON.stringify(ex.concat([{id:"rpt"+Date.now(),target:whatName,type:effType,reason:reason,details:_det,date:new Date().toISOString()}])));}catch(e){}
+    if(DataLayer._client&&reporterId){
+      DataLayer._client.from("reports").insert([row]).then(function(r){
+        setSending(false);
+        if(r&&r.error){
+          // 23505 = deja signale (index unique) : on considere l'action aboutie, comme LinkedIn.
+          if(r.error.code==="23505"){setStep("done");return;}
+          setErr("Envoi impossible pour le moment. Réessaie.");return;
+        }
+        setStep("done");
+      }).catch(function(){setSending(false);setErr("Envoi impossible pour le moment. Réessaie.");});
+    }else{setSending(false);setStep("done");}
+  }
+  var titleTxt=step==="done"?"Signalement envoyé":"Signaler";
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-slide-up 0.3s ease"}}>
-        <div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div>
-            <div style={{fontSize:15,fontWeight:800,color:DS.text}}>Signaler {targetName}</div>
+        <div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}>
+          {step!=="done"&&<button onClick={goBack} aria-label="Retour" style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><ArrowLeft size={16} color={DS.textMuted}/></button>}
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:15,fontWeight:800,color:DS.text}}>{titleTxt}</div>
             <div style={{fontSize:11,color:DS.textMuted,marginTop:2}}>Votre signalement reste confidentiel</div>
           </div>
-          <button onClick={onClose} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:44,height:44,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={14} color={DS.textMuted}/></button>
+          <button onClick={onClose} aria-label="Fermer" style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><X size={14} color={DS.textMuted}/></button>
         </div>
         <div style={{padding:20}}>
-          {step===1&&(
+          {step==="target"&&(
             <div>
-              <div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:12}}>Pourquoi signalez-vous ce contenu ?</div>
+              <div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:4}}>Que souhaitez-vous signaler ?</div>
+              <div style={{fontSize:11,color:DS.textMuted,marginBottom:14}}>Choisissez la cible du signalement.</div>
+              {[["content","Signaler ce contenu",whatName==="ce contenu"?"cette publication":targetName],["profile","Signaler ce profil","le profil de "+targetOwnerName]].map(function(_i){
+                var kv=_i[0];var kl=_i[1];var ksub=_i[2];var isSel=kind===kv;
+                return(
+                  <button key={kv} onClick={function(){setKind(kv);}} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"14px 14px",marginBottom:10,borderRadius:12,border:"1.5px solid "+(isSel?DS.error+"66":DS.border),background:isSel?DS.error+"0D":DS.card,cursor:"pointer",textAlign:"left"}}>
+                    <div style={{width:20,height:20,borderRadius:"50%",border:"2px solid "+(isSel?DS.error:DS.border),background:isSel?DS.error:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {isSel&&<div style={{width:8,height:8,borderRadius:"50%",background:"#fff"}}/>}
+                    </div>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:700,color:isSel?DS.error:DS.text}}>{kl}</div>
+                      <div style={{fontSize:11,color:DS.textMuted,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ksub}</div>
+                    </div>
+                  </button>
+                );
+              })}
+              <button onClick={function(){if(kind)setStep("reason");}} disabled={!kind} style={{width:"100%",padding:"12px",marginTop:4,background:kind?DS.error:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:kind?"pointer":"not-allowed",opacity:kind?1:.6}}>Continuer</button>
+            </div>
+          )}
+          {step==="reason"&&(
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:4}}>Pourquoi signalez-vous {whatName} ?</div>
+              <div style={{fontSize:11,color:DS.textMuted,marginBottom:12}}>Sélectionnez le motif le plus adapté.</div>
               {REASONS.map(function(_i){
                 var rv=_i[0];var rl=_i[1];var isSel=reason===rv;
                 return(
@@ -3593,10 +3655,10 @@ function ReportM(props){
                   </button>
                 );
               })}
-              <button onClick={function(){if(reason)setStep(2);}} disabled={!reason} style={{width:"100%",padding:"12px",marginTop:8,background:reason?DS.error:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:reason?"pointer":"not-allowed",opacity:reason?1:.6}}>Continuer</button>
+              <button onClick={function(){if(reason)setStep("details");}} disabled={!reason} style={{width:"100%",padding:"12px",marginTop:8,background:reason?DS.error:DS.textDim,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:reason?"pointer":"not-allowed",opacity:reason?1:.6}}>Continuer</button>
             </div>
           )}
-          {step===2&&(
+          {step==="details"&&(
             <div>
               <div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:6}}>Détails supplémentaires (facultatif)</div>
               <div style={{fontSize:11,color:DS.textMuted,marginBottom:12}}>Aidez-nous à mieux comprendre le problème.</div>
@@ -3604,17 +3666,33 @@ function ReportM(props){
               <div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"10px 14px",marginBottom:18,fontSize:11,color:DS.warning,lineHeight:1.5}}>
                 Les faux signalements répétés peuvent entrainer des restrictions sur votre compte.
               </div>
+              <button onClick={function(){setStep("confirm");}} style={{width:"100%",padding:"12px",background:DS.error,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Continuer</button>
+            </div>
+          )}
+          {step==="confirm"&&(
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:DS.text,marginBottom:10}}>Confirmer le signalement</div>
+              <div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"14px 16px",marginBottom:14}}>
+                <div style={{fontSize:11,color:DS.textMuted}}>Cible</div>
+                <div style={{fontSize:14,fontWeight:700,color:DS.text,marginBottom:10,wordBreak:"break-word"}}>{whatName}</div>
+                <div style={{fontSize:11,color:DS.textMuted}}>Motif</div>
+                <div style={{fontSize:14,fontWeight:700,color:DS.error,marginBottom:details?10:0}}>{reasonLabel}</div>
+                {details&&<div style={{fontSize:11,color:DS.textMuted}}>Détails</div>}
+                {details&&<div style={{fontSize:13,color:DS.text,lineHeight:1.5,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{details}</div>}
+              </div>
+              <div style={{fontSize:12,color:DS.textMuted,lineHeight:1.6,marginBottom:14}}>Votre signalement sera transmis à notre équipe de modération. Confirmez-vous ?</div>
+              {err&&<div style={{background:DS.error+"12",border:"1px solid "+DS.error+"44",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:DS.error}}>{err}</div>}
               <div style={{display:"flex",gap:8}}>
-                <button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
-                <button onClick={submit} style={{flex:2,padding:"11px",background:DS.error,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Envoyer le signalement</button>
+                <button onClick={function(){setStep("details");setErr(null);}} disabled={sending} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:sending?"not-allowed":"pointer",opacity:sending?.6:1}}>Retour</button>
+                <button onClick={submit} disabled={sending} style={{flex:2,padding:"11px",background:DS.error,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:sending?"not-allowed":"pointer",opacity:sending?.7:1}}>{sending?"Envoi…":"Confirmer le signalement"}</button>
               </div>
             </div>
           )}
-          {step===3&&(
+          {step==="done"&&(
             <div style={{textAlign:"center",paddingTop:8,paddingBottom:10}}>
               <div style={{width:64,height:64,borderRadius:"50%",background:DS.successSoft,border:"2px solid "+DS.success,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><CheckCircle size={30} color={DS.success}/></div>
               <div style={{fontSize:16,fontWeight:800,color:DS.success,marginBottom:8}}>Signalement envoyé</div>
-              <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Notre équipe de modération va examiner ce contenu sous 24-48h. Merci de contribuer à la sécurité de la communauté.</div>
+              <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Notre équipe de modération va examiner ce signalement sous 24-48h. Merci de contribuer à la sécurité de la communauté.</div>
               <button onClick={onClose} style={{width:"100%",padding:"11px",background:DS.primary,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Fermer</button>
             </div>
           )}
