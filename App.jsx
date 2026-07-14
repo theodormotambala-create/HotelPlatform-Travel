@@ -3208,6 +3208,7 @@ function ProFeed(props){
     toast("Commentaire supprimé","neutral");
   }
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
+  var sDelP=useState(null);var delSheet=sDelP[0];var setDelSheet=sDelP[1];
   var sf=useState(_initFavsPro);var favPosts=sf[0];var setFavPosts=sf[1];
   var _sbFavsLoadedPro=useRef(false);
   useEffect(function(){
@@ -3232,6 +3233,23 @@ function ProFeed(props){
     toast(wasFav?"Retiré des favoris":"Ajouté aux favoris","success");
   }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
+  // Suppression de sa propre publication : verrou serveur (RPC delete_own_post, owner_id=auth.uid()),
+  // retrait optimiste local, restauration si le serveur refuse. Double confirmation via ActionSheet.
+  function delPost(id){
+    var _removed=posts.find(function(p){return p.id===id;})||null;
+    setPosts(function(ps){return ps.filter(function(p){return p.id!==id;});});
+    try{if(DataLayer._cache&&DataLayer._cache.feed)DataLayer._cache.feed=DataLayer._cache.feed.filter(function(p){return p.id!==id;});}catch(e){}
+    try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");localStorage.setItem(_lk("hp_pro_posts"),JSON.stringify(_pp.filter(function(p){return p.id!==id;})));}catch(e){}
+    try{
+      if(DataLayer._client&&selfUserId&&String(id).indexOf("local_")!==0){
+        DataLayer._client.rpc("delete_own_post",{p_id:String(id)}).then(function(r){
+          if(r&&r.error){if(_removed)setPosts(function(ps){return ps.some(function(p){return p.id===id;})?ps:[_removed].concat(ps);});toast("Suppression impossible pour le moment","error");}
+        }).catch(function(){});
+      }
+    }catch(e){}
+    setMenuOpen(null);setDelSheet(null);
+    toast("Publication supprimée","neutral");
+  }
   var followingPosts=props.followingIds||[];
   // Suivre depuis le feed = suivre l'ETABLISSEMENT (jamais l'identifiant du post)
   function toggleFollowPost(post){var _pe=_estabForPost(post);if(props.onToggleFollow&&_pe)props.onToggleFollow(_pe.id);}
@@ -3400,6 +3418,7 @@ function ProFeed(props){
     <div style={{background:DS.bg,paddingBottom:24}}>
       <Toast/>
       {reportTarget&&<ReportM targetName={"la publication de "+reportTarget.author} targetId={reportTarget.id} reporterId={selfUserId} onClose={function(){setReportTarget(null);}} onSubmit={function(){setReportTarget(null);toast("Signalement envoyé · Merci pour votre contribution","success");}}/>}
+      {delSheet&&<ActionSheet label="cette publication" onClose={function(){setDelSheet(null);}} onDelete={function(){delPost(delSheet.id);}}/>}
       {menuOpen&&<div onClick={function(){setMenuOpen(null);}} style={{position:"fixed",inset:0,zIndex:199}}/>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",background:DS.surface,borderBottom:"1px solid "+DS.border,marginBottom:10}}>
         {[[fmtK(data.followers),"Abonnés",color],[data.rating+" ★","Note",DS.gold],[fmtK(data.reviewCount),"Avis",DS.success]].map(function(_i,i){var v=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{padding:"14px 4px",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none"}}><div style={{fontSize:20,fontWeight:900,color:col}}>{v}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
@@ -3482,14 +3501,19 @@ function ProFeed(props){
               <div style={{position:"relative"}}>
                 <button onClick={function(ev){ev.stopPropagation();setMenuOpen(menuOpen===post.id?null:post.id);}} style={{background:"none",border:"none",cursor:"pointer",padding:"4px 6px",borderRadius:8,display:"flex",alignItems:"center"}}><MoreVertical size={18} color={DS.textMuted}/></button>
                 {menuOpen===post.id&&(
-                  <div style={{position:"absolute",top:"100%",right:0,background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"6px 0",minWidth:160,zIndex:200,boxShadow:"0 8px 24px rgba(0,0,0,.4)"}}>
-                    <button onClick={function(){toggleFav(post.id);}} style={{width:"100%",padding:"10px 16px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:13,color:DS.text,display:"flex",alignItems:"center",gap:8}}>
-                      <Bookmark size={14} color={favPosts.indexOf(post.id)>=0?DS.gold:DS.textMuted} fill={favPosts.indexOf(post.id)>=0?DS.gold:"none"}/>
+                  <div style={{position:"absolute",top:"100%",right:0,marginTop:6,background:DS.card,border:"1px solid "+DS.border,borderRadius:14,padding:"8px 0",minWidth:238,zIndex:200,boxShadow:"0 10px 32px rgba(0,0,0,.45)"}}>
+                    <button onClick={function(){toggleFav(post.id);}} style={{width:"100%",padding:"14px 18px",minHeight:48,background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:14,color:DS.text,display:"flex",alignItems:"center",gap:12}}>
+                      <Bookmark size={16} color={favPosts.indexOf(post.id)>=0?DS.gold:DS.textMuted} fill={favPosts.indexOf(post.id)>=0?DS.gold:"none"}/>
                       {favPosts.indexOf(post.id)>=0?"Retirer des favoris":"Ajouter aux favoris"}
                     </button>
-                    <button onClick={function(){openReport(post);}} style={{width:"100%",padding:"10px 16px",background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:13,color:DS.error,display:"flex",alignItems:"center",gap:8}}>
-                      <Flag size={14} color={DS.error}/>Signaler ce contenu
-                    </button>
+                    <div style={{height:1,background:DS.border+"70",margin:"6px 0"}}/>
+                    {post.ownerUid&&selfUserId&&post.ownerUid===selfUserId
+                      ?<button onClick={function(){setMenuOpen(null);setDelSheet(post);}} style={{width:"100%",padding:"14px 18px",minHeight:48,background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:14,fontWeight:600,color:DS.error,display:"flex",alignItems:"center",gap:12}}>
+                          <Trash2 size={16} color={DS.error}/>Supprimer la publication
+                        </button>
+                      :<button onClick={function(){openReport(post);}} style={{width:"100%",padding:"14px 18px",minHeight:48,background:"none",border:"none",cursor:"pointer",textAlign:"left",fontSize:14,color:DS.error,display:"flex",alignItems:"center",gap:12}}>
+                          <Flag size={16} color={DS.error}/>Signaler ce contenu
+                        </button>}
                   </div>
                 )}
               </div>
