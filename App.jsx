@@ -2273,7 +2273,7 @@ function ClientProf(props){
   var _sDraftClientName=useState(_rawName);var _draftClientName=_sDraftClientName[0];var _setDraftClientName=_sDraftClientName[1];
   var _sClientSaving=useState(false);var _clientSaving=_sClientSaving[0];var _setClientSaving=_sClientSaving[1];
   function _saveClientProfile(){
-    var nm=_draftClientName.trim();if(!nm)return;
+    var nm=sanitizeText(_draftClientName,50);if(!nm)return;
     _setClientSaving(true);
     var _done=function(){
       _setClientDisplayName(nm);
@@ -2675,7 +2675,7 @@ function EstabM(props){
                 </div>
               )}
             </div>
-          )}{tab==="reviews"&&<div>{(e.isPremium||!e.userId)?<div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:reviewText.trim(),date:new Date().toLocaleDateString("fr-FR"),author:selfName};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{DataLayer.saveReview(e&&e.id,rv,selfUserId||null);}catch(ex2){}toast("Avis publié","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>:<div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 16px",marginBottom:14,fontSize:12,color:DS.textMuted,lineHeight:1.5,display:"flex",alignItems:"center",gap:8}}><Lock size={13} color={DS.textDim}/>Cet établissement ne collecte pas encore d'avis clients.</div>}{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}><Av sz={26} letter={((rv.author||"C")[0]||"C").toUpperCase()}/><span style={{fontSize:12,fontWeight:800,color:DS.text,flex:1}}>{rv.author||"Client"}</span></div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier à partager votre expérience"/>}</div>}</div></div>);
+          )}{tab==="reviews"&&<div>{(e.isPremium||!e.userId)?<div style={{marginBottom:14}}><div style={{marginBottom:6,fontSize:12,fontWeight:700,color:DS.text}}>Laisser un avis</div><div style={{display:"flex",gap:6,marginBottom:8}}>{[1,2,3,4,5].map(function(i){return <button key={i} onClick={function(){setRating(i);}} style={{background:"none",border:"none",cursor:"pointer",padding:2}}><Star size={24} fill={i<=rating?"#F59E0B":"none"} color={i<=rating?"#F59E0B":DS.border} strokeWidth={1.5}/></button>;})} </div><textarea value={reviewText} onChange={function(ev){setReviewText(ev.target.value);}} placeholder="Partagez votre experience..." rows={3} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"10px 12px",fontSize:12,color:DS.text,outline:"none",resize:"none",lineHeight:1.5,boxSizing:"border-box",marginBottom:8}}/><div style={{display:"flex",justifyContent:"flex-end"}}><button disabled={rating===0} onClick={function(){if(rating>0){var rv={id:"rv"+Date.now(),rating:rating,text:sanitizeText(reviewText,1000),date:new Date().toLocaleDateString("fr-FR"),author:selfName};var next=[rv].concat(localReviews);setLocalReviews(next);try{localStorage.setItem(_rvKey,JSON.stringify(next));}catch(ex){}try{DataLayer.saveReview(e&&e.id,rv,selfUserId||null);}catch(ex2){}toast("Avis publié","success");setRating(0);setReviewText("");}}} style={{padding:"8px 20px",background:rating>0?color:DS.textDim,border:"none",borderRadius:20,color:"#fff",fontSize:12,fontWeight:700,cursor:rating>0?"pointer":"not-allowed",opacity:rating>0?1:.6}}>Publier</button></div></div>:<div style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 16px",marginBottom:14,fontSize:12,color:DS.textMuted,lineHeight:1.5,display:"flex",alignItems:"center",gap:8}}><Lock size={13} color={DS.textDim}/>Cet établissement ne collecte pas encore d'avis clients.</div>}{localReviews.length>0?localReviews.map(function(rv){return(<div key={rv.id} style={{background:DS.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}><Av sz={26} letter={((rv.author||"C")[0]||"C").toUpperCase()}/><span style={{fontSize:12,fontWeight:800,color:DS.text,flex:1}}>{rv.author||"Client"}</span></div><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><Stars r={rv.rating} sz={12}/><span style={{fontSize:10,color:DS.textDim}}>{rv.date}</span></div>{rv.text&&<div style={{fontSize:12,color:DS.textMuted,lineHeight:1.5,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{rv.text}</div>}</div>);}):localReviews.length===0&&<Emp Icon={Star} title="Aucun avis" sub="Soyez le premier à partager votre expérience"/>}</div>}</div></div>);
 }
 
 // Formulaire de paiement Stripe — monté dans un Elements provider
@@ -3583,14 +3583,15 @@ function ServiceConfigModal(props){
   var CAT_DISH=["Entree","Plat","Dessert","Boisson","Menu"];
   var cats=isRoom?CAT_ROOM:CAT_DISH;
   function save(){
-    if(!name.trim()||!price)return;
+    var _nm=sanitizeText(name,100);
+    if(!_nm||!price)return;
     var item=Object.assign({},initial||{},{
       id:initial?initial.id:"s"+Date.now(),
-      name:name.trim(),price:parseFloat(price)||0,
-      description:desc,category:cat,available:avail
+      name:_nm,price:parseFloat(price)||0,
+      description:sanitizeText(desc,500),category:cat,available:avail
     });
     if(isRoom){item.capacity=Number(capacity);item.stock=Number(stock);}
-    if(opts.trim())item.options=opts.trim();
+    var _op=sanitizeText(opts,200);if(_op)item.options=_op;
     onSave(item);onClose();
   }
   return(
@@ -4392,7 +4393,7 @@ function ProProf(props){
     if(DataLayer._client&&_uid){DataLayer._client.from("profiles").update({display_name:nm,location:lc}).eq("user_id",_uid).then(_done).catch(_done);}
     else{_done();}
   }
-  function saveAbout(){if(!draftDesc.trim())return;var d=draftDesc.trim();setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}try{if(DataLayer._client&&props.authUserId){DataLayer._client.from("profiles").update({description:d,updated_at:new Date().toISOString()}).eq("user_id",props.authUserId).then(function(){}).catch(function(){});}}catch(e){}setEditingAbout(false);toastP("À propos mis à jour","success");}
+  function saveAbout(){var d=sanitizeText(draftDesc,2000);if(!d)return;setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}try{if(DataLayer._client&&props.authUserId){DataLayer._client.from("profiles").update({description:d,updated_at:new Date().toISOString()}).eq("user_id",props.authUserId).then(function(){}).catch(function(){});}}catch(e){}setEditingAbout(false);toastP("À propos mis à jour","success");}
   var premiumActive=isPremium||data.isPremium;
   // Periode de grace : badge reste visible 7 jours apres expiration de l abonnement
   var _graceActive=false;
@@ -4608,13 +4609,14 @@ function ProOnboarding(props){
     if(!city.trim()){setErr("Veuillez saisir la ville.");return;}
     if(!country){setErr("Veuillez sélectionner le pays.");return;}
     setLoading(true);setErr("");
-    var loc=city.trim()+", "+country;
+    var _en=sanitizeText(name,50);var _ci=sanitizeText(city,60);
+    var loc=_ci+", "+country;
     var client=DataLayer._client;
     if(client){
-      var r=await client.from("profiles").upsert([{user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:loc}],{onConflict:"user_id"});
+      var r=await client.from("profiles").upsert([{user_id:auth.userId,display_name:_en,account_type:auth.type,svc_mode:svcMode,location:loc}],{onConflict:"user_id"});
       if(r.error){setErr("Erreur de sauvegarde (code: "+r.error.code+"). Vérifiez votre connexion.");setLoading(false);return;}
     }
-    onComplete({user_id:auth.userId,display_name:name.trim(),account_type:auth.type,svc_mode:svcMode,location:city.trim()+", "+country,description:"",verified:false});
+    onComplete({user_id:auth.userId,display_name:_en,account_type:auth.type,svc_mode:svcMode,location:loc,description:"",verified:false});
   }
   return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:DS.bg,padding:"24px 20px",fontFamily:"'DM Sans','Inter',sans-serif",overflowY:"auto"}} onClick={function(){if(showCountryDrop)setShowCountryDrop(false);}}>
     <div style={{width:"100%",maxWidth:400}}>
