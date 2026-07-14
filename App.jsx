@@ -3588,13 +3588,6 @@ function ReportM(props){
   var isProfile=kind==="profile";
   var whatName=isProfile?("le profil de "+targetOwnerName):targetName;
   var reasonLabel=(function(){for(var i=0;i<REASONS.length;i++){if(REASONS[i][0]===reason)return REASONS[i][1];}return "";})();
-  function goBack(){
-    setErr(null);
-    if(step==="reason"){if(hasProfile){setStep("target");}else{onClose();}}
-    else if(step==="details"){setStep("reason");}
-    else if(step==="confirm"){setStep("details");}
-    else{onClose();}
-  }
   function submit(){
     if(sending)return;
     var effType=isProfile?"establishment":targetType;
@@ -3622,12 +3615,11 @@ function ReportM(props){
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1400,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
       <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,maxHeight:"88vh",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-slide-up 0.3s ease"}}>
         <div style={{padding:"16px 20px",borderBottom:"1px solid "+DS.border,display:"flex",alignItems:"center",gap:10}}>
-          {step!=="done"&&<button onClick={goBack} aria-label="Retour" style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><ArrowLeft size={16} color={DS.textMuted}/></button>}
+          {step!=="done"&&<button onClick={onClose} aria-label="Fermer" style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><ArrowLeft size={16} color={DS.textMuted}/></button>}
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:15,fontWeight:800,color:DS.text}}>{titleTxt}</div>
             <div style={{fontSize:11,color:DS.textMuted,marginTop:2}}>Votre signalement reste confidentiel</div>
           </div>
-          <button onClick={onClose} aria-label="Fermer" style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><X size={14} color={DS.textMuted}/></button>
         </div>
         <div style={{padding:20}}>
           {step==="target"&&(
