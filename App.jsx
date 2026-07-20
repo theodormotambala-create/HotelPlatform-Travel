@@ -1370,9 +1370,9 @@ function PremiumModal(props){
   function _price(id,def){var v=_PP[id];return v!=null&&!isNaN(Number(v))?Number(v):def;}
   function _disc(m,def){var v=_PD[m];return v!=null&&!isNaN(Number(v))?Number(v):def;}
   var PLANS=isClient
-    ?[{id:"std",name:"Premium Essentiel",price:_price("std",9.99),color:DS.client,features:["Sans publicité","Confidentialité avancée","Verrouillage de profil","Support prioritaire"]},
+    ?[{id:"std",name:"Premium Essentiel",price:_price("std",9.99),color:DS.client,features:["Confidentialité avancée","Verrouillage de profil","Support prioritaire"]},
       {id:"plus",name:"Premium Plus",price:_price("plus",19.99),color:DS.gold,features:["Tout Essentiel","Badge eligible verification","Mode pseudonyme","Statistiques profil"]}]
-    :[{id:"std",name:"Premium Standard",price:_price("std",9.99),color:DS.primary,features:["Publications video","Sans publicité","Éligible badge vérification","Éligible aux avis clients"]},
+    :[{id:"std",name:"Premium Standard",price:_price("std",9.99),color:DS.primary,features:["Publications video","Éligible badge vérification","Éligible aux avis clients"]},
       {id:"plus",name:"Premium Plus",price:_price("plus",19.99),color:DS.gold,features:["Tout Standard","Visibilité prioritaire","Bonus de visibilité continu","Statistiques avancées"]},
       {id:"biz",name:"Premium Avancé",price:_price("biz",49.99),color:DS.hotel,features:["Tout Plus","Avantages exclusifs","Manager dédié","API access"]}];
   var sel=PLANS.find(function(p){return p.id===plan;})||PLANS[0];
@@ -2401,11 +2401,11 @@ function ClientFeed(props){
   function _openPostProfile(post){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}
   var postRefs=useRef({});
   // Campagnes sponsorisees REELLES (serveur) : cartes intercalees, vues/clics comptes.
-  // Masquees pour les spectateurs Premium (promesse "Sans publicité" conservee).
+  // Visibles par TOUS (l'abonnement Premium ne supprime pas les publicites sponsorisees).
   var sAdsF=useState([]);var adsF=sAdsF[0];var setAdsF=sAdsF[1];
   var _adImpSent=useRef({});
   useEffect(function(){
-    if(!DataLayer._client||!selfUserId||isPremium)return;
+    if(!DataLayer._client||!selfUserId)return;
     DataLayer._client.rpc("get_active_ads").then(function(r){if(r&&r.data&&r.data.length)setAdsF(r.data);}).catch(function(){});
   },[selfUserId]);
   function _adImpression(id){if(_adImpSent.current[id])return;_adImpSent.current[id]=1;try{if(DataLayer._client)DataLayer._client.rpc("ad_track",{p_id:id,p_event:"impression"}).then(function(){}).catch(function(){});}catch(e){}}
@@ -3574,7 +3574,7 @@ function ProFeed(props){
   var sAdsP=useState([]);var adsP=sAdsP[0];var setAdsP=sAdsP[1];
   var _adImpSentP=useRef({});
   useEffect(function(){
-    if(!DataLayer._client||!selfUserId||isPremium)return;
+    if(!DataLayer._client||!selfUserId)return;
     DataLayer._client.rpc("get_active_ads").then(function(r){if(r&&r.data&&r.data.length)setAdsP(r.data);}).catch(function(){});
   },[selfUserId]);
   function _adImpressionP(id){if(_adImpSentP.current[id])return;_adImpSentP.current[id]=1;try{if(DataLayer._client)DataLayer._client.rpc("ad_track",{p_id:id,p_event:"impression"}).then(function(){}).catch(function(){});}catch(e){}}
@@ -3754,7 +3754,7 @@ function ProFeed(props){
               <div style={{fontSize:17,fontWeight:800,color:DS.text,marginBottom:8}}>Video reservee aux comptes Premium</div>
               <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Les comptes Free peuvent publier du texte et des images. Passez Premium pour publier des videos illimitees.</div>
               <div style={{background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:12,padding:"12px 16px",marginBottom:20,textAlign:"left"}}>
-                {["Publications video illimitees","Sans publicité","Éligible badge vérification","Visibilité prioritaire"].map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<3?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}
+                {["Publications video illimitees","Éligible badge vérification","Visibilité prioritaire"].map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<2?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}
               </div>
               <button onClick={function(){setShowVideoGate(false);if(onPremium)onPremium();}} style={{width:"100%",padding:"12px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginBottom:10}}>Passer Premium</button>
               <button onClick={function(){setShowVideoGate(false);}} style={{width:"100%",padding:"10px",background:"transparent",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Annuler</button>
