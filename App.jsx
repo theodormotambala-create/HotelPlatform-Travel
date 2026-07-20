@@ -1368,6 +1368,8 @@ function SponsorHub(props){
   var estab=props.estab||{};
   var color=props.color||DS.gold;
   var onGoToFeed=props.onGoToFeed||null;
+  var isPremium=props.isPremium||false;
+  var onPremium=props.onPremium||null;
   useBackClose(true,onClose);
   var PARCOURS=[
     {kind:"sponsor_profile",     icon:Star,          title:"Sponsoriser mon profil",     sub:"Mettez votre établissement en avant"},
@@ -1431,7 +1433,15 @@ function SponsorHub(props){
           <button onClick={onClose} aria-label="Fermer" style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:"50%",width:40,height:40,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><X size={14} color={DS.textMuted}/></button>
         </div>
         <div style={{padding:20}}>
-          {view==="hub"&&(
+          {view==="hub"&&!isPremium&&(
+            <div style={{textAlign:"center",padding:"10px 0"}}>
+              <div style={{width:64,height:64,borderRadius:"50%",background:DS.goldSoft,border:"2px solid "+DS.gold,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><Lock size={26} color={DS.gold}/></div>
+              <div style={{fontSize:16,fontWeight:900,color:DS.gold,marginBottom:8}}>Réservé aux établissements Premium</div>
+              <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Abonnez-vous à Premium pour devenir éligible aux offres et achats de Sponsor &amp; Boost.</div>
+              <button onClick={function(){onClose();if(onPremium)onPremium();}} style={{width:"100%",padding:"12px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer"}}>Passer Premium</button>
+            </div>
+          )}
+          {view==="hub"&&isPremium&&(
             <div>
               <div style={{fontSize:12,color:DS.textMuted,marginBottom:14}}>Choisissez ce que vous voulez mettre en avant.</div>
               {PARCOURS.map(function(pc){var Ic=pc.icon;return card(
@@ -4855,7 +4865,7 @@ function ProProf(props){
           </div>
         )}
         <button onClick={function(){setShowSponsor(true);}} style={{width:"100%",padding:"11px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"55",borderRadius:12,color:DS.gold,fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}><Tag size={15} color={DS.gold}/>Sponsoriser &amp; Booster</button>
-        {showSponsor&&<SponsorHub advertiserId={props.authUserId} estab={data} color={color} onGoToFeed={props.onGoToFeed} onClose={function(){setShowSponsor(false);}}/>}
+        {showSponsor&&<SponsorHub advertiserId={props.authUserId} estab={data} color={color} isPremium={isPremium} onPremium={onPremium} onGoToFeed={props.onGoToFeed} onClose={function(){setShowSponsor(false);}}/>}
         <div style={{display:"flex",gap:7,marginBottom:12}}>
           {[[fmtK(data.followers),"Abonnés"],[null,"Note"],[fmtK(data.reviewCount),"Avis"],[data.priceFrom?(data.priceFrom+" EUR"):"—","Depuis"]].map(function(_i,i){var v=_i[0];var l=_i[1];return <div key={i} style={{flex:1,background:DS.card,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:12,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>{l==="Note"?<><Stars r={Math.round(data.rating||0)} sz={10}/><span style={{fontSize:10,color:DS.gold,fontWeight:800,marginLeft:2}}>{data.rating||"—"}</span></>:v}</div><div style={{fontSize:9,color:DS.textMuted}}>{l}</div></div>;})}
         </div>
