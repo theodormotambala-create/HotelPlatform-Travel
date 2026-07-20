@@ -55,8 +55,37 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { amount, currency, resaId, estabName, type, plan, months, userId } = req.body;
+    const { amount, currency, resaId, estabName, type, plan, months, userId, campaignId } = req.body;
     const isPremiumPayment = type === "premium";
+    const isAdPayment = type === "ad_campaign";
+
+    // ---------- CIRCUIT SPONSOR & BOOST (separe du Premium et des reservations) ----------
+    // Le montant est IMPOSE par le serveur depuis la campagne (prix fixe par la config admin
+    // au moment de la creation) — le client ne transmet que l'identifiant de SA campagne.
+    if (isAdPayment) {
+      const supaAds = serviceClient();
+      if (!supaAds) return res.status(500).json({ error: "Service non configuré" });
+      const c = await supaAds.from("ad_campaigns")
+        .select("id,advertiser_id,price,currency,status")
+        .eq("id", String(campaignId || "")).maybeSingle();
+      if (!c.data) return res.status(404).json({ error: "Campagne introuvable" });
+      if (!userId || c.data.advertiser_id !== String(userId)) return res.status(403).json({ error: "Non autorisé" });
+      if (c.data.status !== "pending_payment") return res.status(400).json({ error: "Campagne déjà traitée" });
+      const adAmt = Math.round(Number(c.data.price) * 100);
+      if (!adAmt || adAmt < 50) return res.status(400).json({ error: "Montant de campagne invalide" });
+      const adPi = await stripe.paymentIntents.create({
+        amount: adAmt,
+        currency: String(c.data.currency || "EUR").toLowerCase(),
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          platform: "HotelPlatform Travel",
+          type: "ad_campaign",
+          campaign_id: String(c.data.id),
+          user_id: String(c.data.advertiser_id),
+        },
+      });
+      return res.status(200).json({ clientSecret: adPi.client_secret, amount: adAmt });
+    }
 
     // Validation stricte du montant (centimes) : 0.50 EUR min, 99 999.99 EUR max
     const amt = Math.round(Number(amount));

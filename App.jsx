@@ -1396,6 +1396,7 @@ function SponsorHub(props){
   var onGoToFeed=props.onGoToFeed||null;
   var isPremium=props.isPremium||false;
   var onPremium=props.onPremium||null;
+  var onPayCampaign=props.onPayCampaign||null;
   useBackClose(true,onClose);
   var PARCOURS=[
     {kind:"sponsor_profile",     icon:Star,          title:"Sponsoriser mon profil",     sub:"Mettez votre établissement en avant"},
@@ -1446,9 +1447,13 @@ function SponsorHub(props){
     if(!DataLayer._client){setErr("Connexion requise.");return;}
     setSending(true);setErr(null);
     var row={advertiser_id:advertiserId,kind:kind,target_id:target?target.id:null,plan_type:kind,duration_days:dur.days};
-    DataLayer._client.from("ad_campaigns").insert([row]).then(function(r){
+    DataLayer._client.from("ad_campaigns").insert([row]).select("id").then(function(r){
       setSending(false);
       if(r&&r.error){setErr("Création impossible pour le moment. Réessaie.");return;}
+      var newId=r.data&&r.data[0]&&r.data[0].id;
+      // La campagne est en "pending_payment" : on redirige vers le PAIEMENT.
+      // Sans paiement, elle ne s'affiche jamais (activation uniquement par le webhook Stripe).
+      if(newId&&onPayCampaign){onClose();onPayCampaign(newId);return;}
       setView("done");
     }).catch(function(){setSending(false);setErr("Création impossible pour le moment. Réessaie.");});
   }
@@ -1582,7 +1587,7 @@ function SponsorHub(props){
               {err&&<div style={{background:DS.error+"12",border:"1px solid "+DS.error+"44",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:DS.error}}>{err}</div>}
               <div style={{display:"flex",gap:8}}>
                 <button onClick={function(){setView("plan");setErr(null);}} disabled={sending} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:sending?"not-allowed":"pointer",opacity:sending?.6:1}}>Retour</button>
-                <button onClick={confirmCreate} disabled={sending} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:sending?"not-allowed":"pointer",opacity:sending?.7:1}}>{sending?"Création…":"Confirmer la campagne"}</button>
+                <button onClick={confirmCreate} disabled={sending} style={{flex:2,padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:sending?"not-allowed":"pointer",opacity:sending?.7:1}}>{sending?"Création…":"Confirmer et payer"}</button>
               </div>
             </div>
           )}
@@ -4960,7 +4965,7 @@ function ProProf(props){
           </div>
         )}
         <button onClick={function(){setShowSponsor(true);}} style={{width:"100%",padding:"11px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"55",borderRadius:12,color:DS.gold,fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}><Tag size={15} color={DS.gold}/>Sponsoriser &amp; Booster</button>
-        {showSponsor&&<SponsorHub advertiserId={props.authUserId} estab={data} color={color} isPremium={isPremium} onPremium={onPremium} onGoToFeed={props.onGoToFeed} onClose={function(){setShowSponsor(false);}}/>}
+        {showSponsor&&<SponsorHub advertiserId={props.authUserId} estab={data} color={color} isPremium={isPremium} onPremium={onPremium} onGoToFeed={props.onGoToFeed} onPayCampaign={props.onPayCampaign} onClose={function(){setShowSponsor(false);}}/>}
         <div style={{display:"flex",gap:7,marginBottom:12}}>
           {[[fmtK(data.followers),"Abonnés"],[null,"Note"],[fmtK(data.reviewCount),"Avis"],[data.priceFrom?(data.priceFrom+" EUR"):"—","Depuis"]].map(function(_i,i){var v=_i[0];var l=_i[1];return <div key={i} style={{flex:1,background:DS.card,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:12,fontWeight:800,color:DS.text,display:"flex",alignItems:"center",justifyContent:"center",gap:2}}>{l==="Note"?<><Stars r={Math.round(data.rating||0)} sz={10}/><span style={{fontSize:10,color:DS.gold,fontWeight:800,marginLeft:2}}>{data.rating||"—"}</span></>:v}</div><div style={{fontSize:9,color:DS.textMuted}}>{l}</div></div>;})}
         </div>
@@ -5302,6 +5307,23 @@ export default function App() {
   function subscribePremium(plan,durationMonths){
     _startPremiumPayment(plan,durationMonths,false);
   }
+  // Paiement d'une campagne Sponsor/Boost — circuit SEPARE du Premium et des reservations.
+  // Le montant est impose par le serveur depuis la campagne (id) ; l'activation vient du webhook.
+  var sAdPay=useState(null);var adPay=sAdPay[0];var setAdPay=sAdPay[1];
+  function _startAdPayment(campaignId){
+    if(!_stripePromise){tk.show("Paiement indisponible : Stripe non configuré","error");return;}
+    var uid=_authForUserData&&_authForUserData.userId;
+    fetch("/api/create-payment-intent",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({type:"ad_campaign",campaignId:campaignId,userId:uid})
+    })
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.error){tk.show("Erreur paiement : "+data.error,"error");return;}
+      setAdPay({clientSecret:data.clientSecret,amount:(Number(data.amount)||0)/100});
+    })
+    .catch(function(){tk.show("Impossible de contacter le service de paiement","error");});
+  }
   function renewPremium(){
     if(!premiumData)return;
     _startPremiumPayment(premiumData.plan,premiumData.durationMonths,true);
@@ -5502,13 +5524,14 @@ export default function App() {
   var sCPwd=useState(false);var showChangePwd=sCPwd[0];var setShowChangePwd=sCPwd[1];
   var tk=useToast(); var Toast=tk.Toast; var toastApp=tk.show;
   // === Bouton retour systeme (Android/navigateur) : ferme l'ecran courant au lieu de quitter l'app ===
-  var anyOverlayOpen=(estab!==null)||(book!==null)||sett||notifsOpen||showPremium||showPrivacy||showChangeEmail||showChangePwd||(premiumPay!==null);
+  var anyOverlayOpen=(estab!==null)||(book!==null)||sett||notifsOpen||showPremium||showPrivacy||showChangeEmail||showChangePwd||(premiumPay!==null)||(adPay!==null);
   function closeTopOverlay(){
     // 1) Surfaces locales enregistrees (conversation, feuille, visionneuse, menus...)
     var _top=HPBack._stack[HPBack._stack.length-1];
     if(_top){_top();return;}
     // 2) Ordre de priorite : du plus "haut" (modale) au plus "bas" (ecran)
     if(premiumPay){setPremiumPay(null);return;}
+    if(adPay){setAdPay(null);return;}
     if(showChangeEmail){setShowChangeEmail(false);return;}
     if(showChangePwd){setShowChangePwd(false);return;}
     if(showPremium){setShowPremium(false);return;}
@@ -5887,13 +5910,14 @@ export default function App() {
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onOpenChat={function(){setPTab("chat");}} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
         {pTab==="chat"         &&<ChatUI chats={DataLayer.getProChats()} myColor={accent} nK="cN" vK="cV" isClientChat={false} qR={["Bonjour, disponible !","Je confirme","Veuillez nous appeler","Merci pour votre message"]} myId={auth&&auth.userId} myName={proD.name||(auth&&(auth.email||"").split("@")[0])} estabName={proD.name} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
-        {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} onGoToFeed={function(){setPTab("feed");}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab}/>}
+        {pTab==="profile"      &&<ProProf proType={auth.type} authUserId={auth&&auth.userId} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} onGoToFeed={function(){setPTab("feed");}} onPayCampaign={function(cid){_startAdPayment(cid);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} coverPhoto={coverPhoto} onCoverChange={setCoverPhoto} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab}/>}
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId} selfName={proD.name||(auth&&auth.email?auth.email.split("@")[0]:"Pro")}/>}
       {showPremium&&<PremiumModal accType={auth.type} prices={PREMIUM_PRICES} discounts={PREMIUM_DISCOUNTS} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium}/>}
         {_accountOverlays}
       {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){setPremiumPay(null);tk.show("Paiement reçu — activation automatique en cours...","success");_refreshPremiumFromServer(0);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
+      {adPay&&<StripePaymentModal clientSecret={adPay.clientSecret} amount={adPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setAdPay(null);}} onSuccess={function(){setAdPay(null);tk.show("Paiement reçu — votre campagne est en cours d'activation","success");}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
       {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={openNotifTarget}/>;}}</Ov>}
       {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}

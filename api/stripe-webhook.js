@@ -98,6 +98,39 @@ export default async function handler(req, res) {
       return res.status(200).json({ received: true, premium: true });
     }
 
+    // ---------- CIRCUIT PLATEFORME : SPONSOR & BOOST (separe du Premium) ----------
+    if (payKind === "ad_campaign") {
+      const campaignId = pi.metadata.campaign_id;
+      const advertiserId = pi.metadata.user_id;
+      // Idempotence
+      const dupA = await supa.from("platform_revenues").select("id").eq("payment_intent_id", pi.id).maybeSingle();
+      if (dupA.data) return res.status(200).json({ received: true, duplicate: true });
+      // Validation du montant contre la CAMPAGNE serveur (prix fige a la creation par la config admin)
+      const c = await supa.from("ad_campaigns").select("id,advertiser_id,kind,price,duration_days,status").eq("id", campaignId || "").maybeSingle();
+      const paid = pi.amount_received || pi.amount || 0;
+      const expected = c.data ? Math.round(Number(c.data.price) * 100) : -1;
+      if (!c.data || c.data.advertiser_id !== advertiserId || paid !== expected) {
+        await supa.from("platform_revenues").insert([{ kind: "other", amount_cents: paid, currency: pi.currency || "eur", user_id: advertiserId || null, payment_intent_id: pi.id, note: "ANOMALIE ad_campaign: campagne/montant invalide (attendu " + expected + ")" }]);
+        return res.status(200).json({ received: true, anomaly: true });
+      }
+      // Activation SERVEUR : la campagne devient active, dates calculees en base
+      await supa.rpc("activate_ad_campaign", { p_id: c.data.id, p_session: pi.id });
+      // Revenu 100% plateforme, marque 'ads' — jamais dans le registre des etablissements
+      await supa.from("platform_revenues").insert([{ kind: "ads", amount_cents: paid, currency: pi.currency || "eur", user_id: advertiserId, payment_intent_id: pi.id, note: c.data.kind + " " + c.data.duration_days + "j" }]);
+      // Notification a l'annonceur
+      const fmtA = (v) => (v / 100).toFixed(2) + " " + (pi.currency || "eur").toUpperCase();
+      await supa.from("notifications").insert([{
+        id: "srv_ad_" + pi.id,
+        user_id: advertiserId,
+        icon: "Tag", color: "#F59E0B",
+        title: "Campagne activée",
+        body: "Paiement de " + fmtA(paid) + " reçu — votre campagne est maintenant active et diffusée dans le feed.",
+        time: "maintenant", read: false, tab: "profile",
+        pref_key: "reservation", target_id: null
+      }]);
+      return res.status(200).json({ received: true, ad_campaign: true });
+    }
+
     // ---------- CIRCUIT ETABLISSEMENTS : RESERVATIONS ----------
     // Idempotence : un même paiement ne produit jamais deux transactions
     const dup = await supa.from("transactions").select("id").eq("payment_intent_id", pi.id).maybeSingle();
