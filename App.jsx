@@ -1347,8 +1347,8 @@ function PremiumModal(props){
     ?[{id:"std",name:"Premium Essentiel",price:_price("std",9.99),color:DS.client,features:["Sans publicité","Confidentialité avancée","Verrouillage de profil","Support prioritaire"]},
       {id:"plus",name:"Premium Plus",price:_price("plus",19.99),color:DS.gold,features:["Tout Essentiel","Badge eligible verification","Mode pseudonyme","Statistiques profil"]}]
     :[{id:"std",name:"Premium Standard",price:_price("std",9.99),color:DS.primary,features:["Publications video","Sans publicité","Éligible badge vérification","Éligible aux avis clients"]},
-      {id:"plus",name:"Premium Plus",price:_price("plus",19.99),color:DS.gold,features:["Tout Standard","Mise en avant boostée","Visibilite prioritaire","Statistiques avancées"]},
-      {id:"biz",name:"Premium Boosté Avancé",price:_price("biz",49.99),color:DS.hotel,features:["Tout Plus","Avantages exclusifs","Manager dédié","API access"]}];
+      {id:"plus",name:"Premium Plus",price:_price("plus",19.99),color:DS.gold,features:["Tout Standard","Visibilité prioritaire","Bonus de visibilité continu","Statistiques avancées"]},
+      {id:"biz",name:"Premium Avancé",price:_price("biz",49.99),color:DS.hotel,features:["Tout Plus","Avantages exclusifs","Manager dédié","API access"]}];
   var sel=PLANS.find(function(p){return p.id===plan;})||PLANS[0];
   var DURATIONS=[{months:1,label:"1 mois",discount:_disc(1,0)},{months:3,label:"3 mois",discount:_disc(3,0.10)},{months:6,label:"6 mois",discount:_disc(6,0.20)},{months:12,label:"12 mois",discount:_disc(12,0.30)}];
   var selDur=DURATIONS.find(function(d){return d.months===duration;})||DURATIONS[0];
@@ -3658,7 +3658,7 @@ function ProFeed(props){
               <div style={{fontSize:17,fontWeight:800,color:DS.text,marginBottom:8}}>Video reservee aux comptes Premium</div>
               <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Les comptes Free peuvent publier du texte et des images. Passez Premium pour publier des videos illimitees.</div>
               <div style={{background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:12,padding:"12px 16px",marginBottom:20,textAlign:"left"}}>
-                {["Publications video illimitees","Sans publicité","Éligible badge vérification","Visibilite boostee"].map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<3?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}
+                {["Publications video illimitees","Sans publicité","Éligible badge vérification","Visibilité prioritaire"].map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<3?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}
               </div>
               <button onClick={function(){setShowVideoGate(false);if(onPremium)onPremium();}} style={{width:"100%",padding:"12px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginBottom:10}}>Passer Premium</button>
               <button onClick={function(){setShowVideoGate(false);}} style={{width:"100%",padding:"10px",background:"transparent",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Annuler</button>
@@ -4064,7 +4064,7 @@ function VerifRequestModal(props){
               <div style={{fontSize:17,fontWeight:800,color:DS.text,marginBottom:8}}>Premium requis</div>
               <div style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,marginBottom:20}}>Un abonnement Premium actif est obligatoire pour soumettre une demande de verification officielle.</div>
               <div style={{background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:12,padding:"12px 16px",marginBottom:20,textAlign:"left"}}>
-                {["Publications video","Éligible badge vérification","Visibilite boostee","Éligible aux avis clients"].map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<3?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}
+                {["Publications video","Éligible badge vérification","Visibilité prioritaire","Éligible aux avis clients"].map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:i<3?8:0}}><CheckCircle size={13} color={DS.gold}/><span style={{fontSize:12,color:DS.textMuted}}>{f}</span></div>;})}
               </div>
               <button onClick={onClose} style={{width:"100%",padding:"11px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:13,fontWeight:900,cursor:"pointer"}}>Obtenir Premium</button>
             </div>
