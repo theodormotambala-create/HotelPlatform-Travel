@@ -921,6 +921,32 @@ function AdBanner(){
   );
 }
 
+// Carte "Sponsorisé" intercalée dans le feed — campagnes REELLES servies par le serveur
+// (get_active_ads). Impression comptee une fois par session de feed, clic via ad_track.
+function SponsoredCard(props){
+  var ad=props.ad;var onOpen=props.onOpen;var onImpression=props.onImpression;
+  useEffect(function(){if(onImpression&&ad&&ad.id)onImpression(ad.id);},[ad&&ad.id]);
+  if(!ad)return null;
+  var color=rC(ad.estab_type||"hotel");
+  return(
+    <div style={{background:DS.surface,marginBottom:8,borderTop:"1px solid "+DS.gold+"33",borderBottom:"1px solid "+DS.gold+"33"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px 10px"}}>
+        <div style={{width:38,height:38,borderRadius:"50%",background:DS.goldSoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Tag size={16} color={DS.gold}/></div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:14,fontWeight:800,color:DS.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{ad.estab_name||"Établissement"}</div>
+          <div style={{fontSize:10,fontWeight:800,color:DS.gold,letterSpacing:1}}>SPONSORISÉ</div>
+        </div>
+        <span style={{fontSize:10,fontWeight:700,color:color,background:color+"18",borderRadius:8,padding:"3px 8px",flexShrink:0}}>{ad.estab_type==="restaurant"?"Restaurant":"Hôtel"}</span>
+      </div>
+      {ad.img&&<img src={ad.img} alt="" onError={function(e){e.target.style.display="none";}} style={{width:"100%",maxHeight:300,objectFit:"cover",display:"block"}}/>}
+      {ad.text&&<div style={{padding:"10px 16px 4px",fontSize:13,color:DS.textMuted,lineHeight:1.6,wordBreak:"break-word"}}>{String(ad.text).slice(0,160)}</div>}
+      <div style={{padding:"10px 16px 14px"}}>
+        <button onClick={function(){if(onOpen)onOpen(ad);}} style={{width:"100%",padding:"10px",background:DS.gold,border:"none",borderRadius:10,color:"#000",fontSize:13,fontWeight:900,cursor:"pointer"}}>Découvrir</button>
+      </div>
+    </div>
+  );
+}
+
 function SplashAd(props){
   var onClose=props.onClose;
   var sC=useState(false);var closing=sC[0];var setClosing=sC[1];
@@ -1385,6 +1411,13 @@ function SponsorHub(props){
   var soff=useState(null);var offers=soff[0];var setOffers=soff[1];
   var ss=useState(false);var sending=ss[0];var setSending=ss[1];
   var se=useState(null);var err=se[0];var setErr=se[1];
+  var sMine=useState(null);var mine=sMine[0];var setMine=sMine[1];
+  var AD_STATUS_FR={pending_payment:"En attente de paiement",pending_review:"En attente de validation",active:"Active",paused:"En pause",ended:"Terminée",refused:"Refusée"};
+  function loadMine(){
+    if(!DataLayer._client||!advertiserId){setMine([]);return;}
+    DataLayer._client.from("ad_campaigns").select("id,kind,target_id,status,duration_days,price,currency,impressions,clicks,starts_at,ends_at,created_at").eq("advertiser_id",advertiserId).order("created_at",{ascending:false}).limit(30)
+      .then(function(r){setMine(r&&r.data?r.data:[]);}).catch(function(){setMine([]);});
+  }
   useEffect(function(){
     if(!DataLayer._client)return;
     DataLayer._client.rpc("get_ad_plans").then(function(r){if(r&&r.data)setPlans(r.data);}).catch(function(){});
@@ -1452,6 +1485,33 @@ function SponsorHub(props){
                 </Fragment>,
                 function(){startKind(pc.kind);}, pc.kind
               );})}
+              <button onClick={function(){setView("mine");loadMine();}} style={{width:"100%",padding:"12px",marginTop:4,background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><Activity size={14} color={DS.textMuted}/>Mes campagnes</button>
+            </div>
+          )}
+          {view==="mine"&&(
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:DS.text,marginBottom:4}}>Mes campagnes</div>
+              <div style={{fontSize:11,color:DS.textMuted,marginBottom:14}}>Statut, vues et clics de vos campagnes.</div>
+              {mine===null&&<div style={{fontSize:12,color:DS.textMuted,textAlign:"center",padding:"14px 0"}}>Chargement…</div>}
+              {mine!==null&&mine.length===0&&<div style={{fontSize:12,color:DS.textMuted,textAlign:"center",padding:"14px 0"}}>Aucune campagne pour l'instant.</div>}
+              {(mine||[]).map(function(c){
+                var pcM=PARCOURS.find(function(x){return x.kind===c.kind;});
+                var stCol=c.status==="active"?DS.success:(c.status==="ended"||c.status==="refused"?DS.textMuted:DS.warning);
+                return(
+                  <div key={c.id} style={{background:DS.card,border:"1px solid "+DS.border,borderRadius:12,padding:"12px 14px",marginBottom:10}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                      <div style={{fontSize:13,fontWeight:800,color:DS.text}}>{pcM?pcM.title:c.kind}</div>
+                      <span style={{fontSize:10,fontWeight:800,color:stCol,background:stCol+"18",borderRadius:8,padding:"3px 8px"}}>{AD_STATUS_FR[c.status]||c.status}</span>
+                    </div>
+                    <div style={{fontSize:11,color:DS.textMuted,marginBottom:8}}>{_durLabel(c.duration_days)} · {c.price} {c.currency||"EUR"}{c.ends_at?(" · fin le "+new Date(c.ends_at).toLocaleDateString("fr-FR")):""}</div>
+                    <div style={{display:"flex",gap:8}}>
+                      <div style={{flex:1,background:DS.surface,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:14,fontWeight:900,color:DS.text}}>{c.impressions||0}</div><div style={{fontSize:9,color:DS.textMuted}}>Vues</div></div>
+                      <div style={{flex:1,background:DS.surface,borderRadius:9,padding:"7px 0",textAlign:"center",border:"1px solid "+DS.border}}><div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{c.clicks||0}</div><div style={{fontSize:9,color:DS.textMuted}}>Clics</div></div>
+                    </div>
+                  </div>
+                );
+              })}
+              <button onClick={function(){setView("hub");}} style={{width:"100%",padding:"11px",marginTop:4,background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
             </div>
           )}
           {view==="pickPost"&&(
@@ -2335,6 +2395,20 @@ function ClientFeed(props){
   // Resolution par identifiant a chaque rendu (cache toujours frais, photo de couverture a jour)
   function _openPostProfile(post){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}
   var postRefs=useRef({});
+  // Campagnes sponsorisees REELLES (serveur) : cartes intercalees, vues/clics comptes.
+  // Masquees pour les spectateurs Premium (promesse "Sans publicité" conservee).
+  var sAdsF=useState([]);var adsF=sAdsF[0];var setAdsF=sAdsF[1];
+  var _adImpSent=useRef({});
+  useEffect(function(){
+    if(!DataLayer._client||!selfUserId||isPremium)return;
+    DataLayer._client.rpc("get_active_ads").then(function(r){if(r&&r.data&&r.data.length)setAdsF(r.data);}).catch(function(){});
+  },[selfUserId]);
+  function _adImpression(id){if(_adImpSent.current[id])return;_adImpSent.current[id]=1;try{if(DataLayer._client)DataLayer._client.rpc("ad_track",{p_id:id,p_event:"impression"}).then(function(){}).catch(function(){});}catch(e){}}
+  function _adOpen(ad){
+    try{if(DataLayer._client)DataLayer._client.rpc("ad_track",{p_id:ad.id,p_event:"click"}).then(function(){}).catch(function(){});}catch(e){}
+    if(ad.kind==="sponsor_post"&&postRefs.current[ad.target_id]){postRefs.current[ad.target_id].scrollIntoView({behavior:"smooth",block:"start"});return;}
+    if(onProfile&&ad.estab_id)onProfile(ad.estab_id,ad.estab_type||"hotel");
+  }
   // Ouverture directe d'un post depuis une notification (defilement + commentaires)
   useEffect(function(){
     var fid=props.focusPostId;
@@ -2376,8 +2450,10 @@ function ClientFeed(props){
       {posts.length===0&&<Emp Icon={Home} title="Aucune publication" sub="Les publications des établissements apparaîtront ici"/>}
       {posts.slice(0,visibleCount).map(function(post,_pi){
         var color=rC(post.type);
+        var _adSlot=(adsF.length>0&&(_pi+1)%4===0)?adsF[(Math.floor((_pi+1)/4)-1)%adsF.length]:null;
         return(
-          <div key={post.id} ref={function(el){postRefs.current[post.id]=el;}} style={{background:DS.surface,marginBottom:8,borderTop:"1px solid "+DS.border+"22",borderBottom:"1px solid "+DS.border+"22",animation:"hp-item-in 0.38s cubic-bezier(0.22,1,0.36,1) both",animationDelay:(_pi*45)+"ms"}}>
+          <Fragment key={post.id}>
+          <div ref={function(el){postRefs.current[post.id]=el;}} style={{background:DS.surface,marginBottom:8,borderTop:"1px solid "+DS.border+"22",borderBottom:"1px solid "+DS.border+"22",animation:"hp-item-in 0.38s cubic-bezier(0.22,1,0.36,1) both",animationDelay:(_pi*45)+"ms"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 16px 10px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
                 <div onClick={function(){_openPostProfile(post);}} style={{cursor:"pointer",flexShrink:0}}>
@@ -2432,6 +2508,8 @@ function ClientFeed(props){
               <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfUserId={selfUserId} selfPhoto={selfPhoto} selfVerified={isPremium} onReportComment={function(cm){setReportCmt(cm);}} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
+          {_adSlot&&<SponsoredCard ad={_adSlot} onOpen={_adOpen} onImpression={_adImpression}/>}
+          </Fragment>
         );
       })}
     {posts.length>visibleCount&&<div ref={sentinelRef} style={{height:1}}/>}
@@ -3487,6 +3565,19 @@ function ProFeed(props){
   // Rendu progressif : lots de 8 publications via sentinelle
   var sVisPro=useState(8);var visibleCountPro=sVisPro[0];var setVisibleCountPro=sVisPro[1];
   var postRefsPro=useRef({});
+  // Campagnes sponsorisees REELLES (serveur) : cartes intercalees, vues/clics comptes.
+  var sAdsP=useState([]);var adsP=sAdsP[0];var setAdsP=sAdsP[1];
+  var _adImpSentP=useRef({});
+  useEffect(function(){
+    if(!DataLayer._client||!selfUserId||isPremium)return;
+    DataLayer._client.rpc("get_active_ads").then(function(r){if(r&&r.data&&r.data.length)setAdsP(r.data);}).catch(function(){});
+  },[selfUserId]);
+  function _adImpressionP(id){if(_adImpSentP.current[id])return;_adImpSentP.current[id]=1;try{if(DataLayer._client)DataLayer._client.rpc("ad_track",{p_id:id,p_event:"impression"}).then(function(){}).catch(function(){});}catch(e){}}
+  function _adOpenP(ad){
+    try{if(DataLayer._client)DataLayer._client.rpc("ad_track",{p_id:ad.id,p_event:"click"}).then(function(){}).catch(function(){});}catch(e){}
+    if(ad.kind==="sponsor_post"&&postRefsPro.current[ad.target_id]){postRefsPro.current[ad.target_id].scrollIntoView({behavior:"smooth",block:"start"});return;}
+    if(onProfile&&ad.estab_id)onProfile(ad.estab_id,ad.estab_type||"hotel");
+  }
   useEffect(function(){
     var fid=props.focusPostId;
     if(!fid)return;
@@ -3669,9 +3760,11 @@ function ProFeed(props){
       {loadingPro&&<FeedSkeleton/>}
       {posts.length===0&&<Emp Icon={FileText} title="Aucune publication" sub="Vos publications apparaîtront ici"/>}
       {posts.slice(0,visibleCountPro).map(function(post,_pfi){
+        var _adSlotP=(adsP.length>0&&(_pfi+1)%4===0)?adsP[(Math.floor((_pfi+1)/4)-1)%adsP.length]:null;
         var pc=rC(post.type);
         return(
-          <div key={post.id} ref={function(el){postRefsPro.current[post.id]=el;}} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pfi*50)+"ms"}}>
+          <Fragment key={post.id}>
+          <div ref={function(el){postRefsPro.current[post.id]=el;}} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pfi*50)+"ms"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 16px 14px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
                 <div onClick={function(){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}} style={{cursor:onProfile?"pointer":"default",flexShrink:0}}>
@@ -3728,6 +3821,8 @@ function ProFeed(props){
               <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} selfUserId={selfUserId} selfPhoto={selfPhoto} onReportComment={function(cm){setReportCmt(cm);}} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
+          {_adSlotP&&<SponsoredCard ad={_adSlotP} onOpen={_adOpenP} onImpression={_adImpressionP}/>}
+          </Fragment>
         );
       })}
     {posts.length>visibleCountPro&&<div ref={sentinelRefPro} style={{height:1}}/>}
