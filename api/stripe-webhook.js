@@ -83,6 +83,22 @@ export default async function handler(req, res) {
       const st = await supa.from("platform_settings").select("premium_prices,premium_discounts").eq("id", 1).maybeSingle();
       const prices = (st.data && st.data.premium_prices) || {};
       const discs = (st.data && st.data.premium_discounts) || {};
+
+      // --- ESSAI 15 JOURS (« Essayez Premium ») : circuit SEPARE, grant_premium (mois) inchange ---
+      const premiumDays = parseInt(pi.metadata.premium_days || "0", 10);
+      if (premiumDays === 15) {
+        const paidT = pi.amount_received || pi.amount || 0;
+        const trialPrice = Number(prices.trial15);
+        const expectedT = Math.round((Number.isFinite(trialPrice) ? trialPrice : 4.99) * 100);
+        if (!userId || paidT !== expectedT || !["std", "plus", "biz"].includes(plan)) {
+          await supa.from("platform_revenues").insert([{ kind: "other", amount_cents: paidT, currency: pi.currency || "eur", user_id: userId || null, payment_intent_id: pi.id, note: "ANOMALIE essai premium: montant/plan invalide (attendu " + expectedT + ")" }]);
+          return res.status(200).json({ received: true, anomaly: true });
+        }
+        await supa.rpc("grant_premium_days", { p_user: userId, p_plan: plan, p_days: 15 });
+        await supa.from("platform_revenues").insert([{ kind: "subscription", amount_cents: paidT, currency: pi.currency || "eur", user_id: userId, plan: plan, duration_months: 0, payment_intent_id: pi.id }]);
+        return res.status(200).json({ received: true, premium_trial: true });
+      }
+
       const price = Number(prices[plan]);
       const disc = Number(discs[String(months)] || 0);
       const expected = Math.round(price * months * (1 - disc) * 100);

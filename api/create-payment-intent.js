@@ -55,7 +55,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { amount, currency, resaId, estabName, type, plan, months, userId, campaignId } = req.body;
+    const { amount, currency, resaId, estabName, type, plan, months, userId, campaignId, trialDays } = req.body;
     const isPremiumPayment = type === "premium";
     const isAdPayment = type === "ad_campaign";
 
@@ -117,6 +117,7 @@ export default async function handler(req, res) {
         type:           isPremiumPayment ? "premium" : "reservation",
         plan:           isPremiumPayment ? safeMeta(plan) : "",
         months:         isPremiumPayment ? safeMeta(months) : "",
+        premium_days:   isPremiumPayment ? safeMeta(trialDays || "") : "",
         user_id:        isPremiumPayment ? safeMeta(userId) : "",
       },
     };
