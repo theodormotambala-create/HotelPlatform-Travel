@@ -365,17 +365,24 @@ var DataLayer = {
             if(newHotels.length){DataLayer._cache.hotels=DataLayer._cache.hotels.filter(function(h){return!h.userId;}).concat(newHotels);}
             if(newRestos.length){DataLayer._cache.restaurants=DataLayer._cache.restaurants.filter(function(r){return!r.userId;}).concat(newRestos);}
             if(DataLayer._onUpdate)DataLayer._onUpdate();
-            // Abonnes REELS : compte combien d'utilisateurs suivent chaque etablissement inscrit
-            supabase.from("profiles_public").select("user_id,following").then(function(fres){
-              if(!fres||!fres.data)return;
-              var fc={};
-              // Exclut l'utilisateur courant : son propre suivi est ajoute en optimiste (+1) par l'ecran profil
-              fres.data.forEach(function(p){if(_HP_UID&&p.user_id===_HP_UID)return;(p.following||[]).forEach(function(fid){fc[fid]=(fc[fid]||0)+1;});});
-              var _applyF=function(arr){return arr.map(function(x){return x.userId?Object.assign({},x,{followers:fc[x.id]||0}):x;});};
-              DataLayer._cache.hotels=_applyF(DataLayer._cache.hotels);
-              DataLayer._cache.restaurants=_applyF(DataLayer._cache.restaurants);
-              if(DataLayer._onUpdate)DataLayer._onUpdate();
-            });
+            // Abonnes REELS : compteurs materialises, lus par cle primaire et bornes
+            // aux etablissements effectivement charges. Ne parcourt plus la liste
+            // d'abonnements de tous les profils de la plateforme.
+            // La valeur est le total serveur (l'utilisateur courant y compris) :
+            // les ecrans qui doivent reagir a un clic gerent leur propre +1/-1.
+            var _fTokens=DataLayer._cache.hotels.concat(DataLayer._cache.restaurants)
+              .filter(function(x){return x.userId;}).map(function(x){return x.id;});
+            if(_fTokens.length){
+              supabase.from("follow_counters").select("target_token,followers_count").in("target_token",_fTokens)
+                .then(function(fres){
+                  if(!fres||fres.error||!fres.data)return;
+                  var fc={};fres.data.forEach(function(r){fc[r.target_token]=Number(r.followers_count)||0;});
+                  var _applyF=function(arr){return arr.map(function(x){return x.userId?Object.assign({},x,{followers:fc[x.id]||0}):x;});};
+                  DataLayer._cache.hotels=_applyF(DataLayer._cache.hotels);
+                  DataLayer._cache.restaurants=_applyF(DataLayer._cache.restaurants);
+                  if(DataLayer._onUpdate)DataLayer._onUpdate();
+                });
+            }
           }
         });
       // 9. Reservations — re-hydrate BookingService depuis Supabase
@@ -2869,7 +2876,11 @@ function EstabM(props){
   var t=useToast();var toast=t.show;var Toast=t.Toast;
   var followingIds=props.followingIds||[];
   var isFollowing=followingIds.indexOf(e.id)>=0;
-  var followersCount=(e.followers||0)+(isFollowing?1:0);
+  // e.followers est desormais le total serveur, l'utilisateur courant inclus s'il
+  // suit deja. On n'applique donc que l'ECART depuis l'ouverture de l'ecran, sinon
+  // un abonnement deja compte par le serveur serait compte une seconde fois.
+  var _followedAtOpen=useRef(isFollowing);
+  var followersCount=(e.followers||0)+((isFollowing?1:0)-(_followedAtOpen.current?1:0));
   function toggleFollow(){if(props.onToggleFollow)props.onToggleFollow(e.id);}
   var favEstabIds=props.favEstabIds||[];
   var isFavEstab=favEstabIds.indexOf(e.id)>=0;
@@ -5446,14 +5457,23 @@ export default function App() {
           try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(sbResas));}catch(e){}
         }).catch(function(){});
     }
-    DataLayer._client.from("profiles").select("following,fav_estabs,notif_prefs,premium_data,privacy_settings,display_name").eq("user_id",_authForUserData.userId).maybeSingle()
+    // Abonnements : la source de verite est la table follows (une ligne par lien),
+    // lue par sa cle primaire (follower_id, target_token) et bornee aux liens de
+    // l'utilisateur par la politique follows_select_own. Contrairement a l'ancien
+    // tableau, une liste vide est une information certaine (« je ne suis personne »)
+    // et non une absence de chargement : l'etat local suit donc le serveur sans
+    // condition, sans quoi un desabonnement total resterait invisible.
+    DataLayer._client.from("follows").select("target_token").eq("follower_id",_authForUserData.userId)
+      .then(function(fr){
+        if(!fr||fr.error||!fr.data)return;
+        var _toks=fr.data.map(function(x){return x.target_token;});
+        setFollowingIds(_toks);
+        try{localStorage.setItem(_lk("hp_following"),JSON.stringify(_toks));}catch(e){}
+      }).catch(function(){});
+    DataLayer._client.from("profiles").select("fav_estabs,notif_prefs,premium_data,privacy_settings,display_name").eq("user_id",_authForUserData.userId).maybeSingle()
       .then(function(res){
         if(!res||!res.data)return;
         var d=res.data;
-        if(d.following&&Array.isArray(d.following)&&d.following.length>0){
-          setFollowingIds(d.following);
-          try{localStorage.setItem(_lk("hp_following"),JSON.stringify(d.following));}catch(e){}
-        }
         if(d.fav_estabs&&Array.isArray(d.fav_estabs)&&d.fav_estabs.length>0){
           setFavEstabIds(d.fav_estabs);
           try{localStorage.setItem(_lk("hp_fav_estabs"),JSON.stringify(d.fav_estabs));}catch(e){}
@@ -5629,17 +5649,41 @@ export default function App() {
       guardPushed.current=false;
     }
   },[anyOverlayOpen]);
+  // L'abonnement est une ligne creee par le serveur, plus une reecriture de toute
+  // la liste : deux appareils qui s'abonnent en meme temps ne s'ecrasent plus, et
+  // rejouer la requete ne cree pas de doublon (cle primaire + ON CONFLICT).
+  // Le serveur renvoie le nombre d'abonnes fait foi ; en cas de refus, l'affichage
+  // optimiste est annule au lieu de mentir.
   function toggleFollowGlobal(id){
     var was=followingIds.indexOf(id)>=0;
-    setFollowingIds(function(f){
-      var next=was?f.filter(function(x){return x!==id;}):f.concat([id]);
-      try{localStorage.setItem(_lk("hp_following"),JSON.stringify(next));}catch(e){}
-      if(DataLayer._client&&auth&&auth.userId){
-        DataLayer._client.from("profiles").update({following:next,updated_at:new Date().toISOString()}).eq("user_id",auth.userId).then(function(){});
-      }
-      return next;
-    });
-    tk.show(was?"Vous ne suivez plus cet etablissement":"Vous suivez cet etablissement","success");
+    var prev=followingIds;
+    var next=was?prev.filter(function(x){return x!==id;}):prev.concat([id]);
+    var _apply=function(list){
+      setFollowingIds(list);
+      try{localStorage.setItem(_lk("hp_following"),JSON.stringify(list));}catch(e){}
+    };
+    _apply(next);
+    if(!(DataLayer._client&&auth&&auth.userId)){
+      tk.show(was?"Vous ne suivez plus cet etablissement":"Vous suivez cet etablissement","success");
+      return;
+    }
+    var _fail=function(){_apply(prev);tk.show("Action impossible — vérifiez votre connexion et réessayez","error");};
+    DataLayer._client.rpc(was?"unfollow_target":"follow_target",{p_token:id})
+      .then(function(r){
+        if(!r||r.error){_fail();return;}
+        // Compteur d'abonnes renvoye par le serveur : on aligne le cache sur la verite.
+        var _n=Number(r.data);
+        if(isFinite(_n)){
+          var _patch=function(arr){return arr.map(function(x){return x.id===id?Object.assign({},x,{followers:_n}):x;});};
+          try{
+            DataLayer._cache.hotels=_patch(DataLayer._cache.hotels);
+            DataLayer._cache.restaurants=_patch(DataLayer._cache.restaurants);
+            if(DataLayer._onUpdate)DataLayer._onUpdate();
+          }catch(ex){}
+        }
+        tk.show(was?"Vous ne suivez plus cet etablissement":"Vous suivez cet etablissement","success");
+      })
+      .catch(function(){_fail();});
   }
   function toggleFavEstab(id){
     var wasFav=favEstabIds.indexOf(id)>=0;
