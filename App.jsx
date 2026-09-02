@@ -336,7 +336,9 @@ var DataLayer = {
         }
       });
       // 8. Profils Pro — ajoute les vrais etablissements inscrits au cache
-      supabase.from("profiles").select("*").in("account_type",["hotel","restaurant"]).neq("display_name","")
+      // Lecture via la vue publique (profiles_public) : n'expose que les colonnes necessaires,
+      // jamais les donnees personnelles (preferences, premium, favoris, statut).
+      supabase.from("profiles_public").select("user_id,account_type,display_name,location,description,cover_url,verified,is_premium,svc_mode").in("account_type",["hotel","restaurant"]).neq("display_name","")
         .then(function(res){
           if(res&&res.data&&res.data.length>0){
             // MERGE (pas d'ecrasement) : on preserve prix/note/avis/chambres/menu deja charges
@@ -364,7 +366,7 @@ var DataLayer = {
             if(newRestos.length){DataLayer._cache.restaurants=DataLayer._cache.restaurants.filter(function(r){return!r.userId;}).concat(newRestos);}
             if(DataLayer._onUpdate)DataLayer._onUpdate();
             // Abonnes REELS : compte combien d'utilisateurs suivent chaque etablissement inscrit
-            supabase.from("profiles").select("user_id,following").then(function(fres){
+            supabase.from("profiles_public").select("user_id,following").then(function(fres){
               if(!fres||!fres.data)return;
               var fc={};
               // Exclut l'utilisateur courant : son propre suivi est ajoute en optimiste (+1) par l'ecran profil
@@ -1782,13 +1784,14 @@ function ChatUI(props){
     var q=(composeQ||"").trim();
     if(q.length<2||!DataLayer._client){setDirResults([]);return;}
     var cancelled=false;
-    DataLayer._client.from("profiles").select("user_id,display_name,photo_url,account_type,privacy_settings").ilike("display_name","%"+q+"%").neq("user_id",myId||"").limit(20)
+    // Annuaire : le filtrage "verrouille / pseudonyme" est desormais applique COTE SERVEUR
+    // (colonne calculee is_discoverable de la vue profiles_public). Les profils masques ne
+    // quittent plus le serveur, et privacy_settings n'est plus expose.
+    DataLayer._client.from("profiles_public").select("user_id,display_name,photo_url,account_type").eq("is_discoverable",true).ilike("display_name","%"+q+"%").neq("user_id",myId||"").limit(20)
       .then(function(r){
         if(cancelled||r.error||!r.data)return;
         var list=r.data.filter(function(p){
           if(!p.display_name)return false;
-          var ps=p.privacy_settings||{};
-          if(p.account_type==="client"&&(ps.locked===true||ps.pseudo===true))return false;
           return true;
         }).map(function(p){
           return {userId:p.user_id,clientId:p.user_id,name:p.display_name,clientName:p.display_name,img:p.photo_url||null,verified:false,dirKind:p.account_type==="client"?"Utilisateur":(p.account_type==="hotel"?"Hôtel":"Restaurant")};
