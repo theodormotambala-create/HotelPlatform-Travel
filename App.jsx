@@ -2583,13 +2583,18 @@ function ClientProf(props){
   function _saveClientProfile(){
     var nm=sanitizeText(_draftClientName,50);if(!nm)return;
     _setClientSaving(true);
-    var _done=function(){
+    // supabase-js ne rejette pas : sans lire res.error, un refus serveur
+    // fermerait le formulaire et laisserait un nom qui n'existe qu'en local.
+    var _done=function(res){
+      _setClientSaving(false);
+      if(res&&res.error){toastCP("Échec de l'enregistrement — vérifiez votre connexion et réessayez","error");return;}
       _setClientDisplayName(nm);
       try{localStorage.setItem(_lk("hp_client_display_name"),nm);}catch(e){}
       if(onNameChange)onNameChange(nm);
-      _setClientSaving(false);_setShowEditClient(false);
+      _setShowEditClient(false);
+      toastCP("Profil mis à jour","success");
     };
-    if(DataLayer._client&&_authUidC){DataLayer._client.from("profiles").update({display_name:nm}).eq("user_id",_authUidC).then(_done).catch(_done);}
+    if(DataLayer._client&&_authUidC){DataLayer._client.from("profiles").update({display_name:nm}).eq("user_id",_authUidC).then(_done).catch(function(){_done({error:true});});}
     else{_done();}
   }
   var displayLetter=(displayName[0]||"M").toUpperCase();
@@ -4803,26 +4808,56 @@ function ProProf(props){
   var _sDraftName=useState(data.name||"");var _draftName=_sDraftName[0];var _setDraftName=_sDraftName[1];
   var _sDraftLoc=useState(data.location||"");var _draftLoc=_sDraftLoc[0];var _setDraftLoc=_sDraftLoc[1];
   var _sProSaving=useState(false);var _proSaving=_sProSaving[0];var _setProSaving=_sProSaving[1];
+  var _sAboutSaving=useState(false);var _aboutSaving=_sAboutSaving[0];var _setAboutSaving=_sAboutSaving[1];
   function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>5*1024*1024){toastP("Photo trop volumineuse (maximum 5 Mo)","error");e.target.value="";return;}var r=new FileReader();r.onload=function(ev){_setPPPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
   function _handleProCoverFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>8*1024*1024){toastP("Image de couverture trop volumineuse (maximum 8 Mo)","error");e.target.value="";return;}var r=new FileReader();r.onload=function(ev){_setPCPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
-  function _saveProPhoto(){if(!_ppPend)return;if(onPhotoChange)onPhotoChange(_ppPend);_setPPPend(null);_setPPMenu(false);toastP("Photo de profil mise à jour","success");}
-  function _saveProCover(){if(!_pcPend)return;if(onCoverChange)onCoverChange(_pcPend);_setPCPend(null);_setPCMenu(false);toastP("Photo de couverture mise à jour","success");}
-  function _deleteProPhoto(){if(onPhotoChange)onPhotoChange(null);_setPPMenu(false);toastP("Photo supprimée","success");}
+  // Pas de confirmation ici : l'envoi vers Storage est asynchrone et peut echouer.
+  // Le succes comme l'echec sont annonces par App, a la reponse reelle du serveur.
+  function _saveProPhoto(){if(!_ppPend)return;if(onPhotoChange)onPhotoChange(_ppPend);_setPPPend(null);_setPPMenu(false);}
+  function _saveProCover(){if(!_pcPend)return;if(onCoverChange)onCoverChange(_pcPend);_setPCPend(null);_setPCMenu(false);}
+  // Confirmation annoncee par App a la reponse serveur (voir setProfilePhoto).
+  function _deleteProPhoto(){if(onPhotoChange)onPhotoChange(null);_setPPMenu(false);}
   function _saveProProfile(){
-    var nm=_draftName.trim();var lc=_draftLoc.trim();if(!nm)return;
+    // Memes limites que les contraintes serveur (profiles_display_name_len 50,
+    // profiles_location_len 120) : l'ecriture serait rejetee au-dela.
+    var nm=sanitizeText(_draftName,50);var lc=sanitizeText(_draftLoc,120);if(!nm)return;
     _setProSaving(true);
     var _uid=props.authUserId;
-    var _done=function(){
-      _setProSaving(false);_setShowEditProf(false);
+    // supabase-js ne rejette pas : il renvoie {data,error}. Sans ce test, une
+    // ecriture refusee (reseau, RLS, contrainte) afficherait « Profil mis a jour »
+    // alors que rien n'est enregistre cote serveur.
+    var _done=function(res){
+      _setProSaving(false);
+      if(res&&res.error){toastP("Échec de l'enregistrement — vérifiez votre connexion et réessayez","error");return;}
+      _setShowEditProf(false);
       try{if(proType==="hotel"){DataLayer._cache.hotels=DataLayer._cache.hotels.map(function(h){return(h.userId===_uid||(h.id===data.id&&!_uid))?Object.assign({},h,{name:nm,author:nm,location:lc}):h;});}
       else{DataLayer._cache.restaurants=DataLayer._cache.restaurants.map(function(r){return(r.userId===_uid||(r.id===data.id&&!_uid))?Object.assign({},r,{name:nm,author:nm,location:lc}):r;});}
       if(DataLayer._onUpdate)DataLayer._onUpdate();}catch(ex){}
       toastP("Profil mis à jour","success");
     };
-    if(DataLayer._client&&_uid){DataLayer._client.from("profiles").update({display_name:nm,location:lc}).eq("user_id",_uid).then(_done).catch(_done);}
+    if(DataLayer._client&&_uid){DataLayer._client.from("profiles").update({display_name:nm,location:lc}).eq("user_id",_uid).then(_done).catch(function(){_done({error:true});});}
     else{_done();}
   }
-  function saveAbout(){var d=sanitizeText(draftDesc,2000);if(!d)return;setDescription(d);try{localStorage.setItem(_descKey,d);}catch(e){}try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}try{if(DataLayer._client&&props.authUserId){DataLayer._client.from("profiles").update({description:d,updated_at:new Date().toISOString()}).eq("user_id",props.authUserId).then(function(){}).catch(function(){});}}catch(e){}setEditingAbout(false);toastP("À propos mis à jour","success");}
+  // L'ecriture serveur fait foi : le cache local et la fermeture du formulaire
+  // n'ont lieu qu'apres confirmation, sinon l'utilisateur verrait « mis a jour »
+  // avec un texte qui disparaitrait au prochain chargement.
+  function saveAbout(){
+    if(_aboutSaving)return;
+    var d=sanitizeText(draftDesc,2000);if(!d)return;
+    var _fin=function(res){
+      _setAboutSaving(false);
+      if(res&&res.error){toastP("Échec de l'enregistrement — vérifiez votre connexion et réessayez","error");return;}
+      setDescription(d);
+      try{localStorage.setItem(_descKey,d);}catch(e){}
+      try{DataLayer.saveEstabDescription(data&&data.id,d);}catch(e){}
+      setEditingAbout(false);
+      toastP("À propos mis à jour","success");
+    };
+    if(DataLayer._client&&props.authUserId){
+      _setAboutSaving(true);
+      DataLayer._client.from("profiles").update({description:d,updated_at:new Date().toISOString()}).eq("user_id",props.authUserId).then(_fin).catch(function(){_fin({error:true});});
+    }else{_fin();}
+  }
   var premiumActive=isPremium||data.isPremium;
   // Periode de grace : badge reste visible 7 jours apres expiration de l abonnement
   var _graceActive=false;
@@ -4902,11 +4937,11 @@ function ProProf(props){
           <div style={{textAlign:"center",fontSize:15,fontWeight:800,color:DS.text,marginBottom:20}}>Modifier le profil</div>
           <div style={{marginBottom:12}}>
             <div style={{fontSize:11,fontWeight:700,color:DS.textDim,marginBottom:5}}>NOM DE L'ÉTABLISSEMENT</div>
-            <input value={_draftName} onChange={function(e){_setDraftName(e.target.value);}} placeholder="Nom de l'établissement" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+            <input value={_draftName} onChange={function(e){_setDraftName(e.target.value);}} maxLength={50} placeholder="Nom de l'établissement" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
           </div>
           <div style={{marginBottom:20}}>
             <div style={{fontSize:11,fontWeight:700,color:DS.textDim,marginBottom:5}}>LOCALISATION</div>
-            <input value={_draftLoc} onChange={function(e){_setDraftLoc(e.target.value);}} placeholder="Ville, Pays" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+            <input value={_draftLoc} onChange={function(e){_setDraftLoc(e.target.value);}} maxLength={120} placeholder="Ville, Pays" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
           </div>
           <div style={{display:"flex",gap:10}}>
             <button onClick={function(){_setShowEditProf(false);}} style={{flex:1,padding:"13px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer"}}>Annuler</button>
@@ -4978,10 +5013,10 @@ function ProProf(props){
         {tab==="about"&&(
           editingAbout?(
             <div>
-              <textarea value={draftDesc} onChange={function(ev){setDraftDesc(ev.target.value);}} rows={5} placeholder="Decrivez votre etablissement..." style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",resize:"none",lineHeight:1.6,boxSizing:"border-box",marginBottom:10}}/>
+              <textarea value={draftDesc} onChange={function(ev){setDraftDesc(ev.target.value);}} rows={5} maxLength={2000} placeholder="Decrivez votre etablissement..." style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",resize:"none",lineHeight:1.6,boxSizing:"border-box",marginBottom:10}}/>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={function(){setDraftDesc(description);setEditingAbout(false);}} style={{flex:1,padding:"9px",background:"transparent",border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Annuler</button>
-                <button onClick={saveAbout} style={{flex:1,padding:"9px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}>Enregistrer</button>
+                <button onClick={saveAbout} disabled={_aboutSaving} style={{flex:1,padding:"9px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:_aboutSaving?"default":"pointer",opacity:_aboutSaving?.6:1}}>{_aboutSaving?"Enregistrement…":"Enregistrer"}</button>
               </div>
             </div>
           ):(
@@ -5461,7 +5496,9 @@ export default function App() {
     try{if(v)localStorage.setItem(_lk("hp_profile_photo"),v);else localStorage.removeItem(_lk("hp_profile_photo"));}catch(e){}
     // Suppression reelle : efface aussi photo_url en base (sinon la photo revient au prochain login)
     if(v===null&&DataLayer._client&&auth&&auth.userId){
-      try{DataLayer._client.from("profiles").update({photo_url:null,updated_at:new Date().toISOString()}).eq("user_id",auth.userId).then(function(){}).catch(function(){});}catch(e){}
+      try{DataLayer._client.from("profiles").update({photo_url:null,updated_at:new Date().toISOString()}).eq("user_id",auth.userId)
+        .then(function(res){ if(res&&res.error) toastApp("Échec de la suppression de la photo — vérifiez votre connexion et réessayez","error"); else toastApp("Photo supprimée","success"); })
+        .catch(function(){ toastApp("Échec de la suppression de la photo — vérifiez votre connexion et réessayez","error"); });}catch(e){}
     }
     // Upload vers Supabase Storage si c'est un DataURL base64
     if(v&&v.startsWith("data:")&&DataLayer._client&&auth&&auth.userId){
@@ -5469,12 +5506,12 @@ export default function App() {
         var _arr=v.split(",");
         // Validation MIME stricte — seuls les formats images autorisés
         var _mimeMatch=_arr[0].match(/:(image\/(jpeg|jpg|png|webp|gif));/);
-        if(!_mimeMatch){ console.warn("[Photo] Type MIME non autorise"); return; }
+        if(!_mimeMatch){ console.warn("[Photo] Type MIME non autorise"); toastApp("Format d'image non pris en charge (JPEG, PNG, WebP ou GIF)","error"); return; }
         var _mime=_mimeMatch[1];
         var _ext=_mimeMatch[2]==="jpg"?"jpg":_mimeMatch[2];
         var _bstr=atob(_arr[1]);
         // Validation taille : max 5 MB cote client avant upload
-        if(_bstr.length>5*1024*1024){ console.warn("[Photo] Fichier trop volumineux (max 5 MB)"); return; }
+        if(_bstr.length>5*1024*1024){ console.warn("[Photo] Fichier trop volumineux (max 5 MB)"); toastApp("Photo trop volumineuse (maximum 5 Mo)","error"); return; }
         var _u8=new Uint8Array(_bstr.length);
         for(var _i=0;_i<_bstr.length;_i++){_u8[_i]=_bstr.charCodeAt(_i);}
         var _blob=new Blob([_u8],{type:_mime});
@@ -5487,6 +5524,9 @@ export default function App() {
           if(url&&setProfilePhotoRaw._lastToken===_uploadToken){
             setProfilePhotoRaw(url);
             try{localStorage.setItem(_lk("hp_profile_photo"),url);}catch(e){}
+            // Confirmation annoncee ici seulement : c'est le point ou l'envoi
+            // vers Storage ET l'ecriture de photo_url sont reellement acquis.
+            toastApp("Photo de profil mise à jour","success");
           } else if(!url){
             // Echec d'upload : la photo n'est PAS sauvegardee (elle serait perdue a la deconnexion)
             toastApp("Échec de l'enregistrement de la photo — vérifiez votre connexion et réessayez","error");
@@ -5507,10 +5547,10 @@ export default function App() {
       try{
         var _ca=v.split(",");
         var _cm=_ca[0].match(/:(image\/(jpeg|jpg|png|webp|gif));/);
-        if(!_cm){ console.warn("[Cover] Type MIME non autorise"); return; }
+        if(!_cm){ console.warn("[Cover] Type MIME non autorise"); toastApp("Format d'image non pris en charge (JPEG, PNG, WebP ou GIF)","error"); return; }
         var _cmime=_cm[1];var _cext=_cm[2]==="jpg"?"jpg":_cm[2];
         var _cb=atob(_ca[1]);
-        if(_cb.length>8*1024*1024){ console.warn("[Cover] Fichier trop volumineux (max 8 MB)"); return; }
+        if(_cb.length>8*1024*1024){ console.warn("[Cover] Fichier trop volumineux (max 8 MB)"); toastApp("Image de couverture trop volumineuse (maximum 8 Mo)","error"); return; }
         var _cu8=new Uint8Array(_cb.length);
         for(var _ci=0;_ci<_cb.length;_ci++){_cu8[_ci]=_cb.charCodeAt(_ci);}
         var _cblob=new Blob([_cu8],{type:_cmime});
@@ -5529,6 +5569,7 @@ export default function App() {
               DataLayer._cache.restaurants=_patchImg(DataLayer._cache.restaurants);
               if(DataLayer._onUpdate)DataLayer._onUpdate();
             }catch(exCv){}
+            toastApp("Photo de couverture mise à jour","success");
           } else if(!url){
             toastApp("Échec de l'enregistrement de la couverture — vérifiez votre connexion et réessayez","error");
           }
