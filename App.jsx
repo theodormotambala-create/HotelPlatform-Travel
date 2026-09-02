@@ -481,11 +481,23 @@ var DataLayer = {
   // --- Raccourcis metier (utilisent le CRUD ci-dessus) ---
   // Enregistre une reservation dans Supabase (en plus de l'etat local)
   saveReservation: function(resa, clientId){
+    // Les dates, la chambre et la quantite deviennent de vraies colonnes, en plus
+    // du blob data qui reste inchange. C'est ce qui permet au serveur de verifier
+    // la disponibilite et de refuser une surreservation (declencheur
+    // enforce_room_availability). Sans ces colonnes, la protection reste inerte.
+    var _date=function(v){return (typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v))?v:null;};
+    var _qte=function(v){var n=Number(v);return (isFinite(n)&&n>0)?Math.floor(n):null;};
+    var _prix=function(v){var n=Number(v);return (isFinite(n)&&n>=0)?n:null;};
     return DataLayer.create("reservations", [{
       id: resa.id, client_id: clientId || null,
       estab_id: resa.estab||resa.id||null, estab_type: resa.estabType||resa.type||null,
       estab_owner_id: resa.estabOwnerId||null,
-      status: resa.status||"pending", data: resa
+      status: resa.status||"pending",
+      room_id: resa.roomId||null,
+      check_in: _date(resa.dateIn), check_out: _date(resa.dateOut),
+      quantity: _qte(resa.roomCount)||_qte(resa.tableCount)||null,
+      total_price: _prix(resa.total),
+      data: resa
     }]);
   },
   // Enregistre un message dans Supabase
@@ -762,15 +774,30 @@ var BookingService = {
   generateId: function(){
     return "R" + Date.now().toString().slice(-8);
   },
-  createBooking: function(resa,clientId){
+  // onResult(erreur|null) — optionnel. Sans lui, le comportement d'appel reste
+  // celui d'avant. Nouveaute indispensable : si le serveur REFUSE (plus de
+  // disponibilite, droits, contrainte), la copie locale est retiree au lieu de
+  // laisser croire a une reservation qui n'existe pas cote serveur.
+  createBooking: function(resa,clientId,onResult){
     if(!resa) return null;
     if(!resa.id){ resa.id = BookingService.generateId(); }
     if(!resa.createdAt){ resa.createdAt = new Date().toISOString(); }
     if(clientId&&!resa.clientId){ resa.clientId = clientId; }
     BookingService._all.push(resa);
     try{localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(BookingService._all));}catch(e){}
-    try{ if(DataLayer._client){ DataLayer.saveReservation(resa,clientId||null).then(function(){}); } }catch(e){}
+    try{
+      if(DataLayer._client){
+        DataLayer.saveReservation(resa,clientId||null).then(function(res){
+          if(res&&res.error){ BookingService._annuleLocal(resa.id); if(onResult)onResult(res.error); return; }
+          if(onResult)onResult(null);
+        }).catch(function(err){ BookingService._annuleLocal(resa.id); if(onResult)onResult(err||true); });
+      } else if(onResult){ onResult(null); }
+    }catch(e){ BookingService._annuleLocal(resa.id); if(onResult)onResult(e); }
     return resa;
+  },
+  _annuleLocal: function(id){
+    BookingService._all = BookingService._all.filter(function(r){ return r.id!==id; });
+    try{localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(BookingService._all));}catch(e){}
   },
   getAll: function(){ return BookingService._all.slice(); },
   appendToHistory: function(history, resa){
@@ -3074,6 +3101,16 @@ function StripePaymentModal(props){
 }
 
 function QRTicket(props){var id=props.id||"HP-000000";var sz=props.sz||110;return(<div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}><QRCodeSVG value={id} size={sz} level="M" includeMargin={false}/></div>);}
+// Message d'echec de reservation. Le texte du serveur n'est repris que pour les
+// refus metier (SQLSTATE 23514 : disponibilite, dates, quantite), qui sont ecrits
+// pour l'utilisateur. Toute autre erreur reste generique : on n'expose jamais un
+// message technique (droits, contrainte interne) dans l'interface.
+function _msgResa(err){
+  var code=err&&(err.code||err.status);
+  var txt=err&&err.message;
+  if(code==="23514"&&txt) return txt;
+  return "Réservation impossible — vérifiez votre connexion et réessayez";
+}
 function BookM(props){
   var e=props.e;var onClose=props.onClose;
   var color=rC(e.type);
@@ -3305,15 +3342,20 @@ function BookM(props){
                   // Flux sans paiement : demande envoyée à l'établissement (pending)
                   if(payMode==="sans"){
                     setPaying(true);
-                    var delay=500;
-                    setTimeout(function(){
-                      var initStatus=payMode==="avec"?"confirmed":"pending";
-                      var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:payMode==="avec"?payMethod:null,qr:resaId,status:initStatus,isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                    // Plus de delai simule : c'est la reponse reelle du serveur qui
+                    // fait foi. Une reservation n'est annoncee que si elle existe
+                    // vraiment en base (disponibilite verifiee, droits verifies).
+                    var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,roomId:(e.selectedRoom&&e.selectedRoom.id)||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:null,qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                    // On passe « resa » et non la valeur de retour : le rappel peut
+                    // etre synchrone (hors ligne), la variable ne serait pas encore
+                    // affectee. createBooking renvoie de toute facon ce meme objet.
+                    BookingService.createBooking(resa,selfUserId,function(err){
                       setPaying(false);
+                      if(err){ toast(_msgResa(err),"error"); return; }
                       setStep(3);
                       toast("Demande envoyée à l'établissement !","success");
-                      if(props.onBooked)props.onBooked(BookingService.createBooking(resa,selfUserId));
-                    },delay);
+                      if(props.onBooked)props.onBooked(resa);
+                    });
                     return;
                   }
                   // Paiement carte → Stripe
@@ -3324,26 +3366,36 @@ function BookM(props){
                     setPaying(true);
                     // La reservation nait 'pending' AVANT le paiement : le webhook Stripe (preuve
                     // de paiement signee) la confirmera cote serveur. Abandon = annulation propre.
+                    var _ouvrePaiement=function(){
+                      fetch("/api/create-payment-intent",{
+                        method:"POST",
+                        headers:{"Content-Type":"application/json"},
+                        body:JSON.stringify({amount:_amtCents,currency:"eur",resaId:resaId,estabName:e.name})
+                      })
+                      .then(function(r){return r.json();})
+                      .then(function(data){
+                        setPaying(false);
+                        if(data.error){toast("Erreur paiement : "+data.error,"error");return;}
+                        setStripeClientSecret(data.clientSecret);
+                        setShowStripeModal(true);
+                      })
+                      .catch(function(){
+                        setPaying(false);
+                        toast("Impossible de contacter le service de paiement","error");
+                      });
+                    };
                     if(!_pendingPaidResa.current){
-                      var resaPre={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
-                      _pendingPaidResa.current=BookingService.createBooking(resaPre,selfUserId);
+                      var resaPre={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,roomId:(e.selectedRoom&&e.selectedRoom.id)||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                      // La disponibilite est verifiee AVANT d'ouvrir le paiement, et le
+                      // paiement n'est demande QU'APRES acceptation par le serveur :
+                      // encaisser une chambre deja complete serait la pire des issues.
+                      _pendingPaidResa.current=BookingService.createBooking(resaPre,selfUserId,function(err){
+                        if(err){ _pendingPaidResa.current=null; setPaying(false); toast(_msgResa(err),"error"); return; }
+                        _ouvrePaiement();
+                      });
+                    } else {
+                      _ouvrePaiement();
                     }
-                    fetch("/api/create-payment-intent",{
-                      method:"POST",
-                      headers:{"Content-Type":"application/json"},
-                      body:JSON.stringify({amount:_amtCents,currency:"eur",resaId:resaId,estabName:e.name})
-                    })
-                    .then(function(r){return r.json();})
-                    .then(function(data){
-                      setPaying(false);
-                      if(data.error){toast("Erreur paiement : "+data.error,"error");return;}
-                      setStripeClientSecret(data.clientSecret);
-                      setShowStripeModal(true);
-                    })
-                    .catch(function(){
-                      setPaying(false);
-                      toast("Impossible de contacter le service de paiement","error");
-                    });
                   }
                 }} style={{flex:2,padding:"11px",background:paying?DS.textDim:color,border:"none",borderRadius:12,color:"#fff",fontSize:14,fontWeight:900,cursor:paying?"not-allowed":"pointer",transition:"background .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                   {paying?<span style={{display:"inline-block",width:14,height:14,border:"2px solid #fff",borderTopColor:"transparent",borderRadius:"50%",animation:"hp-spin 0.7s linear infinite"}}/>:null}

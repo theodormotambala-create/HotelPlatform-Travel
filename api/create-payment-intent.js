@@ -87,8 +87,31 @@ export default async function handler(req, res) {
       return res.status(200).json({ clientSecret: adPi.client_secret, amount: adAmt });
     }
 
+    // ---------- MONTANT D'UNE RESERVATION : IMPOSE PAR LE SERVEUR ----------
+    // Le montant transmis par le navigateur n'est jamais une source de verite :
+    // il suffisait d'appeler cette route a la main pour payer 0,50 EUR une suite.
+    // La reservation porte desormais son propre total (colonne total_price,
+    // elle-meme controlee en base par enforce_reservation_price) : c'est lui
+    // qui fait foi des qu'il existe.
+    let amt = Math.round(Number(amount));
+    if (!isPremiumPayment && resaId) {
+      try {
+        const supaR = serviceClient();
+        if (supaR) {
+          const rr = await supaR.from("reservations")
+            .select("id,total_price,status").eq("id", String(resaId)).maybeSingle();
+          if (rr.data && rr.data.total_price != null) {
+            const serveur = Math.round(Number(rr.data.total_price) * 100);
+            if (!Number.isFinite(serveur) || serveur < 50) {
+              return res.status(400).json({ error: "Montant de réservation invalide" });
+            }
+            amt = serveur;
+          }
+        }
+      } catch (e) { /* repli sur la validation ci-dessous */ }
+    }
+
     // Validation stricte du montant (centimes) : 0.50 EUR min, 99 999.99 EUR max
-    const amt = Math.round(Number(amount));
     if (!amt || amt < 50 || amt > 9999999) {
       return res.status(400).json({ error: "Montant invalide (0.50 EUR – 99 999 EUR)" });
     }
