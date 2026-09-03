@@ -2427,7 +2427,19 @@ function ClientFeed(props){
       try{localStorage.setItem(_lk("hp_favs"),JSON.stringify(next));}catch(e){}
       return next;
     });
-    try{if(DataLayer._client&&selfUserId){if(!wasFav){DataLayer._client.from("post_favorites").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"user_id,post_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}else{DataLayer._client.from("post_favorites").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}}}catch(e){}
+    // Le favori est une donnee serveur (post_favorites, cle primaire
+    // user_id+post_id). Si l'ecriture echoue, l'etat affiche revient en
+    // arriere au lieu de montrer un favori qui n'existe pas en base — meme
+    // patron que delPost : retrait optimiste, restauration sur refus.
+    var _revertFav=function(){
+      setFavPosts(function(f){
+        var back=wasFav?(f.indexOf(id)>=0?f:f.concat([id])):f.filter(function(x){return x!==id;});
+        try{localStorage.setItem(_lk("hp_favs"),JSON.stringify(back));}catch(e){}
+        return back;
+      });
+      toast("Action impossible pour le moment","error");
+    };
+    try{if(DataLayer._client&&selfUserId){if(!wasFav){DataLayer._client.from("post_favorites").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"user_id,post_id",ignoreDuplicates:true}).then(function(r){if(r&&r.error)_revertFav();}).catch(function(){_revertFav();});}else{DataLayer._client.from("post_favorites").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(r){if(r&&r.error)_revertFav();}).catch(function(){_revertFav();});}}}catch(e){_revertFav();}
     setMenuOpen(null);
     toast(wasFav?"Retiré des favoris":"Ajouté aux favoris","success");
   }
@@ -2749,7 +2761,13 @@ function ClientProf(props){
   var savedPosts=savedPostIds.map(function(pid){return DataLayer.getFeed().find(function(p){return p.id===pid;});}).filter(Boolean);
   function _removeSavedPost(pid){
     setSavedPostIds(function(ids){return ids.filter(function(x){return x!==pid;});});
-    try{if(DataLayer._client&&_authUidC)DataLayer._client.from("post_favorites").delete().eq("post_id",pid).eq("user_id",_authUidC).then(function(){}).catch(function(){});}catch(e){}
+    // Restauration si le serveur refuse : le favori existe toujours en base.
+    var _revertSaved=function(){
+      setSavedPostIds(function(ids){return ids.indexOf(pid)>=0?ids:[pid].concat(ids);});
+      try{var f2=JSON.parse(localStorage.getItem(_lk("hp_favs"))||"[]");if(f2.indexOf(pid)<0){f2.push(pid);localStorage.setItem(_lk("hp_favs"),JSON.stringify(f2));}}catch(e){}
+      toastCP("Retrait impossible pour le moment","error");
+    };
+    try{if(DataLayer._client&&_authUidC)DataLayer._client.from("post_favorites").delete().eq("post_id",pid).eq("user_id",_authUidC).then(function(r){if(r&&r.error)_revertSaved();}).catch(function(){_revertSaved();});}catch(e){_revertSaved();}
     try{var f=JSON.parse(localStorage.getItem(_lk("hp_favs"))||"[]");localStorage.setItem(_lk("hp_favs"),JSON.stringify(f.filter(function(x){return x!==pid;})));}catch(e){}
   }
   // Ouverture directe d'une reservation (ticket) depuis une notification
@@ -3734,7 +3752,19 @@ function ProFeed(props){
   function toggleFav(id){
     var wasFav=favPosts.indexOf(id)>=0;
     setFavPosts(function(f){var next=wasFav?f.filter(function(x){return x!==id;}):f.concat([id]);try{localStorage.setItem(_lk("hp_pro_favs"),JSON.stringify(next));}catch(e){}return next;});
-    try{if(DataLayer._client&&selfUserId){if(!wasFav){DataLayer._client.from("post_favorites").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"user_id,post_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}else{DataLayer._client.from("post_favorites").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}}}catch(e){}
+    // Le favori est une donnee serveur (post_favorites, cle primaire
+    // user_id+post_id). Si l'ecriture echoue, l'etat affiche revient en
+    // arriere au lieu de montrer un favori qui n'existe pas en base — meme
+    // patron que delPost : retrait optimiste, restauration sur refus.
+    var _revertFav=function(){
+      setFavPosts(function(f){
+        var back=wasFav?(f.indexOf(id)>=0?f:f.concat([id])):f.filter(function(x){return x!==id;});
+        try{localStorage.setItem(_lk("hp_pro_favs"),JSON.stringify(back));}catch(e){}
+        return back;
+      });
+      toast("Action impossible pour le moment","error");
+    };
+    try{if(DataLayer._client&&selfUserId){if(!wasFav){DataLayer._client.from("post_favorites").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"user_id,post_id",ignoreDuplicates:true}).then(function(r){if(r&&r.error)_revertFav();}).catch(function(){_revertFav();});}else{DataLayer._client.from("post_favorites").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(r){if(r&&r.error)_revertFav();}).catch(function(){_revertFav();});}}}catch(e){_revertFav();}
     setMenuOpen(null);
     toast(wasFav?"Retiré des favoris":"Ajouté aux favoris","success");
   }
