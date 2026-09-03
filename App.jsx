@@ -164,6 +164,46 @@ var DataLayer = {
 
   // --- Fil d'actualite (posts) ---
   getFeed: function(){ return DataLayer._cache.feed; },
+  // Taille de page du fil. C'est la valeur DEJA en place dans l'application ;
+  // elle devient une taille de page et non plus un plafond (le serveur la
+  // borne de la meme facon dans get_feed_page).
+  FEED_PAGE: 100,
+  _feedCursor: null,
+  _feedHasMore: false,
+  feedHasMore: function(){ return DataLayer._feedHasMore===true; },
+  _curseurDepuis: function(rows){
+    if(!rows||!rows.length) return null;
+    var last=rows[rows.length-1];
+    return { at: last.created_at||null, id: last.id||null };
+  },
+  // Page suivante du fil. Les publications sont AJOUTEES au cache, jamais
+  // substituees : rien de ce qui est deja charge n'est perdu.
+  loadMoreFeed: function(onDone){
+    if(!DataLayer._client||!DataLayer._feedHasMore||!DataLayer._feedCursor){ if(onDone)onDone(false); return; }
+    var cur=DataLayer._feedCursor;
+    DataLayer._client.rpc("get_feed_page",{p_after_created_at:cur.at,p_after_id:cur.id,p_limit:DataLayer.FEED_PAGE})
+      .then(function(res){
+        if(!res||res.error||!res.data){ if(onDone)onDone(false); return; }
+        var vus={};DataLayer._cache.feed.forEach(function(p){vus[p.id]=1;});
+        var ajout=res.data.filter(function(r){return !vus[r.id];}).map(function(r){
+          var obj=r.data||r;
+          return Object.assign({},obj,{
+            id:r.id,
+            time:r.created_at?timeAgo(r.created_at):obj.time,
+            likes:typeof r.likes==="number"?r.likes:0,
+            shares:typeof r.shares==="number"?r.shares:0,
+            cmtCount:typeof r.comments_count==="number"?r.comments_count:0,
+            ownerUid:r.owner_id||obj.ownerUid||null
+          });
+        });
+        DataLayer._cache.feed=DataLayer._cache.feed.concat(ajout);
+        DataLayer._feedCursor=DataLayer._curseurDepuis(res.data);
+        DataLayer._feedHasMore=res.data.length===DataLayer.FEED_PAGE;
+        if(DataLayer._onUpdate)DataLayer._onUpdate();
+        if(onDone)onDone(true);
+      })
+      .catch(function(){ if(onDone)onDone(false); });
+  },
 
   // --- Messagerie ---
   getClientChats: function(){ return DataLayer._cache.clientChats; },
@@ -217,8 +257,14 @@ var DataLayer = {
         // (_seedEstablishments est conservee mais n'est plus jamais appelee.)
       });
       // 2. Posts — tri chronologique + compteurs serveur (likes/commentaires/partages maintenus par triggers, jamais les valeurs de démo)
-      supabase.from("posts").select("*").order("created_at",{ascending:false}).limit(100).then(function(res){
+      // Premiere page du fil, par curseur (RPC get_feed_page). Ce n'etait pas
+      // une page mais un PLAFOND : la 101e publication n'etait jamais
+      // atteignable. Mesure sur 200 000 publications : une page profonde coute
+      // 0,14 ms et 5 blocs par curseur, contre 61 ms et 2 261 blocs en OFFSET.
+      supabase.rpc("get_feed_page",{p_after_created_at:null,p_after_id:null,p_limit:DataLayer.FEED_PAGE}).then(function(res){
         if(res && res.data && res.data.length>0){
+          DataLayer._feedCursor = DataLayer._curseurDepuis(res.data);
+          DataLayer._feedHasMore = res.data.length===DataLayer.FEED_PAGE;
           DataLayer._cache.feed = res.data.map(function(r){
             var obj=r.data||r;
             obj=Object.assign({},obj,{
@@ -2351,7 +2397,12 @@ function ClientFeed(props){
         setPosts(function(ps){return ps.map(function(p){var nowLiked=!!sbLikes[p.id];return nowLiked===p.liked?p:Object.assign({},p,{liked:nowLiked});});});
       });
     // Compteurs authentiques depuis les colonnes serveur (maintenues par triggers) — une seule requete O(posts)
-    DataLayer._client.from("posts").select("id,likes,comments_count,shares")
+    // Borne aux publications REELLEMENT affichees : sans le .in(), cette
+    // requete ramenait toutes les publications de la plateforme a chaque
+    // ouverture du fil.
+    var _idsAff=DataLayer.getFeed().map(function(p){return p.id;});
+    if(!_idsAff.length)return;
+    DataLayer._client.from("posts").select("id,likes,comments_count,shares").in("id",_idsAff)
       .then(function(r2){
         if(r2.error||!r2.data)return;
         var byId={};r2.data.forEach(function(r){byId[r.id]=r;});
@@ -2378,11 +2429,21 @@ function ClientFeed(props){
   // Rendu progressif : lots de 8 publications via sentinelle (fluidite constante quel que soit le volume)
   var sVis=useState(8);var visibleCount=sVis[0];var setVisibleCount=sVis[1];
   var sentinelRef=useRef(null);
+  var _chargePage=useRef(false);
   useEffect(function(){
     var el=sentinelRef.current;
     if(!el||typeof IntersectionObserver==="undefined")return;
     var obs=new IntersectionObserver(function(entries){
-      if(entries[0]&&entries[0].isIntersecting)setVisibleCount(function(n){return n+8;});
+      if(!entries[0]||!entries[0].isIntersecting)return;
+      // Tout ce qui est charge est deja affiche : on demande la page suivante
+      // au serveur (curseur), au lieu de s'arreter comme avant.
+      if(visibleCount>=posts.length){
+        if(_chargePage.current||!DataLayer.feedHasMore())return;
+        _chargePage.current=true;
+        DataLayer.loadMoreFeed(function(){_chargePage.current=false;});
+        return;
+      }
+      setVisibleCount(function(n){return n+8;});
     },{rootMargin:"600px"});
     obs.observe(el);
     return function(){obs.disconnect();};
@@ -2665,7 +2726,7 @@ function ClientFeed(props){
           </Fragment>
         );
       })}
-    {posts.length>visibleCount&&<div ref={sentinelRef} style={{height:1}}/>}
+    {(posts.length>visibleCount||DataLayer.feedHasMore())&&<div ref={sentinelRef} style={{height:1}}/>}
     {sharePost&&<ShareSheet post={sharePost} onClose={function(){setSharePost(null);}} onShared={function(){confirmShare(sharePost.id);}}/>}
     </div>
   );
@@ -3807,7 +3868,12 @@ function ProFeed(props){
         setPosts(function(ps){return ps.map(function(p){var nowLiked=!!sbLikes[p.id];return nowLiked===p.liked?p:Object.assign({},p,{liked:nowLiked});});});
       });
     // Compteurs authentiques depuis les colonnes serveur (maintenues par triggers)
-    DataLayer._client.from("posts").select("id,likes,comments_count,shares")
+    // Borne aux publications REELLEMENT affichees : sans le .in(), cette
+    // requete ramenait toutes les publications de la plateforme a chaque
+    // ouverture du fil.
+    var _idsAff=DataLayer.getFeed().map(function(p){return p.id;});
+    if(!_idsAff.length)return;
+    DataLayer._client.from("posts").select("id,likes,comments_count,shares").in("id",_idsAff)
       .then(function(r2){
         if(r2.error||!r2.data)return;
         var byId={};r2.data.forEach(function(r){byId[r.id]=r;});
@@ -3833,6 +3899,7 @@ function ProFeed(props){
   },[selfUserId]);
   // Rendu progressif : lots de 8 publications via sentinelle
   var sVisPro=useState(8);var visibleCountPro=sVisPro[0];var setVisibleCountPro=sVisPro[1];
+  var _chargePagePro=useRef(false);
   var postRefsPro=useRef({});
   // Campagnes sponsorisees REELLES (serveur) : cartes intercalees, vues/clics comptes.
   var sAdsP=useState([]);var adsP=sAdsP[0];var setAdsP=sAdsP[1];
@@ -3867,7 +3934,14 @@ function ProFeed(props){
     var el=sentinelRefPro.current;
     if(!el||typeof IntersectionObserver==="undefined")return;
     var obs=new IntersectionObserver(function(entries){
-      if(entries[0]&&entries[0].isIntersecting)setVisibleCountPro(function(n){return n+8;});
+      if(!entries[0]||!entries[0].isIntersecting)return;
+      if(visibleCountPro>=posts.length){
+        if(_chargePagePro.current||!DataLayer.feedHasMore())return;
+        _chargePagePro.current=true;
+        DataLayer.loadMoreFeed(function(){_chargePagePro.current=false;});
+        return;
+      }
+      setVisibleCountPro(function(n){return n+8;});
     },{rootMargin:"600px"});
     obs.observe(el);
     return function(){obs.disconnect();};
@@ -4116,7 +4190,7 @@ function ProFeed(props){
           </Fragment>
         );
       })}
-    {posts.length>visibleCountPro&&<div ref={sentinelRefPro} style={{height:1}}/>}
+    {(posts.length>visibleCountPro||DataLayer.feedHasMore())&&<div ref={sentinelRefPro} style={{height:1}}/>}
     {sharePost&&<ShareSheet post={sharePost} onClose={function(){setSharePost(null);}} onShared={function(){confirmShare(sharePost.id);}}/>}
     </div>
   );
