@@ -2232,7 +2232,7 @@ function CommentsSheet(props){
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:14,marginTop:8,paddingLeft:4}}>
                       <span style={{fontSize:11,color:DS.textDim,fontWeight:600}}>{cm.time}</span>
-                      <button onClick={function(){setReplyTo(cm);}} style={{fontSize:12,fontWeight:700,color:DS.textMuted,background:"none",border:"none",cursor:"pointer",padding:0}}>Répondre</button>
+                      <button onClick={function(){if(String(cm.id).indexOf("local_")===0)return;setReplyTo(cm);}} disabled={String(cm.id).indexOf("local_")===0} title={String(cm.id).indexOf("local_")===0?"Publication du commentaire en cours…":undefined} style={{fontSize:12,fontWeight:700,color:DS.textMuted,background:"none",border:"none",cursor:String(cm.id).indexOf("local_")===0?"default":"pointer",padding:0,opacity:String(cm.id).indexOf("local_")===0?0.45:1}}>Répondre</button>
                       <span style={{fontSize:10,color:DS.textDim}}>· maintenir pour {mine?"supprimer":"signaler"}</span>
                     </div>
                     {/* Bouton "Afficher X réponses" — Facebook style */}
@@ -2262,7 +2262,7 @@ function CommentsSheet(props){
                                 </div>
                                 <div style={{display:"flex",alignItems:"center",gap:14,marginTop:7,paddingLeft:3}}>
                                   <span style={{fontSize:11,color:DS.textDim,fontWeight:600}}>{rep.time}</span>
-                                  <button onClick={function(){setReplyTo(cm);}} style={{fontSize:12,fontWeight:700,color:DS.textMuted,background:"none",border:"none",cursor:"pointer",padding:0}}>Répondre</button>
+                                  <button onClick={function(){if(String(cm.id).indexOf("local_")===0)return;setReplyTo(cm);}} disabled={String(cm.id).indexOf("local_")===0} title={String(cm.id).indexOf("local_")===0?"Publication du commentaire en cours…":undefined} style={{fontSize:12,fontWeight:700,color:DS.textMuted,background:"none",border:"none",cursor:String(cm.id).indexOf("local_")===0?"default":"pointer",padding:0,opacity:String(cm.id).indexOf("local_")===0?0.45:1}}>Répondre</button>
                                   <span style={{fontSize:10,color:DS.textDim}}>· maintenir pour {repMine?"supprimer":"signaler"}</span>
                                 </div>
                               </div>
@@ -2482,7 +2482,22 @@ function ClientFeed(props){
   function addCmt(id,replyTo){
     var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
     var localId="local_"+Date.now();
-    var _parentId=replyTo&&replyTo.id&&String(replyTo.id).indexOf("-")>0?replyTo.id:null;
+    // Un commentaire n'est rattachable a son parent que si ce parent possede
+    // deja son identifiant de base. La detection reprend la convention du
+    // fichier (delCmt, delPost : indexOf("local_")!==0) et non l'heuristique
+    // « l'identifiant contient un tiret », qui laissait passer un identifiant
+    // local et enregistrait la reponse DEFINITIVEMENT detachee : a l'affichage,
+    // une reponse sans parentId se rabat sur le DERNIER groupe (l.2210), donc
+    // sous un commentaire qui n'est pas le sien.
+    // Fil a plat, comme Facebook : parent_id designe TOUJOURS le commentaire
+    // racine. Repondre a une reponse rattache donc au meme fil, pas a la
+    // reponse elle-meme. Preuve que c'est le modele attendu : l'affichage
+    // n'indexe que les racines dans byId (l.2208) ; un parent_id pointant vers
+    // une reponse ne serait jamais retrouve et retomberait sur le repli.
+    // La mention « @Auteur » conserve a qui l'on repond.
+    var _cible=replyTo||null;
+    var _racine=(_cible&&(_cible.replyTo||_cible.parentId))?_cible.parentId:(_cible?_cible.id:null);
+    var _parentId=(_racine&&String(_racine).indexOf("local_")!==0)?_racine:null;
     var cm={id:localId,userId:selfUserId,author:selfName,photo:selfPhoto,text:text,time:"maintenant",parentId:_parentId,replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm]),cmtCount:(p.cmtCount||p.comments.length)+1}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
@@ -3650,7 +3665,22 @@ function ProFeed(props){
   function addCmt(id,replyTo){
     var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
     var localId="local_"+Date.now();
-    var _parentId=replyTo&&replyTo.id&&String(replyTo.id).indexOf("-")>0?replyTo.id:null;
+    // Un commentaire n'est rattachable a son parent que si ce parent possede
+    // deja son identifiant de base. La detection reprend la convention du
+    // fichier (delCmt, delPost : indexOf("local_")!==0) et non l'heuristique
+    // « l'identifiant contient un tiret », qui laissait passer un identifiant
+    // local et enregistrait la reponse DEFINITIVEMENT detachee : a l'affichage,
+    // une reponse sans parentId se rabat sur le DERNIER groupe (l.2210), donc
+    // sous un commentaire qui n'est pas le sien.
+    // Fil a plat, comme Facebook : parent_id designe TOUJOURS le commentaire
+    // racine. Repondre a une reponse rattache donc au meme fil, pas a la
+    // reponse elle-meme. Preuve que c'est le modele attendu : l'affichage
+    // n'indexe que les racines dans byId (l.2208) ; un parent_id pointant vers
+    // une reponse ne serait jamais retrouve et retomberait sur le repli.
+    // La mention « @Auteur » conserve a qui l'on repond.
+    var _cible=replyTo||null;
+    var _racine=(_cible&&(_cible.replyTo||_cible.parentId))?_cible.parentId:(_cible?_cible.id:null);
+    var _parentId=(_racine&&String(_racine).indexOf("local_")!==0)?_racine:null;
     var cm={id:localId,userId:selfUserId,author:data.name,photo:selfPhoto,text:text,time:"maintenant",parentId:_parentId,replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm]),cmtCount:(p.cmtCount||p.comments.length)+1}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
