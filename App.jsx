@@ -2323,6 +2323,9 @@ function CommentsSheet(props){
             );
           });
         })()}
+        {props.onLoadMoreCmts&&props.hasMoreCmts&&(
+          <button onClick={function(){props.onLoadMoreCmts(post.id);}} style={{width:"100%",padding:"10px",marginTop:4,background:"transparent",border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,fontWeight:700,cursor:"pointer"}}>Voir plus de commentaires</button>
+        )}
       </div>
       {/* Indicateur de réponse */}
       {replyTo&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 14px",background:DS.primary+"12",borderTop:"1px solid "+DS.primary+"30",flexShrink:0}}>
@@ -2450,14 +2453,33 @@ function ClientFeed(props){
   },[posts.length,visibleCount]);
   // Commentaires charges a la demande, par publication (pattern Facebook — pas de telechargement global)
   var _cmtLoaded=useRef({});
-  function _loadCmts(id){
-    if(_cmtLoaded.current[id]||!DataLayer._client)return;
+  // Commentaires pagines par curseur (RPC get_post_comments_page). Avant,
+  // .limit(200) en ordre croissant : au-dela de 200, les plus RECENTS
+  // devenaient invisibles sans que rien ne l'indique.
+  var _cmtLoadedCursor=useRef({});
+  var _cmtLoadedMore=useRef({});
+  function _loadCmts(id, suite){
+    if(!DataLayer._client)return;
+    if(!suite&&_cmtLoaded.current[id])return;
+    if(suite&&!_cmtLoadedMore.current[id])return;
     _cmtLoaded.current[id]=true;
-    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,author_photo,body,created_at,parent_id,reply_to_author,reply_to_text").eq("post_id",id).order("created_at",{ascending:true}).limit(200)
+    var cur=suite?(_cmtLoadedCursor.current[id]||null):null;
+    DataLayer._client.rpc("get_post_comments_page",{p_post_id:id,p_after_created_at:cur?cur.at:null,p_after_id:cur?cur.id:null,p_limit:CMT_PAGE})
       .then(function(r3){
-        if(r3.error||!r3.data||r3.data.length===0)return;
+        if(r3.error||!r3.data||r3.data.length===0){_cmtLoadedMore.current[id]=false;return;}
+        var _last=r3.data[r3.data.length-1];
+        _cmtLoadedCursor.current[id]={at:_last.created_at,id:_last.id};
+        _cmtLoadedMore.current[id]=r3.data.length===CMT_PAGE;
         var cs=r3.data.map(function(c){return {id:c.id,userId:c.user_id,author:c.author||"Utilisateur",photo:c.author_photo||null,text:c.body,time:timeAgo(c.created_at),parentId:c.parent_id||null,replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null};});
-        setPosts(function(ps){return ps.map(function(p){if(p.id!==id)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
+        // Premiere page : la page serveur passe devant, les commentaires locaux
+        // non encore confirmes restent a la suite (comportement d'origine).
+        // Page suivante : elle s'AJOUTE a la fin, sans desordonner l'existant.
+        setPosts(function(ps){return ps.map(function(p){
+          if(p.id!==id)return p;
+          var ids=cs.map(function(c){return String(c.id);});
+          var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});
+          return Object.assign({},p,{comments:suite?keep.concat(cs):cs.concat(keep)});
+        });});
       }).catch(function(){});
   }
   var sShare=useState(null);var sharePost=sShare[0];var setSharePost=sShare[1];
@@ -2719,7 +2741,7 @@ function ClientFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfUserId={selfUserId} selfPhoto={selfPhoto} selfVerified={isPremium} onReportComment={function(cm){setReportCmt(cm);}} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} onLoadMoreCmts={function(pid){_loadCmts(pid,true);}} hasMoreCmts={_cmtLoadedMore.current[post.id]===true} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfName={selfName} selfLetter={selfLetter} selfUserId={selfUserId} selfPhoto={selfPhoto} selfVerified={isPremium} onReportComment={function(cm){setReportCmt(cm);}} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
           {_adSlot&&<SponsoredCard ad={_adSlot} onOpen={_adOpen} onImpression={_adImpression}/>}
@@ -3308,6 +3330,10 @@ function QRTicket(props){var id=props.id||"HP-000000";var sz=props.sz||110;retur
 // message technique (droits, contrainte interne) dans l'interface.
 // Message d'echec de publication d'un avis. Memes principes que _msgResa :
 // seuls les refus metier ecrits pour l'utilisateur sont repris tels quels.
+// Taille de page des commentaires. C'est la valeur DEJA en place dans
+// l'application ; elle devient une taille de page et non plus un plafond
+// (le serveur la borne de la meme facon dans get_post_comments_page).
+var CMT_PAGE=200;
 function _msgAvis(err){
   var code=err&&(err.code||err.status);
   if(code==="23505") return "Vous avez déjà publié un avis sur cet établissement";
@@ -3948,14 +3974,33 @@ function ProFeed(props){
   },[posts.length,visibleCountPro]);
   // Commentaires charges a la demande, par publication (pattern Facebook)
   var _cmtLoadedPro=useRef({});
-  function _loadCmtsPro(id){
-    if(_cmtLoadedPro.current[id]||!DataLayer._client)return;
+  // Commentaires pagines par curseur (RPC get_post_comments_page). Avant,
+  // .limit(200) en ordre croissant : au-dela de 200, les plus RECENTS
+  // devenaient invisibles sans que rien ne l'indique.
+  var _cmtLoadedProCursor=useRef({});
+  var _cmtLoadedProMore=useRef({});
+  function _loadCmtsPro(id, suite){
+    if(!DataLayer._client)return;
+    if(!suite&&_cmtLoadedPro.current[id])return;
+    if(suite&&!_cmtLoadedProMore.current[id])return;
     _cmtLoadedPro.current[id]=true;
-    DataLayer._client.from("post_comments").select("id,post_id,user_id,author,author_photo,body,created_at,parent_id,reply_to_author,reply_to_text").eq("post_id",id).order("created_at",{ascending:true}).limit(200)
+    var cur=suite?(_cmtLoadedProCursor.current[id]||null):null;
+    DataLayer._client.rpc("get_post_comments_page",{p_post_id:id,p_after_created_at:cur?cur.at:null,p_after_id:cur?cur.id:null,p_limit:CMT_PAGE})
       .then(function(r3){
-        if(r3.error||!r3.data||r3.data.length===0)return;
+        if(r3.error||!r3.data||r3.data.length===0){_cmtLoadedProMore.current[id]=false;return;}
+        var _last=r3.data[r3.data.length-1];
+        _cmtLoadedProCursor.current[id]={at:_last.created_at,id:_last.id};
+        _cmtLoadedProMore.current[id]=r3.data.length===CMT_PAGE;
         var cs=r3.data.map(function(c){return {id:c.id,userId:c.user_id,author:c.author||"Utilisateur",photo:c.author_photo||null,text:c.body,time:timeAgo(c.created_at),parentId:c.parent_id||null,replyTo:c.reply_to_author?("@"+c.reply_to_author+" : "+(c.reply_to_text||"")):null};});
-        setPosts(function(ps){return ps.map(function(p){if(p.id!==id)return p;var ids=cs.map(function(c){return String(c.id);});var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});return Object.assign({},p,{comments:cs.concat(keep)});});});
+        // Premiere page : la page serveur passe devant, les commentaires locaux
+        // non encore confirmes restent a la suite (comportement d'origine).
+        // Page suivante : elle s'AJOUTE a la fin, sans desordonner l'existant.
+        setPosts(function(ps){return ps.map(function(p){
+          if(p.id!==id)return p;
+          var ids=cs.map(function(c){return String(c.id);});
+          var keep=p.comments.filter(function(x){return ids.indexOf(String(x.id))<0;});
+          return Object.assign({},p,{comments:suite?keep.concat(cs):cs.concat(keep)});
+        });});
       }).catch(function(){});
   }
   var sHeartPro=useState(null);var heartAnimPro=sHeartPro[0];var setHeartAnimPro=sHeartPro[1];
@@ -4183,7 +4228,7 @@ function ProFeed(props){
               })}
             </div>
             {post.showCmt&&(
-              <CommentsSheet post={post} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} selfUserId={selfUserId} selfPhoto={selfPhoto} onReportComment={function(cm){setReportCmt(cm);}} onClose={function(){toggleCmt(post.id);}}/>
+              <CommentsSheet post={post} onLoadMoreCmts={function(pid){_loadCmtsPro(pid,true);}} hasMoreCmts={_cmtLoadedProMore.current[post.id]===true} cmtText={cmtText} setCmtText={setCmtText} addCmt={addCmt} delCmt={delCmt} selfLetter={data.name[0]} selfName={data.name} selfUserId={selfUserId} selfPhoto={selfPhoto} onReportComment={function(cm){setReportCmt(cm);}} onClose={function(){toggleCmt(post.id);}}/>
             )}
           </div>
           {_adSlotP&&<SponsoredCard ad={_adSlotP} onOpen={_adOpenP} onImpression={_adImpressionP}/>}
