@@ -2443,10 +2443,21 @@ function ClientFeed(props){
       try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem(_lk("hp_likes"),JSON.stringify(lk));}catch(e){}
       return next;
     });
+    // Le compteur affiche est optimiste ; si le serveur refuse, on REVIENT en
+    // arriere au lieu de laisser un j'aime qui n'existe pas en base (meme
+    // patron que delPost : retrait optimiste, restauration sur refus).
+    var _revertLike=function(){
+      setPosts(function(ps){
+        var back=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:wasLiked,likes:wasLiked?p.likes+1:Math.max(p.likes-1,0)}):p;});
+        try{var lk2={};back.forEach(function(p){if(p.liked)lk2[p.id]=1;});localStorage.setItem(_lk("hp_likes"),JSON.stringify(lk2));}catch(e){}
+        return back;
+      });
+      toast("Action impossible pour le moment","error");
+    };
     try{
       if(DataLayer._client&&selfUserId){
-        if(!wasLiked){DataLayer._client.from("post_likes").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"post_id,user_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}
-        else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}
+        if(!wasLiked){DataLayer._client.from("post_likes").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"post_id,user_id",ignoreDuplicates:true}).then(function(r){if(r&&r.error)_revertLike();}).catch(function(){_revertLike();});}
+        else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(r){if(r&&r.error)_revertLike();}).catch(function(){_revertLike();});}
       }
     }catch(e){}
   }
@@ -2454,8 +2465,19 @@ function ClientFeed(props){
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
   function confirmShare(id){
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});
-    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_shares").insert([{post_id:id,user_id:selfUserId}]).then(function(){}).catch(function(){});}}catch(e){}
-    toast("Partagé avec succès","success");
+    // Le compteur de partages est maintenu par declencheur serveur : si
+    // l'ecriture echoue, le +1 affiche serait faux. On le retire alors.
+    var _revertShare=function(){
+      setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:Math.max((p.shares||1)-1,0)}):p;});});
+      toast("Partage non enregistré — vérifiez votre connexion","error");
+    };
+    try{
+      if(DataLayer._client&&selfUserId){
+        DataLayer._client.from("post_shares").insert([{post_id:id,user_id:selfUserId}])
+          .then(function(r){if(r&&r.error){_revertShare();return;}toast("Partagé avec succès","success");})
+          .catch(function(){_revertShare();});
+      } else { toast("Partagé avec succès","success"); }
+    }catch(e){_revertShare();}
   }
   function addCmt(id,replyTo){
     var text=sanitizeText(cmtText[id]||"",500);if(!text)return;
@@ -2464,14 +2486,32 @@ function ClientFeed(props){
     var cm={id:localId,userId:selfUserId,author:selfName,photo:selfPhoto,text:text,time:"maintenant",parentId:_parentId,replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm]),cmtCount:(p.cmtCount||p.comments.length)+1}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
+    // Le commentaire est affiche immediatement ; si le serveur refuse, il est
+    // retire et le texte rendu a l'utilisateur, au lieu de rester affiche avec
+    // un identifiant local qui disparaitra au rechargement.
+    var _revertCmt=function(){
+      setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:(p.comments||[]).filter(function(c){return c.id!==localId;}),cmtCount:Math.max((p.cmtCount||1)-1,0)}):p;});});
+      setCmtText(function(prev){var back=Object.assign({},prev);back[id]=text;return back;});
+      toast("Commentaire non publié — vérifiez votre connexion","error");
+    };
     try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:selfName,author_photo:selfPhotoUrl,body:text,parent_id:_parentId,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).select("id").then(function(r){
+      if(r&&r.error){_revertCmt();return;}
+      toast("Commentaire publié","neutral");
       if(r.data&&r.data[0]&&r.data[0].id){var dbId=r.data[0].id;setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.map(function(c){return c.id===localId?Object.assign({},c,{id:dbId}):c;})}):p;});});}
-    }).catch(function(){});}}catch(e){}
-    toast("Commentaire publié","neutral");
+    }).catch(function(){_revertCmt();});}else{toast("Commentaire publié","neutral");}}catch(e){_revertCmt();}
   }
   function delCmt(postId,cmId){
+    var _removedCm=null;
+    try{var _pSrc=posts.find(function(p){return p.id===postId;});if(_pSrc)_removedCm=(_pSrc.comments||[]).find(function(cm){return cm.id===cmId;})||null;}catch(e){}
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;}),cmtCount:Math.max((p.cmtCount||p.comments.length)-1,0)}):p;});});
-    try{if(DataLayer._client&&selfUserId&&String(cmId).indexOf("local_")!==0)DataLayer._client.from("post_comments").delete().eq("id",String(cmId)).eq("user_id",selfUserId).then(function(){}).catch(function(){});}catch(e){}
+    // Restauration si le serveur refuse : le commentaire existe toujours en
+    // base, l'utilisateur ne doit pas croire l'avoir supprime.
+    var _revertDel=function(){
+      if(!_removedCm)return;
+      setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:(p.comments||[]).some(function(cm){return cm.id===cmId;})?p.comments:[_removedCm].concat(p.comments||[]),cmtCount:(p.cmtCount||0)+1}):p;});});
+      toast("Suppression impossible pour le moment","error");
+    };
+    try{if(DataLayer._client&&selfUserId&&String(cmId).indexOf("local_")!==0)DataLayer._client.from("post_comments").delete().eq("id",String(cmId)).eq("user_id",selfUserId).then(function(r){if(r&&r.error)_revertDel();}).catch(function(){_revertDel();});}catch(e){}
     toast("Commentaire supprimé","neutral");
   }
   var sLoad=useState(true);var loading=sLoad[0];var setLoading=sLoad[1];
@@ -3614,14 +3654,32 @@ function ProFeed(props){
     var cm={id:localId,userId:selfUserId,author:data.name,photo:selfPhoto,text:text,time:"maintenant",parentId:_parentId,replyTo:replyTo?("@"+replyTo.author+" : "+replyTo.text.slice(0,40)+(replyTo.text.length>40?"…":"")):null};
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.concat([cm]),cmtCount:(p.cmtCount||p.comments.length)+1}):p;});});
     var nc=Object.assign({},cmtText);nc[id]="";setCmtText(nc);
+    // Le commentaire est affiche immediatement ; si le serveur refuse, il est
+    // retire et le texte rendu a l'utilisateur, au lieu de rester affiche avec
+    // un identifiant local qui disparaitra au rechargement.
+    var _revertCmt=function(){
+      setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:(p.comments||[]).filter(function(c){return c.id!==localId;}),cmtCount:Math.max((p.cmtCount||1)-1,0)}):p;});});
+      setCmtText(function(prev){var back=Object.assign({},prev);back[id]=text;return back;});
+      toast("Commentaire non publié — vérifiez votre connexion","error");
+    };
     try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_comments").insert([{post_id:id,user_id:selfUserId,author:data.name,author_photo:selfPhotoUrl,body:text,parent_id:_parentId,reply_to_author:replyTo?replyTo.author:null,reply_to_text:replyTo?String(replyTo.text||"").slice(0,80):null}]).select("id").then(function(r){
+      if(r&&r.error){_revertCmt();return;}
+      toast("Commentaire publié","neutral");
       if(r.data&&r.data[0]&&r.data[0].id){var dbId=r.data[0].id;setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{comments:p.comments.map(function(c){return c.id===localId?Object.assign({},c,{id:dbId}):c;})}):p;});});}
-    }).catch(function(){});}}catch(e){}
-    toast("Commentaire publié","neutral");
+    }).catch(function(){_revertCmt();});}else{toast("Commentaire publié","neutral");}}catch(e){_revertCmt();}
   }
   function delCmt(postId,cmId){
+    var _removedCm=null;
+    try{var _pSrc=posts.find(function(p){return p.id===postId;});if(_pSrc)_removedCm=(_pSrc.comments||[]).find(function(cm){return cm.id===cmId;})||null;}catch(e){}
     setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:p.comments.filter(function(cm){return cm.id!==cmId;}),cmtCount:Math.max((p.cmtCount||p.comments.length)-1,0)}):p;});});
-    try{if(DataLayer._client&&selfUserId&&String(cmId).indexOf("local_")!==0)DataLayer._client.from("post_comments").delete().eq("id",String(cmId)).eq("user_id",selfUserId).then(function(){}).catch(function(){});}catch(e){}
+    // Restauration si le serveur refuse : le commentaire existe toujours en
+    // base, l'utilisateur ne doit pas croire l'avoir supprime.
+    var _revertDel=function(){
+      if(!_removedCm)return;
+      setPosts(function(ps){return ps.map(function(p){return p.id===postId?Object.assign({},p,{comments:(p.comments||[]).some(function(cm){return cm.id===cmId;})?p.comments:[_removedCm].concat(p.comments||[]),cmtCount:(p.cmtCount||0)+1}):p;});});
+      toast("Suppression impossible pour le moment","error");
+    };
+    try{if(DataLayer._client&&selfUserId&&String(cmId).indexOf("local_")!==0)DataLayer._client.from("post_comments").delete().eq("id",String(cmId)).eq("user_id",selfUserId).then(function(r){if(r&&r.error)_revertDel();}).catch(function(){_revertDel();});}catch(e){}
     toast("Commentaire supprimé","neutral");
   }
   var sm=useState(null);var menuOpen=sm[0];var setMenuOpen=sm[1];
@@ -3775,10 +3833,21 @@ function ProFeed(props){
       try{var lk={};next.forEach(function(p){if(p.liked)lk[p.id]=1;});localStorage.setItem(_lk("hp_pro_likes"),JSON.stringify(lk));}catch(e){}
       return next;
     });
+    // Le compteur affiche est optimiste ; si le serveur refuse, on REVIENT en
+    // arriere au lieu de laisser un j'aime qui n'existe pas en base (meme
+    // patron que delPost : retrait optimiste, restauration sur refus).
+    var _revertLike=function(){
+      setPosts(function(ps){
+        var back=ps.map(function(p){return p.id===id?Object.assign({},p,{liked:wasLiked,likes:wasLiked?p.likes+1:Math.max(p.likes-1,0)}):p;});
+        try{var lk2={};back.forEach(function(p){if(p.liked)lk2[p.id]=1;});localStorage.setItem(_lk("hp_likes"),JSON.stringify(lk2));}catch(e){}
+        return back;
+      });
+      toast("Action impossible pour le moment","error");
+    };
     try{
       if(DataLayer._client&&selfUserId){
-        if(!wasLiked){DataLayer._client.from("post_likes").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"post_id,user_id",ignoreDuplicates:true}).then(function(){}).catch(function(){});}
-        else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(){}).catch(function(){});}
+        if(!wasLiked){DataLayer._client.from("post_likes").upsert([{user_id:selfUserId,post_id:id}],{onConflict:"post_id,user_id",ignoreDuplicates:true}).then(function(r){if(r&&r.error)_revertLike();}).catch(function(){_revertLike();});}
+        else{DataLayer._client.from("post_likes").delete().eq("post_id",id).eq("user_id",selfUserId).then(function(r){if(r&&r.error)_revertLike();}).catch(function(){_revertLike();});}
       }
     }catch(e){}
   }
@@ -3786,8 +3855,19 @@ function ProFeed(props){
   function doShare(id){var p=null;for(var k=0;k<posts.length;k++){if(posts[k].id===id){p=posts[k];break;}}setSharePost(p);}
   function confirmShare(id){
     setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:(p.shares||0)+1}):p;});});
-    try{if(DataLayer._client&&selfUserId){DataLayer._client.from("post_shares").insert([{post_id:id,user_id:selfUserId}]).then(function(){}).catch(function(){});}}catch(e){}
-    toast("Partagé avec succès","success");
+    // Le compteur de partages est maintenu par declencheur serveur : si
+    // l'ecriture echoue, le +1 affiche serait faux. On le retire alors.
+    var _revertShare=function(){
+      setPosts(function(ps){return ps.map(function(p){return p.id===id?Object.assign({},p,{shares:Math.max((p.shares||1)-1,0)}):p;});});
+      toast("Partage non enregistré — vérifiez votre connexion","error");
+    };
+    try{
+      if(DataLayer._client&&selfUserId){
+        DataLayer._client.from("post_shares").insert([{post_id:id,user_id:selfUserId}])
+          .then(function(r){if(r&&r.error){_revertShare();return;}toast("Partagé avec succès","success");})
+          .catch(function(){_revertShare();});
+      } else { toast("Partagé avec succès","success"); }
+    }catch(e){_revertShare();}
   }
   function openCmtPro(id){_loadCmtsPro(id);toggleCmt(id);}
   var smedia=useState(null);var mediaPreview=smedia[0];var setMediaPreview=smedia[1];
