@@ -209,10 +209,12 @@ var DataLayer = {
           if(hotels.length) DataLayer._cache.hotels = hotels;
           if(rests.length)  DataLayer._cache.restaurants = rests;
           if(DataLayer._onUpdate) DataLayer._onUpdate();
-        } else if(res && res.data && res.data.length===0){
-          // Base vide : on l'alimente avec la demo (premier lancement)
-          DataLayer._seedEstablishments(supabase);
         }
+        // Base vide : on n'y injecte PLUS les etablissements de demonstration.
+        // Ecrire des donnees fictives dans la base de production (« Grand Hotel
+        // Royal », notes et avis inventes) est le contraire d'une plateforme
+        // reelle : une base vide reste vide jusqu'aux premieres inscriptions.
+        // (_seedEstablishments est conservee mais n'est plus jamais appelee.)
       });
       // 2. Posts — tri chronologique + compteurs serveur (likes/commentaires/partages maintenus par triggers, jamais les valeurs de démo)
       supabase.from("posts").select("*").order("created_at",{ascending:false}).limit(100).then(function(res){
@@ -914,19 +916,61 @@ function ChatListSkeleton(){return(<div style={{animation:"hp-fade .2s ease"}}>{
 function ResaSkeleton(){return(<div style={{padding:"0 14px",animation:"hp-fade .2s ease"}}>{[0,1,2].map(function(i){return(<div key={i} style={{background:DS.card,borderRadius:14,padding:"14px",marginBottom:12,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{flex:1,display:"flex",flexDirection:"column",gap:7}}><Sk h={14} w="60%"/><Sk h={11} w="40%"/><Sk h={10} w="55%"/></div><div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}><Sk h={16} w={70} r={6}/><Sk h={10} w={50} r={6}/></div></div><div style={{display:"flex",gap:6}}><Sk h={30} w={80} r={8}/><Sk h={30} w={80} r={8}/></div></div>);})}</div>);}
 
 function AdBanner(){
-  var si=useState(0);var adIdx=si[0];var setAdIdx=si[1];
-  useEffect(function(){var t=setInterval(function(){setAdIdx(function(i){return(i+1)%ADS_POOL.length;});},6000);return function(){clearInterval(t);};},[]);
-  var AD=ADS_POOL[adIdx];if(!AD||!AD.active)return null;
+  // Bandeau sponsorise : UNIQUEMENT des campagnes reelles, actives et payees
+  // (sponsor_profile). Aucune campagne => aucun bandeau : pas de paiement,
+  // pas d'affichage. L'emplacement est attribue proportionnellement au prix
+  // paye — un emplacement rare ne se distribue pas a parts egales entre un
+  // annonceur a 7 jours et un annonceur a 12 mois.
+  var sAdsB=useState([]);var adsB=sAdsB[0];var setAdsB=sAdsB[1];
+  var sCurB=useState(null);var curB=sCurB[0];var setCurB=sCurB[1];
+  var _impB=useRef({});
+  useEffect(function(){
+    if(!DataLayer._client)return;
+    DataLayer._client.rpc("get_active_ads").then(function(r){
+      if(!r||r.error||!r.data)return;
+      var list=r.data.filter(function(a){return a.kind==="sponsor_profile";});
+      setAdsB(list);
+      if(list.length)setCurB(_pickWeighted(list));
+    }).catch(function(){});
+  },[]);
+  useEffect(function(){
+    if(adsB.length<2)return;
+    var t=setInterval(function(){setCurB(_pickWeighted(adsB));},6000);
+    return function(){clearInterval(t);};
+  },[adsB]);
+  // Impression comptee une fois par campagne et par session d'ecran (meme
+  // regle que la carte sponsorisee du fil), pas a chaque rotation.
+  useEffect(function(){
+    if(!curB||!curB.id||_impB.current[curB.id])return;
+    _impB.current[curB.id]=1;
+    try{if(DataLayer._client)DataLayer._client.rpc("ad_track",{p_id:curB.id,p_event:"impression"}).then(function(){}).catch(function(){});}catch(e){}
+  },[curB&&curB.id]);
+  if(!curB)return null;
   return(
-    <div key={adIdx} style={{margin:"6px 14px",padding:"7px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:10,display:"flex",alignItems:"center",gap:8,animation:"hp-fade 0.4s ease"}}>
+    <div key={curB.id} onClick={function(){
+      try{if(DataLayer._client)DataLayer._client.rpc("ad_track",{p_id:curB.id,p_event:"click"}).then(function(){}).catch(function(){});}catch(e){}
+      if(props.onOpen)props.onOpen(curB);
+    }} style={{margin:"6px 14px",padding:"7px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:10,display:"flex",alignItems:"center",gap:8,animation:"hp-fade 0.4s ease",cursor:"pointer"}}>
       <Tag size={11} color={DS.gold}/>
-      <div style={{flex:1,minWidth:0}}>
-        <span style={{fontSize:9,fontWeight:800,color:DS.gold,letterSpacing:1}}>{AD.label} · </span>
-        <span style={{fontSize:9,fontWeight:800,color:DS.gold}}>{AD.estab} · </span>
-        <span style={{fontSize:10,color:DS.textMuted}}>{AD.text}</span>
+      <div style={{flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+        <span style={{fontSize:9,fontWeight:800,color:DS.gold,letterSpacing:1}}>SPONSORISÉ · </span>
+        <span style={{fontSize:9,fontWeight:800,color:DS.gold}}>{curB.estab_name||"Établissement"} · </span>
+        <span style={{fontSize:10,color:DS.textMuted}}>{String(curB.text||"").slice(0,90)}</span>
       </div>
     </div>
   );
+}
+
+// Tirage pondere par le prix paye : chaque campagne a une probabilite
+// proportionnelle a son prix. Si aucun prix n'est exploitable, tirage uniforme.
+function _pickWeighted(list){
+  if(!list||!list.length)return null;
+  var total=0,i;
+  for(i=0;i<list.length;i++){total+=Math.max(Number(list[i].price)||0,0);}
+  if(total<=0)return list[Math.floor(Math.random()*list.length)];
+  var x=Math.random()*total;
+  for(i=0;i<list.length;i++){x-=Math.max(Number(list[i].price)||0,0);if(x<=0)return list[i];}
+  return list[list.length-1];
 }
 
 // Carte "Sponsorisé" intercalée dans le feed — campagnes REELLES servies par le serveur
@@ -956,29 +1000,57 @@ function SponsoredCard(props){
 }
 
 function SplashAd(props){
-  var onClose=props.onClose;
+  // Ecran d'ouverture sponsorise : une campagne REELLE, active et payee
+  // (sponsor_profile), tiree au sort proportionnellement au prix paye.
+  // S'il n'existe aucune campagne, l'ecran ne s'affiche pas du tout et se
+  // referme silencieusement (pas de paiement, pas d'affichage) — la fausse
+  // publicite en dur ne sert plus jamais.
+  var onClose=props.onClose;var onOpen=props.onOpen;
   var sC=useState(false);var closing=sC[0];var setClosing=sC[1];
+  var sAd=useState(null);var ad=sAd[0];var setAd=sAd[1];
+  var _impS=useRef(false);
+  useEffect(function(){
+    if(!DataLayer._client){onClose();return;}
+    var cancelled=false;
+    DataLayer._client.rpc("get_active_ads").then(function(r){
+      if(cancelled)return;
+      var list=(r&&!r.error&&r.data)?r.data.filter(function(a){return a.kind==="sponsor_profile";}):[];
+      if(!list.length){onClose();return;}
+      setAd(_pickWeighted(list));
+    }).catch(function(){if(!cancelled)onClose();});
+    return function(){cancelled=true;};
+  },[]);
+  useEffect(function(){
+    if(!ad||!ad.id||_impS.current)return;
+    _impS.current=true;
+    try{if(DataLayer._client)DataLayer._client.rpc("ad_track",{p_id:ad.id,p_event:"impression"}).then(function(){}).catch(function(){});}catch(e){}
+  },[ad&&ad.id]);
   function handleClose(){setClosing(true);setTimeout(function(){onClose();},260);}
+  function handleOpen(){
+    try{if(DataLayer._client)DataLayer._client.rpc("ad_track",{p_id:ad.id,p_event:"click"}).then(function(){}).catch(function(){});}catch(e){}
+    setClosing(true);setTimeout(function(){onClose();if(onOpen)onOpen(ad);},260);
+  }
+  if(!ad)return null;
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"hp-fade 0.3s ease"}}>
       <div style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,animation:closing?"hp-sheet-out 0.26s ease forwards":"hp-slide-up 0.32s ease",overflow:"hidden"}}>
         <div style={{position:"relative"}}>
-          <img src={SPLASH_AD.img} alt={SPLASH_AD.estab} style={{width:"100%",height:220,objectFit:"cover",display:"block"}}/>
-          <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.7) 100%)"}}/>
+          {ad.img&&<img src={ad.img} alt={ad.estab_name||""} onError={function(ev){ev.target.style.display="none";}} style={{width:"100%",height:220,objectFit:"cover",display:"block"}}/>}
+          <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.7) 100%)",pointerEvents:"none"}}/>
           <div style={{position:"absolute",top:12,left:14,background:DS.gold,borderRadius:6,padding:"3px 8px",display:"flex",alignItems:"center",gap:4}}>
             <Tag size={9} color="#000"/>
-            <span style={{fontSize:9,fontWeight:900,color:"#000",letterSpacing:1}}>{SPLASH_AD.label}</span>
+            <span style={{fontSize:9,fontWeight:900,color:"#000",letterSpacing:1}}>SPONSORISÉ</span>
           </div>
           <button onClick={handleClose} style={{position:"absolute",top:10,right:10,background:"rgba(0,0,0,.5)",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
             <X size={14} color="#fff"/>
           </button>
           <div style={{position:"absolute",bottom:14,left:14,right:14}}>
-            <div style={{fontSize:16,fontWeight:900,color:"#fff",marginBottom:2}}>{SPLASH_AD.estab}</div>
+            <div style={{fontSize:16,fontWeight:900,color:"#fff",marginBottom:2}}>{ad.estab_name||"Établissement"}</div>
           </div>
         </div>
         <div style={{padding:"16px 20px 24px"}}>
-          <p style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,margin:"0 0 16px"}}>{SPLASH_AD.text}</p>
-          <button onClick={handleClose} style={{width:"100%",padding:"12px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginBottom:10}}>{SPLASH_AD.cta}</button>
+          {ad.text&&<p style={{fontSize:13,color:DS.textMuted,lineHeight:1.6,margin:"0 0 16px"}}>{String(ad.text).slice(0,220)}</p>}
+          <button onClick={handleOpen} style={{width:"100%",padding:"12px",background:DS.gold,border:"none",borderRadius:12,color:"#000",fontSize:14,fontWeight:900,cursor:"pointer",marginBottom:10}}>Découvrir</button>
           <button onClick={handleClose} style={{width:"100%",padding:"8px",background:"none",border:"none",color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Ignorer</button>
         </div>
       </div>
@@ -6020,7 +6092,7 @@ export default function App() {
         {devBanner}
         {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
         <div key={cTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner/>}<ClientFeed dataVersion={dataVersion} focusPostId={pendingFeedPost} onFocusConsumed={function(){setPendingFeedPost(null);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={privacySettings.locked?null:profilePhoto} isPremium={isPremium} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous"))}/></div>}
+          {cTab==="feed"     &&<div>{!isPremium&&<AdBanner onOpen={function(ad){if(ad&&ad.estab_id)openProf(ad.estab_id,ad.estab_type||"hotel");}}/>}<ClientFeed dataVersion={dataVersion} focusPostId={pendingFeedPost} onFocusConsumed={function(){setPendingFeedPost(null);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={privacySettings.locked?null:profilePhoto} isPremium={isPremium} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous"))}/></div>}
           {cTab==="discover" &&<ClientDisc onProfile={openProf} onBook={function(e){setBook(e);}} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab}/>}
           {cTab==="chat"     &&<ChatUI chats={DataLayer.getClientChats()} myColor={DS.client} nK="pN" iK="pI" vK="pV" isClientChat={true} onProfile={openProf} myId={auth&&auth.userId} myName={clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Vous")} initialConvId={pendingConv&&pendingConv.id} initialConvName={pendingConv&&pendingConv.name} initialConvImg={pendingConv&&pendingConv.img} onInitialConvConsumed={function(){setPendingConv(null);}} onUnreadChange={setChatUnread}/>}
           {cTab==="profile"  &&<ClientProf focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onCancelResa={cancelResaClient} onOpenPost={function(pid){setPendingFeedPost(pid);setCTab("feed");}} onSettings={function(){setSett(true);}} onPremium={function(){setShowPremium(true);}} isPremium={isPremium} premiumData={premiumData} onRenewPremium={renewPremium} onPrivacy={function(){setShowPrivacy(true);}} resaHistory={resaHistory} followingCount={followingIds.length} selfEmail={auth&&auth.email} authUserId={auth&&auth.userId} favEstabIds={favEstabIds} privacySettings={privacySettings} profilePhoto={profilePhoto} onPhotoChange={setProfilePhoto} onNameChange={_onClientNameChange}/>}
@@ -6032,7 +6104,7 @@ export default function App() {
         {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){setPremiumPay(null);tk.show("Paiement reçu — activation automatique en cours...","success");_refreshPremiumFromServer(0);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
         {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
         {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={openNotifTarget}/>;}}</Ov>}
-        {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}
+        {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd} onOpen={function(ad){if(ad&&ad.estab_id)openProf(ad.estab_id,ad.estab_type||"hotel");}}/>}
         <Toast/>
       </div>
     );
@@ -6065,7 +6137,7 @@ export default function App() {
       {devBanner}
       {offline&&<div style={{background:DS.error+"18",borderBottom:"1px solid "+DS.error+"33",padding:"6px 16px",fontSize:11,color:DS.error,fontWeight:700,textAlign:"center"}}>Vous êtes hors ligne</div>}
       <div key={pTab} style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:"hp-fade-up 0.34s cubic-bezier(0.22,1,0.36,1)"}}>
-        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner/>}<ProFeed proType={auth.type} focusPostId={pendingFeedPost} onFocusConsumed={function(){setPendingFeedPost(null);}} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto}/></div>}
+        {pTab==="feed"         &&<div>{!isPremium&&<AdBanner onOpen={function(ad){if(ad&&ad.estab_id)openProf(ad.estab_id,ad.estab_type||"hotel");}}/>}<ProFeed proType={auth.type} focusPostId={pendingFeedPost} onFocusConsumed={function(){setPendingFeedPost(null);}} isPremium={isPremium} onPremium={function(){setShowPremium(true);}} onProfile={openProf} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfPhoto={profilePhoto}/></div>}
         {pTab==="services"     &&<HotelSvc data={proD} userId={auth&&auth.userId}/>}
         {pTab==="offres"       &&<RestOff data={proD}/>}
         {pTab==="reservations" &&<ProResa proType={auth.type} focusResaId={pendingResaFocus} onFocusConsumed={function(){setPendingResaFocus(null);}} onOpenChat={function(){setPTab("chat");}} selfEmail={auth&&auth.email} estabName={proD.name} selfUserId={auth&&auth.userId}/>}
@@ -6080,7 +6152,7 @@ export default function App() {
       {adPay&&<StripePaymentModal clientSecret={adPay.clientSecret} amount={adPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setAdPay(null);}} onSuccess={function(){setAdPay(null);tk.show("Paiement reçu — votre campagne est en cours d'activation","success");}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
       {showPrivacy&&<PrivacyModal accType={auth.type} isPremium={isPremium} onPremium={function(){setShowPrivacy(false);setShowPremium(true);}} onClose={function(){setShowPrivacy(false);}} settings={privacySettings} onUpdate={updatePrivacy}/>}
       {notifsOpen&&<Ov onClose={function(){setNotifs(false);}}>{function(close){return <NotifP isPro={isPro} accent={accent} notifs={notifList} onMarkRead={markNotifRead} onBack={close} onNavigate={openNotifTarget}/>;}}</Ov>}
-      {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd}/>}
+      {showSplashAd&&!isPremium&&<SplashAd onClose={closeSplashAd} onOpen={function(ad){if(ad&&ad.estab_id)openProf(ad.estab_id,ad.estab_type||"hotel");}}/>}
       <Toast/>
     </div>
   );
