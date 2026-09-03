@@ -621,10 +621,15 @@ var DataLayer = {
     try{
       var query = DataLayer._client.from("reservations").update({ status: status }).eq("id", id);
       if(clientId) query = query.eq("client_id", clientId);
-      query.then(function(res){
+      // La promesse est desormais RENVOYEE : un ecran qui a affiche le nouveau
+      // statut de facon optimiste doit pouvoir revenir en arriere si le serveur
+      // refuse (RLS, transition interdite par protect_reservation_status).
+      // Les appelants qui l'ignorent gardent exactement le comportement d'avant.
+      return query.then(function(res){
         if(res&&res.error) console.warn("[DataLayer] updateReservationStatus error:", res.error.message);
+        return res;
       });
-    }catch(e){ console.warn("[DataLayer] updateReservationStatus exception:", e); }
+    }catch(e){ console.warn("[DataLayer] updateReservationStatus exception:", e); return Promise.resolve({ error: e }); }
   },
 
   // Upload photo profil vers Supabase Storage — retourne l'URL publique via onSuccess(url)
@@ -5056,19 +5061,29 @@ function ProResa(props){
   var proType=props.proType;var onOpenChat=props.onOpenChat;
   var selfEmail=props.selfEmail||"";
   var estabName=props.estabName||null;
-  var CONNECTED_CLIENT_NAME=props.selfName||(function(){try{return localStorage.getItem(_lk("hp_client_display_name"))||"";}catch(e){return "";}}())||(selfEmail.split("@")[0]||"Client");
   var color=rC(proType);
-  var _liveResas=BookingService.getAll().map(function(r){return {id:r.id,clientId:r.clientId||null,client:r.clientName||CONNECTED_CLIENT_NAME,service:r.service||"Reservation",dateIn:r.dateIn||"",dateOut:r.dateOut||r.dateIn||"",nights:r.nights||1,guests:r.guests||1,total:r.total||0,payMode:r.payMode||"sans",status:r.status||"pending",qrScanned:r.status==="consumed"};});
-  var s1=useState(function(){
-    return _liveResas;
-  });
+  // BookingService.getAll() est le magasin des reservations EMISES par le compte
+  // connecte (il n'est alimente que par createBooking, appele depuis l'ecran de
+  // reservation). L'utiliser ici affichait a l'etablissement les reservations
+  // qu'il a lui-meme passees ailleurs, et attribuait a un client inconnu le nom
+  // du professionnel connecte. Les reservations RECUES n'ont qu'une seule source
+  // de verite : la table reservations, filtree sur cet etablissement (ci-dessous).
+  var s1=useState([]);
   var resas=s1[0];var setResas=s1[1];
+  // La liste demarre vide : tant que la reponse du serveur n'est pas arrivee,
+  // l'ecran doit afficher un chargement et NON « Aucune reservation », qui
+  // serait une affirmation fausse.
+  var s1b=useState(false);var resasEnCours=s1b[0];var setResasEnCours=s1b[1];
   // Source de verite : les reservations de CET etablissement depuis Supabase (pas celles de tout le monde)
   useEffect(function(){
     if(!DataLayer._client||!estabName)return;
+    setResasEnCours(true);
     var _q=props.selfUserId
-      ?DataLayer._client.from("reservations").select("*").or("estab_owner_id.eq."+props.selfUserId+",estab_id.eq."+JSON.stringify(estabName).slice(1,-1)).order("created_at",{ascending:false})
-      :DataLayer._client.from("reservations").select("*").eq("estab_id",estabName).order("created_at",{ascending:false});
+      // Colonnes explicitement lues par le mappeur ci-dessous (plus de SELECT *) :
+      // le blob « data » est deja volumineux, inutile d'y ajouter les colonnes
+      // que l'ecran n'affiche pas.
+      ?DataLayer._client.from("reservations").select("id,client_id,status,data,created_at").or("estab_owner_id.eq."+props.selfUserId+",estab_id.eq."+JSON.stringify(estabName).slice(1,-1)).order("created_at",{ascending:false})
+      :DataLayer._client.from("reservations").select("id,client_id,status,data,created_at").eq("estab_id",estabName).order("created_at",{ascending:false});
     _q
       .then(function(res){
         if(res.error||!res.data)return;
@@ -5077,7 +5092,7 @@ function ProResa(props){
           return{id:row.id,clientId:row.client_id||null,client:d.clientName||"Client",service:d.service||"Reservation",dateIn:d.dateIn||"",dateOut:d.dateOut||d.dateIn||"",nights:d.nights||1,guests:d.guests||1,total:d.total||0,payMode:d.payMode||"sans",status:row.status||"pending",qrScanned:row.status==="consumed"};
         });
         setResas(rows);
-      }).catch(function(){});
+      }).catch(function(){}).then(function(){setResasEnCours(false);});
   },[estabName]);
   var s2=useState("all");var filter=s2[0];var setFilter=s2[1];
   var s3=useState(null);var scanTarget=s3[0];var setScanTarget=s3[1];
@@ -5099,10 +5114,32 @@ function ProResa(props){
   var filtered=filter==="all"?resas:resas.filter(function(r){return r.status===filter;});
   var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim,cancelled:DS.warning};
   var sLabels={confirmed:"Confirmée",pending:"En attente",refused:"Refusée",consumed:"Consommée",cancelled:"Annulée par le client"};
-  function _persistResaStatus(id,patch){try{var all=BookingService.getAll();var updated=all.map(function(r){return r.id===id?Object.assign({},r,patch):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(updated));}catch(e){}try{if(patch&&patch.status)DataLayer.updateReservationStatus(id,patch.status);}catch(e2){}}
-  function confirmResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"confirmed"}):x;});});_persistResaStatus(id,{status:"confirmed"});toastR("Réservation confirmée","success");}
-  function refuseResa(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{status:"refused"}):x;});});_persistResaStatus(id,{status:"refused"});toastR("Réservation refusée","info");}
-  function scanQR(id){setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,{qrScanned:true,status:"consumed"}):x;});});_persistResaStatus(id,{status:"consumed"});setScanTarget(null);toastR("Arrivée confirmée · Client marqué présent","success");}
+  // Le statut d'une reservation RECUE appartient au serveur. Cet ecran l'affiche
+  // de facon optimiste puis REVIENT EN ARRIERE si le serveur refuse (droits,
+  // transition interdite) : annoncer « Confirmee » sur une reservation restee
+  // « en attente » en base ferait perdre un client a l'etablissement.
+  // Note : plus aucune ecriture dans hp_resas_all — ce magasin local ne contient
+  // que les reservations EMISES par le compte, pas celles qu'il recoit.
+  function _appliqueStatut(id,patch,libelle,ton,ancien){
+    setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,patch):x;});});
+    var p=null;
+    try{ p=DataLayer.updateReservationStatus(id,patch.status); }catch(e2){}
+    if(!p){ toastR(libelle,ton); return; } // pas de serveur configure : comportement inchange
+    p.then(function(res){
+      if(res&&res.error){
+        setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,ancien):x;});});
+        toastR("Mise à jour refusée par le serveur","error");
+        return;
+      }
+      toastR(libelle,ton);
+    }).catch(function(){
+      setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,ancien):x;});});
+      toastR("Mise à jour impossible — vérifiez votre connexion","error");
+    });
+  }
+  function confirmResa(id){_appliqueStatut(id,{status:"confirmed"},"Réservation confirmée","success",{status:"pending"});}
+  function refuseResa(id){_appliqueStatut(id,{status:"refused"},"Réservation refusée","info",{status:"pending"});}
+  function scanQR(id){setScanTarget(null);_appliqueStatut(id,{status:"consumed",qrScanned:true},"Arrivée confirmée · Client marqué présent","success",{status:"confirmed",qrScanned:false});}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
       <ToastR/>
@@ -5142,7 +5179,7 @@ function ProResa(props){
         {[["all","Toutes"],["pending","En attente"],["confirmed","Confirmées"],["consumed","Consommées"],["refused","Refusées"],["cancelled","Annulées"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=filter===v;return <button key={v} onClick={function(){setFilter(v);}} style={{padding:"6px 12px",borderRadius:20,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{l}</button>;})}
       </div>
       <div style={{padding:"0 14px"}}>
-        {resaSkLoading?<ResaSkeleton/>:<>{filtered.map(function(r,_ri){return(
+        {(resaSkLoading||resasEnCours)?<ResaSkeleton/>:<>{filtered.map(function(r,_ri){return(
           <div key={r.id} id={"hp-resa-"+r.id} style={{background:DS.card,borderRadius:14,padding:"14px",marginBottom:12,border:"1px solid "+(r.qrScanned?DS.textDim+"44":DS.border),opacity:r.status==="consumed"?0.7:1,animation:"hp-item-in 0.32s ease both",animationDelay:(_ri*55)+"ms"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
               <div style={{flex:1}}>
