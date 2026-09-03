@@ -915,7 +915,7 @@ function NotifSkeleton(){return(<div style={{animation:"hp-fade .2s ease"}}>{[0,
 function ChatListSkeleton(){return(<div style={{animation:"hp-fade .2s ease"}}>{[0,1,2,3].map(function(i){return(<div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:"1px solid "+DS.border+"20"}}><div className="hp-sk" style={{width:46,height:46,borderRadius:"50%",flexShrink:0}}/><div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}><div style={{display:"flex",justifyContent:"space-between"}}><Sk h={13} w="45%"/><Sk h={10} w="15%"/></div><Sk h={11} w="70%"/></div></div>);})}</div>);}
 function ResaSkeleton(){return(<div style={{padding:"0 14px",animation:"hp-fade .2s ease"}}>{[0,1,2].map(function(i){return(<div key={i} style={{background:DS.card,borderRadius:14,padding:"14px",marginBottom:12,border:"1px solid "+DS.border}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{flex:1,display:"flex",flexDirection:"column",gap:7}}><Sk h={14} w="60%"/><Sk h={11} w="40%"/><Sk h={10} w="55%"/></div><div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"flex-end"}}><Sk h={16} w={70} r={6}/><Sk h={10} w={50} r={6}/></div></div><div style={{display:"flex",gap:6}}><Sk h={30} w={80} r={8}/><Sk h={30} w={80} r={8}/></div></div>);})}</div>);}
 
-function AdBanner(){
+function AdBanner(props){
   // Bandeau sponsorise : UNIQUEMENT des campagnes reelles, actives et payees
   // (sponsor_profile). Aucune campagne => aucun bandeau : pas de paiement,
   // pas d'affichage. L'emplacement est attribue proportionnellement au prix
