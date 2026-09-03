@@ -790,7 +790,21 @@ var AuthService = {
 //   }
 // =====================================================================
 var BookingService = {
-  _all: (function(){try{return JSON.parse(localStorage.getItem(_lk("hp_resas_all"))||"[]");}catch(e){return [];}}()),
+  // La cle de stockage est portee par le compte connecte (_lk). Or _HP_UID n'est
+  // connu qu'apres la resolution de session, bien apres le chargement du module :
+  // lire ici, une fois pour toutes, revenait a lire une cle NON portee par le
+  // compte pendant que toutes les ecritures utilisaient la cle portee — la liste
+  // des reservations restait donc vide a l'ecran. La lecture est desormais
+  // rehydratee des que le compte change.
+  _all: [],
+  _allUid: undefined,
+  _hydrate: function(){
+    if(BookingService._allUid===_HP_UID) return BookingService._all;
+    BookingService._allUid=_HP_UID;
+    try{BookingService._all=JSON.parse(localStorage.getItem(_lk("hp_resas_all"))||"[]");}catch(e){BookingService._all=[];}
+    if(!Array.isArray(BookingService._all)) BookingService._all=[];
+    return BookingService._all;
+  },
   generateId: function(){
     return "R" + Date.now().toString().slice(-8);
   },
@@ -803,6 +817,7 @@ var BookingService = {
     if(!resa.id){ resa.id = BookingService.generateId(); }
     if(!resa.createdAt){ resa.createdAt = new Date().toISOString(); }
     if(clientId&&!resa.clientId){ resa.clientId = clientId; }
+    BookingService._hydrate();
     BookingService._all.push(resa);
     try{localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(BookingService._all));}catch(e){}
     try{
@@ -816,10 +831,11 @@ var BookingService = {
     return resa;
   },
   _annuleLocal: function(id){
+    BookingService._hydrate();
     BookingService._all = BookingService._all.filter(function(r){ return r.id!==id; });
     try{localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(BookingService._all));}catch(e){}
   },
-  getAll: function(){ return BookingService._all.slice(); },
+  getAll: function(){ return BookingService._hydrate().slice(); },
   appendToHistory: function(history, resa){
     return (history || []).concat([resa]);
   }
@@ -3381,7 +3397,7 @@ function BookM(props){
   var dateOut=isHotelBooking?(dateIn?computeDateOut(dateIn,nightsCount):""):dateIn;
   var basePrice=Number(isCombo?e.comboTotal:(hasDishes?e.dishTotal:(e.selectedRoom?e.selectedRoom.price:e.priceFrom)))||0;
   var totalPrice=isCombo?basePrice*nights:(hasDishes?basePrice*tableCount:(isHotelBooking?basePrice*nights*roomCount:basePrice*tableCount));
-  var serviceLabel=isCombo?("Séjour combiné - "+e.selectedRoom.name):(hasDishes?(e.selectedDishes.length+" plat"+(e.selectedDishes.length>1?"s":"")+" sélectionné"+(e.selectedDishes.length>1?"s":"")):(e.selectedRoom?e.selectedRoom.name:(e.type==="hotel"?"Chambre Standard":"Réservation")));
+  var serviceLabel=isCombo?("Séjour combiné - "+e.selectedRoom.name):(hasDishes?(e.selectedDishes.length+" plat"+(e.selectedDishes.length>1?"s":"")+" sélectionné"+(e.selectedDishes.length>1?"s":"")):(e.selectedRoom?e.selectedRoom.name:(e.type==="hotel"?"Chambre à préciser avec l'établissement":"Réservation")));
   var guestsLabel=isRestaurantBooking?"NOMBRE DE CONVIVES":"NOMBRE DE VOYAGEURS";
   var dateLabel=isRestaurantBooking?"DATE DE RESERVATION":"DATE D'ARRIVÉE";
   if(!e)return null;
@@ -6259,6 +6275,21 @@ export default function App() {
     if(!isPro)setCTab(t==="reservations"?"profile":t);
     else setPTab(t==="profile"?"reservations":t);
   }
+  // Une reservation acceptee par le serveur rejoint immediatement l'historique
+  // affiche (onglet Profil > Reservations) : sans cela l'ecran restait muet
+  // jusqu'au rechargement complet de l'application. Le rappel n'est declenche
+  // par BookM QU'APRES la reponse reelle du serveur (createBooking / webhook),
+  // jamais de facon optimiste. Meme mecanisme d'ecriture locale que l'annulation.
+  function _onBooked(resa){
+    if(!resa||!resa.id)return;
+    setResaHistory(function(h){
+      var list=h||[];
+      if(list.some(function(r){return r.id===resa.id;}))return list;
+      var next=[resa].concat(list);
+      try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(next));}catch(e){}
+      return next;
+    });
+  }
   // P4 : annulation par le client — statut serveur (verrou : uniquement pending/confirmed), notification automatique a l'etablissement
   function cancelResaClient(id){
     DataLayer.updateReservationStatus(id,"cancelled");
@@ -6358,6 +6389,7 @@ export default function App() {
         </div>
         <BotNav tabs={cTabs} active={cTab} set={setCTab} accent={DS.client}/>
         {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={false} selfUserId={auth&&auth.userId} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client"))}/>}
+        {book&&<BookM e={book} onClose={function(){setBook(null);}} onBooked={_onBooked} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfName={(privacySettings.pseudo||privacySettings.locked)?"Voyageur":(clientDisplayName||(auth&&auth.email?auth.email.split("@")[0]:"Client"))}/>}
         {showPremium&&<PremiumModal accType={auth.type} prices={PREMIUM_PRICES} discounts={PREMIUM_DISCOUNTS} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium} onSubscribeTrial={subscribeTrial}/>}
         {_accountOverlays}
         {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){setPremiumPay(null);tk.show("Paiement reçu — activation automatique en cours...","success");_refreshPremiumFromServer(0);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
@@ -6405,6 +6437,7 @@ export default function App() {
       </div>
       <BotNav tabs={pTabs} active={pTab} set={setPTab} accent={accent}/>
       {estab&&<EstabM e={estab} onClose={function(){setEstab(null);}} onBook={function(bookingData){setBook(bookingData||estab);setEstab(null);}} onChat={openChat} followingIds={followingIds} onToggleFollow={toggleFollowGlobal} favEstabIds={favEstabIds} onToggleFavEstab={toggleFavEstab} viewerIsPro={true} selfUserId={auth&&auth.userId} selfName={proD.name||(auth&&auth.email?auth.email.split("@")[0]:"Pro")}/>}
+      {book&&<BookM e={book} onClose={function(){setBook(null);}} onBooked={_onBooked} selfEmail={auth&&auth.email} selfUserId={auth&&auth.userId} selfName={proD.name||(auth&&auth.email?auth.email.split("@")[0]:"Pro")}/>}
       {showPremium&&<PremiumModal accType={auth.type} prices={PREMIUM_PRICES} discounts={PREMIUM_DISCOUNTS} onClose={function(){setShowPremium(false);}} onSubscribe={subscribePremium} onSubscribeTrial={subscribeTrial}/>}
         {_accountOverlays}
       {premiumPay&&<StripePaymentModal clientSecret={premiumPay.clientSecret} amount={premiumPay.amount.toFixed(2)} color={DS.gold} DS={DS} onClose={function(){setPremiumPay(null);}} onSuccess={function(){setPremiumPay(null);tk.show("Paiement reçu — activation automatique en cours...","success");_refreshPremiumFromServer(0);}} onError={function(msg){tk.show(msg||"Échec du paiement","error");}}/>}
