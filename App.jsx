@@ -6329,14 +6329,35 @@ export default function App() {
   }
   // P4 : annulation par le client — statut serveur (verrou : uniquement pending/confirmed), notification automatique a l'etablissement
   function cancelResaClient(id){
-    DataLayer.updateReservationStatus(id,"cancelled");
-    setResaHistory(function(h){
-      var next=(h||[]).map(function(r){return r.id===id?Object.assign({},r,{status:"cancelled"}):r;});
-      try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(next));}catch(e){}
-      return next;
+    // Etat precedent REEL, releve avant l'ecriture : le bouton « Annuler » n'est
+    // affiche que pour « pending » et « confirmed » (ClientProf), il y a donc deux
+    // etats possibles et l'un ne peut pas etre suppose a la place de l'autre.
+    var _avant=null;
+    (resaHistory||[]).forEach(function(r){ if(r.id===id&&_avant===null) _avant=r.status||"pending"; });
+    if(_avant===null) _avant="pending";
+    function _ecrit(statut){
+      setResaHistory(function(h){
+        var next=(h||[]).map(function(r){return r.id===id?Object.assign({},r,{status:statut}):r;});
+        try{localStorage.setItem(_lk("hp_resas"),JSON.stringify(next));}catch(e){}
+        return next;
+      });
+      try{var all=BookingService.getAll().map(function(r){return r.id===id?Object.assign({},r,{status:statut}):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(all));BookingService._all=all;}catch(e){}
+    }
+    _ecrit("cancelled");
+    var p=null;
+    try{ p=DataLayer.updateReservationStatus(id,"cancelled"); }catch(e){}
+    // Sans serveur configure, le comportement reste celui d'avant.
+    if(!p){ toastApp("Réservation annulée","success"); return; }
+    p.then(function(res){
+      if(res&&res.error){ _ecrit(_avant); toastApp("Annulation refusée par le serveur","error"); return; }
+      // L'annulation est acquise en base. Le message ne va pas au-dela de ce que
+      // la reponse prouve : la notification de l'etablissement depend d'un
+      // declencheur cote base, que cet ecran ne peut pas constater.
+      toastApp("Réservation annulée","success");
+    }).catch(function(){
+      _ecrit(_avant);
+      toastApp("Annulation impossible — vérifiez votre connexion","error");
     });
-    try{var all=BookingService.getAll().map(function(r){return r.id===id?Object.assign({},r,{status:"cancelled"}):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(all));BookingService._all=all;}catch(e){}
-    toastApp("Réservation annulée — l'établissement a été prévenu","success");
   }
   function openProf(id,type){
     // Recherche par identifiant dans la liste du type, puis toutes listes — JAMAIS de repli arbitraire (profil fantome)
