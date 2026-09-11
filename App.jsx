@@ -2755,40 +2755,76 @@ function ClientDisc(props){
   var s2=useState("");var search=s2[0];var setSearch=s2[1];
   var sSort=useState("relevance");var sortBy=sSort[0];var setSortBy=sSort[1];
   var sDSk=useState(true);var discSkLoading=sDSk[0];var setDiscSkLoading=sDSk[1];
-  useEffect(function(){var t=setTimeout(function(){setDiscSkLoading(false);},800);return function(){clearTimeout(t);};},[]);
-  var items=(function(){
-    var _base=tab==="hotels"?DataLayer.getHotels():DataLayer.getRestaurants();
-    var _h0=DataLayer.getHotels()[0];var _r0=DataLayer.getRestaurants()[0];
-    return _base.map(function(item){
-      try{
-        // Prix "a partir de" depuis les vraies chambres/plats de CET etablissement (tous, plus seulement la demo)
-        if(item.type==="hotel"&&item.rooms&&item.rooms.length){
-          var _av0=item.rooms.filter(function(r){return r.available!==false&&r.price>0;});
-          if(_av0.length){var _mn0=Math.min.apply(null,_av0.map(function(r){return r.price;}));if(_mn0>0&&_mn0!==item.priceFrom)item=Object.assign({},item,{priceFrom:_mn0});}
-        } else if(item.type==="restaurant"&&item.menu&&item.menu.length){
-          var _dsh=[];item.menu.forEach(function(c){(c.items||[]).forEach(function(d){if(d&&d.price>0&&d.available!==false)_dsh.push(d.price);});});
-          if(_dsh.length){var _mnD=Math.min.apply(null,_dsh);if(_mnD>0&&_mnD!==item.priceFrom)item=Object.assign({},item,{priceFrom:_mnD});}
-        }
-        // Cas special : le pro connecte voit ses propres editions live (localStorage)
-        if(tab==="hotels"&&_h0&&item.id===_h0.id){var _rr=localStorage.getItem(_lk("hp_hotelsvc_rooms"));if(_rr){var _av=JSON.parse(_rr).filter(function(r){return r.available&&r.price>0;});if(_av.length){var _mn=Math.min.apply(null,_av.map(function(r){return r.price;}));if(_mn>0)item=Object.assign({},item,{priceFrom:_mn});}}}
-        else if(tab==="restaurants"&&_r0&&item.id===_r0.id){var _ri=localStorage.getItem(_lk("hp_restoff_items"));if(_ri){var _av2=JSON.parse(_ri).filter(function(d){return d.available&&d.price>0;});if(_av2.length){var _mn2=Math.min.apply(null,_av2.map(function(d){return d.price;}));if(_mn2>0)item=Object.assign({},item,{priceFrom:_mn2});}}}
-      }catch(_e){}
-      return item;
-    });
-  })();
-  var filtered=items.filter(function(i){return i.name.toLowerCase().indexOf(search.toLowerCase())>=0||(i.location||"").toLowerCase().indexOf(search.toLowerCase())>=0;});
-  // Tri (pertinence par defaut = ordre existant, non destructif)
-  if(sortBy!=="relevance"){
-    filtered=filtered.slice().sort(function(a,b){
-      if(sortBy==="price_asc"){return (a.priceFrom||Infinity)-(b.priceFrom||Infinity);}
-      if(sortBy==="price_desc"){return (b.priceFrom||0)-(a.priceFrom||0);}
-      if(sortBy==="rating"){return (b.rating||0)-(a.rating||0);}
-      return 0;
+  // ------------------------------------------------------------------
+  // Decouverte servie par le SERVEUR (RPC get_establishments_page).
+  // Avant : profiles_public etait lu SANS BORNE au demarrage (tous les
+  // hotels et restaurants de la plateforme), la recherche etait un indexOf
+  // sur ce tableau et le tri un sort en memoire. On ne pouvait donc trouver
+  // que ce qui avait ete telecharge, et le cout croissait avec la plateforme
+  // entiere. Mesure sur 300 000 etablissements : une page coutait 3 460 blocs
+  // sans index, elle en coute 4 avec l'index, 8 pour une page profonde.
+  // Desormais : filtre, recherche, tri et pagination par curseur cote serveur.
+  // Le curseur transmis est le DERNIER IDENTIFIANT recu, jamais une cle de
+  // tri : le serveur relit lui-meme l'ancrage, une position ne peut pas etre
+  // forgee.
+  // ------------------------------------------------------------------
+  var PAGE_ETABS=24;
+  var sLst=useState([]);var liste=sLst[0];var setListe=sLst[1];
+  var sEnc=useState(false);var encore=sEnc[0];var setEncore=sEnc[1];
+  var sChg=useState(false);var chargeSuite=sChg[0];var setChargeSuite=sChg[1];
+  var sErr=useState(false);var erreurChargement=sErr[0];var setErreurChargement=sErr[1];
+  var sQ=useState("");var rechercheAppliquee=sQ[0];var setRechercheAppliquee=sQ[1];
+  // La frappe est regroupee avant d'interroger le serveur : sans cela chaque
+  // caractere declencherait une requete pour chaque utilisateur qui tape.
+  useEffect(function(){
+    var t=setTimeout(function(){setRechercheAppliquee(search);},250);
+    return function(){clearTimeout(t);};
+  },[search]);
+  var _typeServeur=tab==="hotels"?"hotel":"restaurant";
+  function _chargePage(apresId,onFini){
+    if(!DataLayer._client){setErreurChargement(true);setDiscSkLoading(false);return;}
+    DataLayer._client.rpc("get_establishments_page",{
+      p_type:_typeServeur,
+      p_search:rechercheAppliquee||null,
+      p_sort:sortBy,
+      p_after_id:apresId||null,
+      p_limit:PAGE_ETABS
+    }).then(function(r){
+      if(r&&r.error){setErreurChargement(true);setDiscSkLoading(false);if(onFini)onFini(null);return;}
+      var rows=(r&&r.data)||[];
+      var mappe=rows.map(function(x){
+        return {id:x.id,type:x.type,name:x.name,location:x.location,description:x.description,
+                img:x.img,priceFrom:x.price_from!=null?Number(x.price_from):0,
+                rating:x.rating!=null?Number(x.rating):0,reviewCount:x.review_count||0,
+                verified:x.verified===true,isPremium:x.is_premium===true,svcMode:x.svc_mode,
+                hasRestaurant:x.has_restaurant===true,userId:x.owner_id||undefined,
+                followers:Number(x.followers)||0};
+      });
+      setErreurChargement(false);
+      setEncore(rows.length===PAGE_ETABS);
+      setDiscSkLoading(false);
+      if(onFini)onFini(mappe); else setListe(mappe);
+    }).catch(function(){setErreurChargement(true);setDiscSkLoading(false);if(onFini)onFini(null);});
+  }
+  useEffect(function(){
+    setDiscSkLoading(true);setListe([]);setEncore(false);
+    _chargePage(null,null);
+  },[_typeServeur,sortBy,rechercheAppliquee]);
+  function chargerSuite(){
+    if(chargeSuite||!encore||!liste.length)return;
+    setChargeSuite(true);
+    _chargePage(liste[liste.length-1].id,function(suite){
+      setChargeSuite(false);
+      if(suite&&suite.length)setListe(function(prev){
+        var vus={};prev.forEach(function(x){vus[x.id]=1;});
+        return prev.concat(suite.filter(function(x){return !vus[x.id];}));
+      });
     });
   }
+  var filtered=liste;
   var color=tab==="hotels"?DS.hotel:DS.restaurant;
   var SORTS=[["relevance","Pertinence"],["price_asc","Prix ↑"],["price_desc","Prix ↓"],["rating","Note"]];
-  return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{display:"flex",gap:6,padding:"0 14px 4px",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>{SORTS.map(function(_s){var v=_s[0];var l=_s[1];var isA=sortBy===v;return <button key={v} onClick={function(){setSortBy(v);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+(isA?color:DS.border),background:isA?color+"18":"transparent",color:isA?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{l}</button>;})}</div><div style={{padding:"0 14px",paddingBottom:16}}>{discSkLoading?<DiscSkeleton/>:(filtered.length===0?<Emp Icon={Search} title="Aucun résultat"/>:filtered.map(function(item,_idx){return(<div key={item.id} className="hp-card" style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border,animation:"hp-item-in 0.32s ease both",animationDelay:(_idx*60)+"ms"}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}{onToggleFavEstab&&<button onClick={function(ev){ev.stopPropagation();onToggleFavEstab(item.id);}} style={{position:"absolute",top:8,left:8,width:32,height:32,borderRadius:"50%",background:"rgba(0,0,0,.5)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Heart size={16} color={favEstabIds.indexOf(item.id)>=0?DS.error:"#fff"} fill={favEstabIds.indexOf(item.id)>=0?DS.error:"none"}/></button>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{display:"flex",alignItems:"center",gap:5}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div>{item.verified&&<VBadge sz={16}/>}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}>{item.priceFrom?<><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></>:null}</div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){var _needsProfile=item.type==="hotel"||item.svcMode==="combined"||!(item.priceFrom>0);if(_needsProfile){if(onProfile)onProfile(item.id,item.type);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>{(item.type==="hotel"||item.svcMode==="combined")?"Voir & réserver":(item.priceFrom>0?"Réserver":"Voir le menu")}</button></div></div>);}))}</div></div>);
+  return(<div style={{background:DS.bg}}><div style={{padding:"10px 14px",background:DS.surface,borderBottom:"1px solid "+DS.border}}><div style={{display:"flex",alignItems:"center",gap:8,background:DS.card,borderRadius:12,padding:"9px 14px",border:"1px solid "+DS.border}}><Search size={14} color={DS.textMuted}/><input value={search} onChange={function(e){setSearch(e.target.value);}} onFocus={function(e){e.target.classList.add("hp-input-focus");}} onBlur={function(e){e.target.classList.remove("hp-input-focus");}} placeholder="Rechercher..." style={{flex:1,background:"none",border:"none",outline:"none",color:DS.text,fontSize:13}}/></div></div><div style={{display:"flex",padding:"10px 14px",gap:8}}>{[["hotels","Hotels",Building2,DS.hotel],["restaurants","Restaurants",Utensils,DS.restaurant]].map(function(_i){var t=_i[0];var l=_i[1];var Ic=_i[2];var col=_i[3];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"8px",borderRadius:12,border:"1px solid "+(isAct?col:DS.border),background:isAct?col+"18":"transparent",color:isAct?col:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic size={14}/>{l}</button>;})} </div><div style={{display:"flex",gap:6,padding:"0 14px 4px",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>{SORTS.map(function(_s){var v=_s[0];var l=_s[1];var isA=sortBy===v;return <button key={v} onClick={function(){setSortBy(v);}} style={{padding:"5px 12px",borderRadius:20,border:"1px solid "+(isA?color:DS.border),background:isA?color+"18":"transparent",color:isA?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{l}</button>;})}</div><div style={{padding:"0 14px",paddingBottom:16}}>{discSkLoading?<DiscSkeleton/>:(filtered.length===0?(erreurChargement?<Emp Icon={Search} title="Chargement impossible" sub="Les établissements n'ont pas pu être récupérés. Vérifiez votre connexion."/>:<Emp Icon={Search} title="Aucun résultat"/>):filtered.map(function(item,_idx){return(<div key={item.id} className="hp-card" style={{marginBottom:12,background:DS.card,borderRadius:16,overflow:"hidden",border:"1px solid "+DS.border,animation:"hp-item-in 0.32s ease both",animationDelay:(_idx*60)+"ms"}}><div onClick={function(){if(onProfile)onProfile(item.id,item.type,item);}} style={{cursor:"pointer"}}><div style={{position:"relative",height:160}}><img src={item.img} alt="" className="hp-img" onLoad={function(e){e.target.classList.add("hp-img-loaded");}} style={{width:"100%",height:"100%",objectFit:"cover"}}/>{item.svcMode==="combined"&&<div style={{position:"absolute",top:8,right:8,background:"rgba(0,0,0,.65)",borderRadius:20,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}><Utensils size={10} color="#fff"/><span style={{fontSize:9,color:"#fff",fontWeight:800}}>Hotel + Restaurant</span></div>}{onToggleFavEstab&&<button onClick={function(ev){ev.stopPropagation();onToggleFavEstab(item.id);}} style={{position:"absolute",top:8,left:8,width:32,height:32,borderRadius:"50%",background:"rgba(0,0,0,.5)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Heart size={16} color={favEstabIds.indexOf(item.id)>=0?DS.error:"#fff"} fill={favEstabIds.indexOf(item.id)>=0?DS.error:"none"}/></button>}</div><div style={{padding:"12px 14px 0"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}><div><div style={{display:"flex",alignItems:"center",gap:5}}><div style={{fontSize:15,fontWeight:800,color:DS.text}}>{item.name}</div>{item.verified&&<VBadge sz={16}/>}</div><div style={{fontSize:11,color:DS.textMuted}}>{item.location}</div></div><div style={{textAlign:"right"}}>{item.priceFrom?<><div style={{fontSize:16,fontWeight:900,color:DS.gold}}>{item.priceFrom} EUR</div><div style={{fontSize:9,color:DS.textMuted}}>a partir de</div></>:null}</div></div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}><Stars r={item.rating} sz={12}/><span style={{fontSize:11,color:DS.textMuted}}>({item.reviewCount} avis)</span></div></div></div><div style={{padding:"8px 14px 14px",display:"flex",gap:8}}><button onClick={function(){if(onProfile)onProfile(item.id,item.type,item);}} style={{flex:1,padding:"8px",background:DS.surface,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Voir profil</button><button onClick={function(){var _needsProfile=item.type==="hotel"||item.svcMode==="combined"||!(item.priceFrom>0);if(_needsProfile){if(onProfile)onProfile(item.id,item.type,item);}else{if(onBook)onBook(item);}}} style={{flex:1,padding:"8px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:"pointer"}}><Calendar size={12} style={{display:"inline",marginRight:4}}/>{(item.type==="hotel"||item.svcMode==="combined")?"Voir & réserver":(item.priceFrom>0?"Réserver":"Voir le menu")}</button></div></div>);}))}{encore&&<button onClick={chargerSuite} disabled={chargeSuite} style={{width:"100%",padding:"12px",marginTop:4,marginBottom:8,background:DS.card,border:"1px solid "+DS.border,borderRadius:12,color:chargeSuite?DS.textDim:color,fontSize:13,fontWeight:700,cursor:chargeSuite?"default":"pointer"}}>{chargeSuite?"Chargement...":"Voir plus d'établissements"}</button>}</div></div>);
 }
 
 function ClientProf(props){
@@ -6373,7 +6409,11 @@ export default function App() {
       toastApp("Annulation impossible — vérifiez votre connexion","error");
     });
   }
-  function openProf(id,type){
+  function openProf(id,type,objet){
+    // Un ecran qui dispose deja de l'etablissement complet (resultats servis
+    // par le serveur, donc absents du cache local) le transmet directement.
+    // Les appelants a deux arguments gardent exactement le comportement d'avant.
+    if(objet&&objet.id){setEstab(objet);return;}
     // Recherche par identifiant dans la liste du type, puis toutes listes — JAMAIS de repli arbitraire (profil fantome)
     var l=type==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
     var e=l.find(function(x){return x.id===id;})||DataLayer.getEstablishmentById(id);
