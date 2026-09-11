@@ -163,6 +163,25 @@ function _estabForPost(post){
     return all.find(function(x){return x.name===post.author;})||null;
   }catch(e){return null;}
 }
+// Identite (identifiant + type) de l'etablissement auteur, PORTEE PAR LA
+// PUBLICATION elle-meme (colonnes posts.establishment_id / posts.type).
+// Depuis que les etablissements sont resolus par identifiant, leur absence du
+// cache est un etat transitoire normal — le temps d'un aller-retour serveur.
+// Pendant ce temps, _estabForPost renvoie null : mesure faite, le bouton
+// affichait « Suivre » alors que l'utilisateur suivait deja l'etablissement,
+// le clic ne declenchait aucun appel serveur, et le clic sur l'auteur etait
+// avale sans rien ouvrir.
+// Les actions qui n'ont besoin que de l'IDENTITE (suivre, ouvrir le profil)
+// utilisent donc cette fonction ; celles qui ont besoin de l'OBJET complet
+// (photo) continuent d'utiliser _estabForPost et se degradent proprement.
+// Aucune identite n'est inventee : on ne lit que ce que la publication porte.
+function _identiteEtabDuPost(post){
+  if(!post) return null;
+  var pe=_estabForPost(post);
+  if(pe) return {id:pe.id,type:pe.type||post.type||null};
+  if(post.estabId) return {id:post.estabId,type:post.type||null};
+  return null;
+}
 var DataLayer = {
   // Cache interne : initialise avec les donnees de demonstration.
   // L'UI lit TOUJOURS depuis ce cache (synchrone, jamais vide).
@@ -200,6 +219,9 @@ var DataLayer = {
   // les acces existants par id ou par userId continuent de fonctionner tels
   // quels.
   LOT_RESOLUTION: 100,
+  // identifiant -> PROMESSE partagee de sa resolution en cours (pas un simple
+  // drapeau) : un second appelant attend la meme promesse au lieu de conclure
+  // que l'etablissement est introuvable.
   _enCoursResolution: {},
   _ligneVersEtab: function(x){
     return {id:x.id,type:x.type,name:x.name,author:x.name,location:x.location,
@@ -241,28 +263,49 @@ var DataLayer = {
     var demandes=(ids||[]).filter(function(v){return v&&typeof v==="string";});
     var vus={};demandes=demandes.filter(function(v){if(vus[v])return false;vus[v]=1;return true;});
     var connus={};DataLayer.getEstablishments().forEach(function(e){connus[e.id]=e;});
+    // Un identifiant DEJA EN VOL n'est pas redemande, mais l'appelant doit
+    // ATTENDRE la resolution en cours au lieu de conclure qu'elle n'existe
+    // pas. Mesure faite avec l'ancienne version : un clic sur une publication
+    // pendant que le fil resolvait le meme etablissement affichait « Profil
+    // indisponible » alors que l'etablissement existait et arrivait juste
+    // apres. _enCoursResolution associe donc a chaque identifiant LA PROMESSE
+    // partagee de sa resolution.
+    var enVol=[];var dejaVue={};
+    demandes.forEach(function(v){
+      if(connus[v])return;
+      var p=DataLayer._enCoursResolution[v];
+      if(p&&!dejaVue[v]){dejaVue[v]=1;enVol.push(p);}
+    });
     var manquants=demandes.filter(function(v){return !connus[v]&&!DataLayer._enCoursResolution[v];});
-    if(!manquants.length||!DataLayer._client){
+    if((!manquants.length&&!enVol.length)||!DataLayer._client){
       if(cb)cb(demandes.map(function(v){return connus[v];}).filter(Boolean));
       return;
     }
-    manquants.forEach(function(v){DataLayer._enCoursResolution[v]=1;});
+    var _termine=function(){
+      var apres={};DataLayer.getEstablishments().forEach(function(e){apres[e.id]=e;});
+      if(cb)cb(demandes.map(function(v){return apres[v];}).filter(Boolean));
+    };
+    if(!manquants.length){ Promise.all(enVol).then(_termine); return; }
     var lots=[];
     for(var i=0;i<manquants.length;i+=DataLayer.LOT_RESOLUTION){
       lots.push(manquants.slice(i,i+DataLayer.LOT_RESOLUTION));
     }
-    Promise.all(lots.map(function(lot){
-      return DataLayer._client.rpc("get_establishments_by_ids",{p_ids:lot})
+    var promesses=lots.map(function(lot){
+      var p=DataLayer._client.rpc("get_establishments_by_ids",{p_ids:lot})
         .then(function(r){return (r&&!r.error&&r.data)?r.data:[];})
-        .catch(function(){return [];});
-    })).then(function(res){
-      manquants.forEach(function(v){delete DataLayer._enCoursResolution[v];});
-      var lignes=[];res.forEach(function(a){lignes=lignes.concat(a);});
-      var etabs=lignes.map(DataLayer._ligneVersEtab);
-      if(DataLayer._fusionne(etabs)&&DataLayer._onUpdate)DataLayer._onUpdate();
-      var apres={};DataLayer.getEstablishments().forEach(function(e){apres[e.id]=e;});
-      if(cb)cb(demandes.map(function(v){return apres[v];}).filter(Boolean));
+        .catch(function(){return [];})
+        .then(function(lignes){
+          // La fusion a lieu DANS la promesse partagee : tout appelant qui
+          // l'attend trouve le cache deja a jour a sa reprise.
+          lot.forEach(function(v){delete DataLayer._enCoursResolution[v];});
+          var etabs=lignes.map(DataLayer._ligneVersEtab);
+          if(DataLayer._fusionne(etabs)&&DataLayer._onUpdate)DataLayer._onUpdate();
+          return lignes;
+        });
+      lot.forEach(function(v){DataLayer._enCoursResolution[v]=p;});
+      return p;
     });
+    Promise.all(promesses.concat(enVol)).then(_termine);
   },
 
   // --- Fil d'actualite (posts) ---
@@ -2586,8 +2629,8 @@ function ClientFeed(props){
   }
   function openReport(post){setMenuOpen(null);setReportTarget(post);}
   // Suivre depuis le feed = suivre l'ETABLISSEMENT (jamais l'identifiant du post)
-  function toggleFollowPost(post){var _pe=_estabForPost(post);if(props.onToggleFollow&&_pe)props.onToggleFollow(_pe.id);}
-  function _followKey(post){var _pe=_estabForPost(post);return _pe?_pe.id:post.id;}
+  function toggleFollowPost(post){var _id=_identiteEtabDuPost(post);if(props.onToggleFollow&&_id)props.onToggleFollow(_id.id);}
+  function _followKey(post){var _id=_identiteEtabDuPost(post);return _id?_id.id:post.id;}
   function toggleLike(id){
     var post=posts.find(function(p){return p.id===id;});
     var wasLiked=post?post.liked:false;
@@ -2687,7 +2730,7 @@ function ClientFeed(props){
   var sHeart=useState(null);var heartAnim=sHeart[0];var setHeartAnim=sHeart[1];
   function triggerHeart(id){setHeartAnim(id);setTimeout(function(){setHeartAnim(null);},500);}
   // Resolution par identifiant a chaque rendu (cache toujours frais, photo de couverture a jour)
-  function _openPostProfile(post){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}
+  function _openPostProfile(post){var _id=_identiteEtabDuPost(post);if(onProfile&&_id)onProfile(_id.id,_id.type||post.type);}
   var postRefs=useRef({});
   // Campagnes sponsorisees REELLES (serveur) : cartes intercalees, vues/clics comptes.
   // Visibles par TOUS (l'abonnement Premium ne supprime pas les publicites sponsorisees).
@@ -4009,8 +4052,8 @@ function ProFeed(props){
   }
   var followingPosts=props.followingIds||[];
   // Suivre depuis le feed = suivre l'ETABLISSEMENT (jamais l'identifiant du post)
-  function toggleFollowPost(post){var _pe=_estabForPost(post);if(props.onToggleFollow&&_pe)props.onToggleFollow(_pe.id);}
-  function _followKey(post){var _pe=_estabForPost(post);return _pe?_pe.id:post.id;}
+  function toggleFollowPost(post){var _id=_identiteEtabDuPost(post);if(props.onToggleFollow&&_id)props.onToggleFollow(_id.id);}
+  function _followKey(post){var _id=_identiteEtabDuPost(post);return _id?_id.id:post.id;}
   var sLoadPro=useState(true);var loadingPro=sLoadPro[0];var setLoadingPro=sLoadPro[1];
   useEffect(function(){var t=setTimeout(function(){setLoadingPro(false);},350);return function(){clearTimeout(t);};},[]);
   var _sbLikesLoadedPro=useRef(false);
@@ -4311,11 +4354,11 @@ function ProFeed(props){
           <div ref={function(el){postRefsPro.current[post.id]=el;}} style={{background:DS.surface,marginBottom:10,borderTop:"1px solid "+DS.border+"28",borderBottom:"1px solid "+DS.border+"28",animation:"hp-item-in 0.34s ease both",animationDelay:(_pfi*50)+"ms"}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12,padding:"18px 16px 14px"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:12,flex:1,minWidth:0}}>
-                <div onClick={function(){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}} style={{cursor:onProfile?"pointer":"default",flexShrink:0}}>
+                <div onClick={function(){var _id=_identiteEtabDuPost(post);if(onProfile&&_id)onProfile(_id.id,_id.type||post.type);}} style={{cursor:onProfile?"pointer":"default",flexShrink:0}}>
                   <Av sz={52} letter={post.author[0]} img={function(){var _pe=_estabForPost(post);return _pe?_pe.img:null;}()} verified={post.verified}/>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div onClick={function(){var _pe=_estabForPost(post);if(onProfile&&_pe)onProfile(_pe.id,_pe.type||post.type);}} style={{fontSize:15,fontWeight:800,color:DS.text,lineHeight:1.3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:onProfile?"pointer":"default",display:"inline-block",maxWidth:"100%"}}>{post.author}</div>
+                  <div onClick={function(){var _id=_identiteEtabDuPost(post);if(onProfile&&_id)onProfile(_id.id,_id.type||post.type);}} style={{fontSize:15,fontWeight:800,color:DS.text,lineHeight:1.3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",cursor:onProfile?"pointer":"default",display:"inline-block",maxWidth:"100%"}}>{post.author}</div>
                   <div style={{display:"flex",flexWrap:"nowrap",alignItems:"center",gap:5,marginTop:2,overflow:"hidden"}}>
                     <span style={{fontSize:12,color:pc,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{post.type==="hotel"?"Hôtel":"Restaurant"}</span>
                     {post.combined&&<span style={{fontSize:9,color:DS.primary,fontWeight:800,background:DS.primarySoft,borderRadius:8,padding:"1px 6px",flexShrink:0,whiteSpace:"nowrap"}}>+ Restaurant</span>}
