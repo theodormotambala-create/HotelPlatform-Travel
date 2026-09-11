@@ -186,6 +186,84 @@ var DataLayer = {
     for(var i=0;i<all.length;i++){ if(all[i].id===id) return all[i]; }
     return null;
   },
+  // --- Resolution d'etablissements PAR IDENTIFIANT, servie par le serveur ---
+  // Avant : tous les etablissements de la plateforme etaient telechargees au
+  // demarrage (profiles_public sans borne) pour que la banniere publicitaire,
+  // la messagerie, le fil, les favoris et l'ecran Pro puissent retrouver un
+  // etablissement par son identifiant dans un tableau en memoire. Mesure sur
+  // la base reelle : 22 971 blocs et 3 285 ms pour 7 lignes, a chaque
+  // lancement, et le cout croit avec la plateforme entiere.
+  // Desormais : on ne charge QUE les etablissements dont l'ecran a besoin,
+  // par identifiant (cle primaire), via get_establishments_by_ids. Le serveur
+  // borne lui-meme le nombre d'identifiants ; le client decoupe en lots.
+  // Les lignes resolues sont AJOUTEES au cache (jamais un ecrasement) : tous
+  // les acces existants par id ou par userId continuent de fonctionner tels
+  // quels.
+  LOT_RESOLUTION: 100,
+  _enCoursResolution: {},
+  _ligneVersEtab: function(x){
+    return {id:x.id,type:x.type,name:x.name,author:x.name,location:x.location,
+            description:x.description,img:x.img,
+            priceFrom:x.price_from!=null?Number(x.price_from):0,
+            rating:x.rating!=null?Number(x.rating):0,reviewCount:x.review_count||0,
+            verified:x.verified===true,isPremium:x.is_premium===true,
+            svcMode:x.svc_mode,hasRestaurant:x.has_restaurant===true,
+            userId:x.owner_id||undefined,followers:Number(x.followers)||0};
+  },
+  _fusionne: function(etabs){
+    if(!etabs||!etabs.length) return false;
+    var change=false;
+    ["hotels","restaurants"].forEach(function(cle){
+      var type=cle==="hotels"?"hotel":"restaurant";
+      var lot=etabs.filter(function(e){return e.type===type;});
+      if(!lot.length) return;
+      var parId={};lot.forEach(function(e){parId[e.id]=e;});
+      var suite=DataLayer._cache[cle].map(function(prev){
+        var neuf=parId[prev.id];
+        if(!neuf) return prev;
+        delete parId[prev.id];
+        // Fusion : les donnees deja chargees par un ecran (chambres, menu,
+        // services, offres) ne sont jamais effacees par la resolution.
+        return Object.assign({},prev,neuf);
+      });
+      var restants=Object.keys(parId).map(function(k){return parId[k];});
+      if(restants.length){suite=suite.concat(restants);}
+      DataLayer._cache[cle]=suite;
+      change=true;
+    });
+    return change;
+  },
+  // Garantit que les etablissements demandes sont presents dans le cache.
+  // cb(etabsResolus) est appele une fois la resolution terminee (ou tout de
+  // suite si tout est deja connu). Ne leve jamais : un echec reseau laisse le
+  // cache tel quel et cb recoit ce qui etait deja connu.
+  ensureEstablishments: function(ids,cb){
+    var demandes=(ids||[]).filter(function(v){return v&&typeof v==="string";});
+    var vus={};demandes=demandes.filter(function(v){if(vus[v])return false;vus[v]=1;return true;});
+    var connus={};DataLayer.getEstablishments().forEach(function(e){connus[e.id]=e;});
+    var manquants=demandes.filter(function(v){return !connus[v]&&!DataLayer._enCoursResolution[v];});
+    if(!manquants.length||!DataLayer._client){
+      if(cb)cb(demandes.map(function(v){return connus[v];}).filter(Boolean));
+      return;
+    }
+    manquants.forEach(function(v){DataLayer._enCoursResolution[v]=1;});
+    var lots=[];
+    for(var i=0;i<manquants.length;i+=DataLayer.LOT_RESOLUTION){
+      lots.push(manquants.slice(i,i+DataLayer.LOT_RESOLUTION));
+    }
+    Promise.all(lots.map(function(lot){
+      return DataLayer._client.rpc("get_establishments_by_ids",{p_ids:lot})
+        .then(function(r){return (r&&!r.error&&r.data)?r.data:[];})
+        .catch(function(){return [];});
+    })).then(function(res){
+      manquants.forEach(function(v){delete DataLayer._enCoursResolution[v];});
+      var lignes=[];res.forEach(function(a){lignes=lignes.concat(a);});
+      var etabs=lignes.map(DataLayer._ligneVersEtab);
+      if(DataLayer._fusionne(etabs)&&DataLayer._onUpdate)DataLayer._onUpdate();
+      var apres={};DataLayer.getEstablishments().forEach(function(e){apres[e.id]=e;});
+      if(cb)cb(demandes.map(function(v){return apres[v];}).filter(Boolean));
+    });
+  },
 
   // --- Fil d'actualite (posts) ---
   getFeed: function(){ return DataLayer._cache.feed; },
@@ -200,6 +278,18 @@ var DataLayer = {
     if(!rows||!rows.length) return null;
     var last=rows[rows.length-1];
     return { at: last.created_at||null, id: last.id||null };
+  },
+  // Etablissements cites par une page du fil. Le fil affiche la photo et
+  // ouvre le profil de l'etablissement auteur : ces etablissements-la sont
+  // resolus par identifiant, bornes par la taille de page, au lieu d'avoir
+  // telecharge toute la plateforme au demarrage.
+  _resoudEtabsDesPosts: function(rows){
+    try{
+      var ids=(rows||[]).map(function(r){
+        return r.establishment_id||(r.data&&r.data.estabId)||null;
+      }).filter(Boolean);
+      if(ids.length)DataLayer.ensureEstablishments(ids,null);
+    }catch(e){}
   },
   // Page suivante du fil. Les publications sont AJOUTEES au cache, jamais
   // substituees : rien de ce qui est deja charge n'est perdu.
@@ -218,10 +308,12 @@ var DataLayer = {
             likes:typeof r.likes==="number"?r.likes:0,
             shares:typeof r.shares==="number"?r.shares:0,
             cmtCount:typeof r.comments_count==="number"?r.comments_count:0,
-            ownerUid:r.owner_id||obj.ownerUid||null
+            ownerUid:r.owner_id||obj.ownerUid||null,
+            estabId:r.establishment_id||obj.estabId||null
           });
         });
         DataLayer._cache.feed=DataLayer._cache.feed.concat(ajout);
+        DataLayer._resoudEtabsDesPosts(res.data);
         DataLayer._feedCursor=DataLayer._curseurDepuis(res.data);
         DataLayer._feedHasMore=res.data.length===DataLayer.FEED_PAGE;
         if(DataLayer._onUpdate)DataLayer._onUpdate();
@@ -251,36 +343,21 @@ var DataLayer = {
     if(!supabase) return;
     DataLayer._client = supabase; // memorise le client pour les operations CRUD
     try{
-      // 1. Etablissements
-      supabase.from("establishments").select("*").then(function(res){
-        if(res && res.data && res.data.length>0){
-          var hotels=[], rests=[];
-          res.data.forEach(function(row){
-            var obj = row.data || row;
-            // Normalisation : les lignes sans blob "data" utilisent les noms de colonnes SQL (snake_case)
-            if(!row.data){
-              obj = Object.assign({}, row, {
-                priceFrom: row.price_from!=null?Number(row.price_from):obj.priceFrom,
-                reviewCount: row.review_count!=null?row.review_count:(obj.reviewCount||0),
-                rating: row.rating!=null?Number(row.rating):(obj.rating||0),
-                svcMode: row.svc_mode||obj.svcMode,
-                hasRestaurant: row.has_restaurant===true||obj.hasRestaurant===true,
-                isPremium: row.is_premium===true,
-                userId: row.owner_id||undefined
-              });
-            }
-            if(obj.type==="hotel") hotels.push(obj); else rests.push(obj);
-          });
-          if(hotels.length) DataLayer._cache.hotels = hotels;
-          if(rests.length)  DataLayer._cache.restaurants = rests;
-          if(DataLayer._onUpdate) DataLayer._onUpdate();
-        }
-        // Base vide : on n'y injecte PLUS les etablissements de demonstration.
-        // Ecrire des donnees fictives dans la base de production (« Grand Hotel
-        // Royal », notes et avis inventes) est le contraire d'une plateforme
-        // reelle : une base vide reste vide jusqu'aux premieres inscriptions.
-        // (_seedEstablishments est conservee mais n'est plus jamais appelee.)
-      });
+      // 1. Etablissements : plus AUCUN telechargement global au demarrage.
+      // Avant, la table establishments etait lue EN ENTIER (select("*") sans
+      // borne) a chaque ouverture de l'application, puis conservee en memoire
+      // pour que chaque ecran y retrouve un etablissement par identifiant.
+      // A l'echelle visee, c'est le repertoire mondial des etablissements
+      // telecharge par chaque utilisateur a chaque lancement.
+      // Desormais :
+      //  - l'ecran Decouverte est servi page par page par le serveur
+      //    (get_establishments_page, curseur) ;
+      //  - tous les autres ecrans resolvent l'etablissement dont ils ont
+      //    besoin PAR SON IDENTIFIANT (get_establishments_by_ids), par lots
+      //    bornes : banniere publicitaire, messagerie, fil, favoris,
+      //    etablissement du Pro connecte.
+      // Base vide : on n'y injecte PLUS les etablissements de demonstration.
+      // (_seedEstablishments est conservee mais n'est plus jamais appelee.)
       // 2. Posts — tri chronologique + compteurs serveur (likes/commentaires/partages maintenus par triggers, jamais les valeurs de démo)
       // Premiere page du fil, par curseur (RPC get_feed_page). Ce n'etait pas
       // une page mais un PLAFOND : la 101e publication n'etait jamais
@@ -297,10 +374,12 @@ var DataLayer = {
               likes:typeof r.likes==="number"?r.likes:0,
               shares:typeof r.shares==="number"?r.shares:0,
               cmtCount:typeof r.comments_count==="number"?r.comments_count:0,
-              ownerUid:r.owner_id||obj.ownerUid||null
+              ownerUid:r.owner_id||obj.ownerUid||null,
+              estabId:r.establishment_id||obj.estabId||null
             });
             return obj;
           });
+          DataLayer._resoudEtabsDesPosts(res.data);
           if(DataLayer._onUpdate) DataLayer._onUpdate();
         } else if(res && res.data && res.data.length===0){
           DataLayer._seedPosts(supabase);
@@ -328,56 +407,20 @@ var DataLayer = {
       // (declencheur trg_reviews_rating_sync -> establishments.rating /
       // review_count, deja lus a l'etape 1 ci-dessus), et la liste des avis
       // d'un etablissement est chargee a la demande, paginee, par son ecran.
-      // 8. Profils Pro — ajoute les vrais etablissements inscrits au cache
-      // Lecture via la vue publique (profiles_public) : n'expose que les colonnes necessaires,
-      // jamais les donnees personnelles (preferences, premium, favoris, statut).
-      supabase.from("profiles_public").select("user_id,account_type,display_name,location,description,cover_url,verified,is_premium,svc_mode").in("account_type",["hotel","restaurant"]).neq("display_name","")
-        .then(function(res){
-          if(res&&res.data&&res.data.length>0){
-            // MERGE (pas d'ecrasement) : on preserve prix/note/avis/chambres/menu deja charges
-            // par les etapes 1 (table establishments) et 3 (chambres). Le profil ne met a jour
-            // que nom/photo/lieu/description/verifie/premium. Note/avis toujours definis (>=0).
-            var _exH={};DataLayer._cache.hotels.forEach(function(h){if(h.userId)_exH[h.userId]=h;});
-            var _exR={};DataLayer._cache.restaurants.forEach(function(r){if(r.userId)_exR[r.userId]=r;});
-            var _mkEstab=function(p,type,ex){
-              var prev=ex[p.user_id]||{};
-              return Object.assign({},prev,{
-                id:"prof_"+p.user_id,userId:p.user_id,name:p.display_name,author:p.display_name,type:type,
-                svcMode:p.svc_mode||prev.svcMode||(type==="hotel"?"hotel":"restaurant"),
-                location:p.location||prev.location||"",description:p.description||prev.description||"",
-                img:p.cover_url||prev.img||(type==="hotel"?"https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400&q=70":"https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&q=70"),
-                verified:p.verified||false,isPremium:p.is_premium||false,
-                priceFrom:prev.priceFrom||0,rating:prev.rating||0,reviewCount:prev.reviewCount||0,
-                services:prev.services||[],rooms:prev.rooms||[],menu:prev.menu||[],offers:prev.offers||[]
-              });
-            };
-            var newHotels=res.data.filter(function(p){return p.account_type==="hotel";}).map(function(p){return _mkEstab(p,"hotel",_exH);});
-            var newRestos=res.data.filter(function(p){return p.account_type==="restaurant";}).map(function(p){return _mkEstab(p,"restaurant",_exR);});
-            // Applique les notes reelles deja agregees (si l'etape avis a fini avant)
-            try{if(DataLayer._reviewAgg){var _ap=function(x){var a=DataLayer._reviewAgg[x.id];return a?Object.assign({},x,{rating:a.avg,reviewCount:a.n}):x;};newHotels=newHotels.map(_ap);newRestos=newRestos.map(_ap);}}catch(exA){}
-            if(newHotels.length){DataLayer._cache.hotels=DataLayer._cache.hotels.filter(function(h){return!h.userId;}).concat(newHotels);}
-            if(newRestos.length){DataLayer._cache.restaurants=DataLayer._cache.restaurants.filter(function(r){return!r.userId;}).concat(newRestos);}
-            if(DataLayer._onUpdate)DataLayer._onUpdate();
-            // Abonnes REELS : compteurs materialises, lus par cle primaire et bornes
-            // aux etablissements effectivement charges. Ne parcourt plus la liste
-            // d'abonnements de tous les profils de la plateforme.
-            // La valeur est le total serveur (l'utilisateur courant y compris) :
-            // les ecrans qui doivent reagir a un clic gerent leur propre +1/-1.
-            var _fTokens=DataLayer._cache.hotels.concat(DataLayer._cache.restaurants)
-              .filter(function(x){return x.userId;}).map(function(x){return x.id;});
-            if(_fTokens.length){
-              supabase.from("follow_counters").select("target_token,followers_count").in("target_token",_fTokens)
-                .then(function(fres){
-                  if(!fres||fres.error||!fres.data)return;
-                  var fc={};fres.data.forEach(function(r){fc[r.target_token]=Number(r.followers_count)||0;});
-                  var _applyF=function(arr){return arr.map(function(x){return x.userId?Object.assign({},x,{followers:fc[x.id]||0}):x;});};
-                  DataLayer._cache.hotels=_applyF(DataLayer._cache.hotels);
-                  DataLayer._cache.restaurants=_applyF(DataLayer._cache.restaurants);
-                  if(DataLayer._onUpdate)DataLayer._onUpdate();
-                });
-            }
-          }
-        });
+      // 8. Profils Pro : plus AUCUN telechargement global au demarrage.
+      // Avant, profiles_public etait lu SANS BORNE (tous les hotels et tous
+      // les restaurants de la plateforme) pour ajouter au cache les
+      // etablissements inscrits, puis follow_counters etait relu avec une
+      // clause IN dimensionnee par ce meme nombre d'etablissements. Mesure sur
+      // la base reelle : 22 971 blocs et 3 285 ms pour 7 lignes, a chaque
+      // lancement de l'application.
+      // Cette lecture etait de toute facon REDONDANTE : le declencheur
+      // trg_ensure_pro_establishment (AFTER INSERT OR UPDATE sur profiles)
+      // ecrit deja chaque profil Pro dans establishments sous l'identifiant
+      // prof_<uid>. La source de verite est donc establishments, et le nombre
+      // d'abonnes est renvoye par les memes fonctions serveur
+      // (get_establishments_page / get_establishments_by_ids, jointure sur
+      // follow_counters).
       // 9. Reservations — re-hydrate BookingService depuis Supabase
       // Confidentialite : uniquement les reservations de l'utilisateur connecte (jamais celles des autres)
       if(_HP_UID) supabase.from("reservations").select("*").eq("client_id",_HP_UID).then(function(res){
@@ -1989,9 +2032,29 @@ function ChatUI(props){
   var sCompose=useState(false);var showCompose=sCompose[0];var setShowCompose=sCompose[1];
   var sComposeQ=useState("");var composeQ=sComposeQ[0];var setComposeQ=sComposeQ[1];
   useBackClose(showCompose,function(){setShowCompose(false);setComposeQ("");});
+  // Suggestions d'etablissements pour un nouveau message, servies par le
+  // serveur (une page bornee par type). Avant, cette liste etait le
+  // telechargement global de la plateforme filtre par indexOf : on ne pouvait
+  // ecrire qu'aux etablissements deja telecharges, et le cout croissait avec
+  // la plateforme. La recherche au-dela de ces suggestions passe par
+  // l'annuaire serveur (dirResults) ci-dessus.
+  var sSugg=useState([]);var suggEtabs=sSugg[0];var setSuggEtabs=sSugg[1];
+  useEffect(function(){
+    if(!isClientChat||!showCompose||!DataLayer._client)return;
+    var annule=false;
+    Promise.all(["hotel","restaurant"].map(function(t){
+      return DataLayer._client.rpc("get_establishments_page",{p_type:t,p_search:null,p_sort:"relevance",p_after_id:null,p_limit:12})
+        .then(function(r){return (r&&!r.error&&r.data)?r.data:[];}).catch(function(){return [];});
+    })).then(function(res){
+      if(annule)return;
+      var lignes=[];res.forEach(function(a){lignes=lignes.concat(a);});
+      setSuggEtabs(lignes.map(DataLayer._ligneVersEtab));
+    });
+    return function(){annule=true;};
+  },[isClientChat,showCompose]);
   var _composeList=(function(){
     var base=isClientChat
-      ? DataLayer.getEstablishments().filter(function(e){return !composeQ||(e.name||"").toLowerCase().includes(composeQ.toLowerCase());})
+      ? suggEtabs.filter(function(e){return !composeQ||(e.name||"").toLowerCase().includes(composeQ.toLowerCase());})
       : proClients.filter(function(r){return !composeQ||(r.clientName||"").toLowerCase().includes(composeQ.toLowerCase());});
     var seenUid={};base.forEach(function(b){if(b.userId)seenUid[b.userId]=true;if(b.clientId)seenUid[b.clientId]=true;});
     var extra=dirResults.filter(function(d){return !seenUid[d.userId];});
@@ -5889,6 +5952,14 @@ export default function App() {
   var followingIds=s12[0];  var setFollowingIds=s12[1];
   var s13fav=useState(function(){try{return JSON.parse(localStorage.getItem(_lk("hp_fav_estabs"))||"[]");}catch(e){return[];}});
   var favEstabIds=s13fav[0]; var setFavEstabIds=s13fav[1];
+  // Les etablissements favoris sont resolus PAR LEURS IDENTIFIANTS, par lots
+  // bornes. L'ecran Profil les retrouvait auparavant dans le telechargement
+  // global de la plateforme : un favori absent de ce telechargement
+  // disparaissait simplement de la liste.
+  useEffect(function(){
+    if(!favEstabIds||!favEstabIds.length)return;
+    DataLayer.ensureEstablishments(favEstabIds,null);
+  },[favEstabIds]);
   var sNotif=useState(function(){try{var v=localStorage.getItem(_lk("hp_notifs"));if(!v)return null;var p=JSON.parse(v);if(Array.isArray(p)&&p.length>0&&!p[0].icon){localStorage.removeItem(_lk("hp_notifs"));return null;}return p;}catch(e){return null;}});
   var _notifStored=sNotif[0]; var setNotifStored=sNotif[1];
   var sNotifPrefs=useState(function(){try{var v=localStorage.getItem(_lk("hp_notif_prefs"));return v?JSON.parse(v):{reservation:true,message:true,comment:true,reaction:true,promo:true,follow:true};}catch(e){return{reservation:true,message:true,comment:true,reaction:true,promo:true,follow:true};}});
@@ -6273,6 +6344,14 @@ export default function App() {
         setProProfLoaded(true);
       }).catch(function(){setProProfLoaded(true);});
   },[_authForProf&&_authForProf.userId]);
+  // L'etablissement de l'utilisateur Pro connecte est resolu par SON identifiant
+  // (prof_<uid>, cle primaire). Avant, il etait retrouve dans le telechargement
+  // global de la plateforme ; les ecrans Pro qui ne le trouvaient pas retombaient
+  // sur le premier etablissement de la liste, c'est-a-dire l'identite d'un autre.
+  useEffect(function(){
+    if(!_authForProf||!_authForProf.userId||_authForProf.type==="client")return;
+    DataLayer.ensureEstablishments(["prof_"+_authForProf.userId],null);
+  },[_authForProf&&_authForProf.userId]);
 
   // === ROUTING =====================================================
 
@@ -6417,8 +6496,15 @@ export default function App() {
     // Recherche par identifiant dans la liste du type, puis toutes listes — JAMAIS de repli arbitraire (profil fantome)
     var l=type==="hotel"?DataLayer.getHotels():DataLayer.getRestaurants();
     var e=l.find(function(x){return x.id===id;})||DataLayer.getEstablishmentById(id);
-    if(e)setEstab(e);
-    else toastApp("Profil indisponible pour le moment","error");
+    if(e){setEstab(e);return;}
+    // Absent du cache : on le demande au serveur par son identifiant plutot
+    // que d'avoir telecharge toute la plateforme au demarrage pour l'y trouver.
+    if(!id||!DataLayer._client){toastApp("Profil indisponible pour le moment","error");return;}
+    DataLayer.ensureEstablishments([id],function(res){
+      var trouve=(res&&res.length)?res[0]:null;
+      if(trouve)setEstab(trouve);
+      else toastApp("Profil indisponible pour le moment","error");
+    });
   }
   function openChat(e){
     // Le reglage « qui peut m'ecrire » est un filtre ENTRANT applique par le serveur
