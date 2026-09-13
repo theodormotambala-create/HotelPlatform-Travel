@@ -598,59 +598,64 @@ var DataLayer = {
   },
 
   // --- Sauvegarde des donnees metier etablissement ---
-  saveEstabRooms: function(estabId, rooms){
-    if(!DataLayer._client||!estabId) return;
+  // --- Catalogue d'un etablissement : remplacement ATOMIQUE, cote serveur ---
+  // Avant : DEUX requetes HTTP separees, sans transaction — un DELETE de tout
+  // le catalogue, puis un INSERT de la liste complete dont le resultat etait
+  // jete. Mesure : un simple nom de chambre de plus de 100 caracteres (la base
+  // impose name <= 100, l'interface ne bornait rien) faisait passer
+  // l'etablissement de 3 chambres et price_from = 120 EUR a 0 chambre et
+  // price_from = NULL — et une reservation acceptee avant devenait
+  // « Chambre introuvable » apres. L'etablissement cessait d'etre reservable
+  // sans que personne ne s'en apercoive.
+  // Desormais : une seule operation serveur, donc une seule transaction. Soit
+  // tout est applique, soit RIEN ne change ; aucune ligne n'est supprimee sans
+  // que son remplacant ait ete accepte.
+  // Ces fonctions RENVOIENT le resultat : l'appelant annonce le succes
+  // seulement apres acceptation reelle (meme discipline que createBooking et
+  // saveReview).
+  _ecritCatalogue: function(rpc, estabId, rows){
+    if(!DataLayer._client||!estabId) return Promise.resolve({ data:null, error:{ message:"hors-ligne" } });
     try{
-      var rows = rooms.map(function(r){
-        return { id: r.id, establishment_id: estabId, name: r.name,
-                 price: r.price||0, capacity: r.capacity||2,
-                 available: r.available!==false, stock: r.stock||1,
-                 description: r.description||null };
-      });
-      DataLayer._client.from("establishment_rooms")
-        .delete().eq("establishment_id", estabId).then(function(){
-          if(rows.length) DataLayer._client.from("establishment_rooms").insert(rows).then(function(){});
-        });
-    }catch(e){}
+      return DataLayer._client.rpc(rpc, { p_establishment_id: estabId, p_rows: rows });
+    }catch(e){ return Promise.resolve({ data:null, error:e }); }
+  },
+  saveEstabRooms: function(estabId, rooms){
+    return DataLayer._ecritCatalogue("set_establishment_rooms", estabId, (rooms||[]).map(function(r){
+      return { id:r.id, name:r.name, price:r.price||0, capacity:r.capacity||2,
+               available:r.available!==false, stock:r.stock||1,
+               description:r.description||null };
+    }));
   },
   saveEstabDishes: function(estabId, dishes){
-    if(!DataLayer._client||!estabId) return;
-    try{
-      var rows = dishes.map(function(d){
-        return { id: d.id, establishment_id: estabId, name: d.name,
-                 price: d.price||0, category: d.category||"Plats",
-                 description: d.description||null, available: d.available!==false };
-      });
-      DataLayer._client.from("establishment_dishes")
-        .delete().eq("establishment_id", estabId).then(function(){
-          if(rows.length) DataLayer._client.from("establishment_dishes").insert(rows).then(function(){});
-        });
-    }catch(e){}
+    return DataLayer._ecritCatalogue("set_establishment_dishes", estabId, (dishes||[]).map(function(d){
+      return { id:d.id, name:d.name, price:d.price||0, category:d.category||"Plats",
+               description:d.description||null, available:d.available!==false };
+    }));
   },
   saveEstabAmenities: function(estabId, amenities){
-    if(!DataLayer._client||!estabId) return;
-    try{
-      var rows = amenities.map(function(a){
-        return { id: a.id, establishment_id: estabId, name: a.name, active: a.active!==false };
-      });
-      DataLayer._client.from("establishment_amenities")
-        .delete().eq("establishment_id", estabId).then(function(){
-          if(rows.length) DataLayer._client.from("establishment_amenities").insert(rows).then(function(){});
-        });
-    }catch(e){}
+    return DataLayer._ecritCatalogue("set_establishment_amenities", estabId, (amenities||[]).map(function(a){
+      return { id:a.id, name:a.name, active:a.active!==false };
+    }));
   },
   saveEstabOffers: function(estabId, offers){
-    if(!DataLayer._client||!estabId) return;
-    try{
-      var rows = offers.map(function(o){
-        return { id: o.id, establishment_id: estabId, name: o.name,
-                 price: o.price||null, available: o.available!==false };
-      });
-      DataLayer._client.from("establishment_offers")
-        .delete().eq("establishment_id", estabId).then(function(){
-          if(rows.length) DataLayer._client.from("establishment_offers").insert(rows).then(function(){});
-        });
-    }catch(e){}
+    return DataLayer._ecritCatalogue("set_establishment_offers", estabId, (offers||[]).map(function(o){
+      return { id:o.id, name:o.name, price:(o.price===0||o.price)?o.price:null,
+               available:o.available!==false };
+    }));
+  },
+  // Message lisible a partir d'un refus reel du serveur. Les contraintes
+  // citees existent en base (rooms_name_len / dishes_name_len /
+  // offers_name_len : 100 caracteres ; rooms_desc_len / dishes_desc_len :
+  // 500) : on les traduit, on n'en invente aucune.
+  messageCatalogue: function(err){
+    var m = (err && (err.message||err.msg||err.details)) ? String(err.message||err.msg||err.details) : "";
+    if(m.indexOf("hors-ligne")>=0) return "Enregistrement impossible — aucune connexion au serveur.";
+    if(m.indexOf("_name_len")>=0) return "Enregistrement refusé — le nom dépasse 100 caractères.";
+    if(m.indexOf("_desc_len")>=0) return "Enregistrement refusé — la description dépasse 500 caractères.";
+    if(m.indexOf("ne vous appartient pas")>=0) return "Enregistrement refusé — cet établissement ne vous appartient pas.";
+    if(m.indexOf("Ressource sans identifiant")>=0) return "Enregistrement refusé — une ressource est sans identifiant.";
+    if(m.indexOf("Etablissement manquant")>=0) return "Enregistrement impossible — établissement non identifié.";
+    return m ? ("Enregistrement refusé — "+m) : "Enregistrement impossible — vérifiez votre connexion.";
   },
   saveEstabDescription: function(estabId, description){
     if(!DataLayer._client||!estabId||!description) return;
@@ -4888,27 +4893,46 @@ function HotelSvc(props){
     try{localStorage.setItem(_lk("hp_hotelsvc_svcmode"),v);}catch(e){}
     if(userId&&DataLayer._client){DataLayer._client.from("profiles").update({svc_mode:v,updated_at:new Date().toISOString()}).eq("user_id",userId).then(function(){});}
   }
-  function _saveRooms(rs){try{localStorage.setItem(_lk("hp_hotelsvc_rooms"),JSON.stringify(rs));}catch(e){}try{DataLayer.saveEstabRooms(_hEstabId,rs);}catch(e){}}
-  function _saveDishes(ms){try{localStorage.setItem(_lk("hp_hotelsvc_dishes"),JSON.stringify(ms));}catch(e){}try{DataLayer.saveEstabDishes(_hEstabId,ms);}catch(e){}}
-  function _saveAmenities(am){try{localStorage.setItem(_lk("hp_hotelsvc_amenities"),JSON.stringify(am));}catch(e){}try{DataLayer.saveEstabAmenities(_hEstabId,am);}catch(e){}}
-  function toggleAmenity(id){setAmenities(function(am){var next=am.map(function(a){return a.id===id?Object.assign({},a,{active:!a.active}):a;});_saveAmenities(next);return next;});}
-  function addAmenity(){if(!newSvcName.trim())return;var am=amenities.concat([{id:_idRessource("svc"),name:newSvcName.trim(),active:true}]);setAmenities(am);_saveAmenities(am);setNewSvcName("");setAddSvc(false);}
-  function removeAmenity(id){setAmenities(function(am){var next=am.filter(function(a){return a.id!==id;});_saveAmenities(next);return next;});}
-  function toggleAvail(id){setRooms(function(rs){var next=rs.map(function(r){return r.id===id?Object.assign({},r,{available:!r.available}):r;});_saveRooms(next);return next;});}
-  function toggleMenuAvail(id){setMenu(function(ms){var next=ms.map(function(m){return m.id===id?Object.assign({},m,{available:!m.available}):m;});_saveDishes(next);return next;});}
+  // Affichage optimiste PUIS annulation si le serveur refuse — meme discipline
+  // que BookingService.createBooking. « precedent » est l'etat exact d'avant la
+  // modification : en cas de refus, l'ecran et localStorage y reviennent et
+  // l'utilisateur voit la vraie raison, au lieu d'un succes annonce a l'aveugle.
+  function _annule(setEtat, cle, precedent, err){
+    if(!precedent) return;
+    setEtat(precedent);
+    try{localStorage.setItem(_lk(cle),JSON.stringify(precedent));}catch(e){}
+    try{toastH(DataLayer.messageCatalogue(err),"error");}catch(e){}
+  }
+  function _envoie(promesse, setEtat, cle, precedent){
+    try{
+      if(promesse&&promesse.then){
+        promesse.then(function(res){
+          if(res&&res.error)_annule(setEtat,cle,precedent,res.error);
+        }).catch(function(err){_annule(setEtat,cle,precedent,err);});
+      }
+    }catch(e){}
+  }
+  function _saveRooms(rs,precedent){try{localStorage.setItem(_lk("hp_hotelsvc_rooms"),JSON.stringify(rs));}catch(e){}_envoie(DataLayer.saveEstabRooms(_hEstabId,rs),setRooms,"hp_hotelsvc_rooms",precedent);}
+  function _saveDishes(ms,precedent){try{localStorage.setItem(_lk("hp_hotelsvc_dishes"),JSON.stringify(ms));}catch(e){}_envoie(DataLayer.saveEstabDishes(_hEstabId,ms),setMenu,"hp_hotelsvc_dishes",precedent);}
+  function _saveAmenities(am,precedent){try{localStorage.setItem(_lk("hp_hotelsvc_amenities"),JSON.stringify(am));}catch(e){}_envoie(DataLayer.saveEstabAmenities(_hEstabId,am),setAmenities,"hp_hotelsvc_amenities",precedent);}
+  function toggleAmenity(id){setAmenities(function(am){var next=am.map(function(a){return a.id===id?Object.assign({},a,{active:!a.active}):a;});_saveAmenities(next,am);return next;});}
+  function addAmenity(){if(!newSvcName.trim())return;var am=amenities.concat([{id:_idRessource("svc"),name:newSvcName.trim(),active:true}]);setAmenities(am);_saveAmenities(am,amenities);setNewSvcName("");setAddSvc(false);}
+  function removeAmenity(id){setAmenities(function(am){var next=am.filter(function(a){return a.id!==id;});_saveAmenities(next,am);return next;});}
+  function toggleAvail(id){setRooms(function(rs){var next=rs.map(function(r){return r.id===id?Object.assign({},r,{available:!r.available}):r;});_saveRooms(next,rs);return next;});}
+  function toggleMenuAvail(id){setMenu(function(ms){var next=ms.map(function(m){return m.id===id?Object.assign({},m,{available:!m.available}):m;});_saveDishes(next,ms);return next;});}
   var tkH=useToast();var toastH=tkH.show;var ToastH=tkH.Toast;
   function saveRoom(item){
-    if(editItem){setRooms(function(rs){var next=rs.map(function(r){return r.id===item.id?item:r;});_saveRooms(next);return next;});toastH("Chambre mise à jour","success");}
-    else{setRooms(function(rs){var next=rs.concat([item]);_saveRooms(next);return next;});toastH("Chambre ajoutée","success");}
+    if(editItem){setRooms(function(rs){var next=rs.map(function(r){return r.id===item.id?item:r;});_saveRooms(next,rs);return next;});toastH("Chambre mise à jour","success");}
+    else{setRooms(function(rs){var next=rs.concat([item]);_saveRooms(next,rs);return next;});toastH("Chambre ajoutée","success");}
     setEditItem(null);setShowAdd(false);
   }
   function saveDish(item){
-    if(editItem){setMenu(function(ms){var next=ms.map(function(m){return m.id===item.id?item:m;});_saveDishes(next);return next;});toastH("Plat mis a jour","success");}
-    else{setMenu(function(ms){var next=ms.concat([item]);_saveDishes(next);return next;});toastH("Plat ajouté","success");}
+    if(editItem){setMenu(function(ms){var next=ms.map(function(m){return m.id===item.id?item:m;});_saveDishes(next,ms);return next;});toastH("Plat mis a jour","success");}
+    else{setMenu(function(ms){var next=ms.concat([item]);_saveDishes(next,ms);return next;});toastH("Plat ajouté","success");}
     setEditItem(null);setShowAdd(false);
   }
-  function deleteRoom(id){setRooms(function(rs){var next=rs.filter(function(r){return r.id!==id;});_saveRooms(next);return next;});toastH("Chambre supprimée","info");}
-  function deleteDish(id){setMenu(function(ms){var next=ms.filter(function(m){return m.id!==id;});_saveDishes(next);return next;});toastH("Plat supprimé","info");}
+  function deleteRoom(id){setRooms(function(rs){var next=rs.filter(function(r){return r.id!==id;});_saveRooms(next,rs);return next;});toastH("Chambre supprimée","info");}
+  function deleteDish(id){setMenu(function(ms){var next=ms.filter(function(m){return m.id!==id;});_saveDishes(next,ms);return next;});toastH("Plat supprimé","info");}
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
       <ToastH/>
@@ -5089,18 +5113,35 @@ function RestOff(props){
         setOffers(os);try{localStorage.setItem(_lk("hp_restoff_offers"),JSON.stringify(os));}catch(e){}
       }).catch(function(){});
   },[_rEstabId]);
-  function _saveOffers(next){try{localStorage.setItem(_lk("hp_restoff_offers"),JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabOffers(_rEstabId,next);}catch(e){}}
+  // Affichage optimiste PUIS annulation si le serveur refuse — meme discipline
+  // que BookingService.createBooking et que l'ecran Hotel.
+  function _annuleR(setEtat, cle, precedent, err){
+    if(!precedent) return;
+    setEtat(precedent);
+    try{localStorage.setItem(_lk(cle),JSON.stringify(precedent));}catch(e){}
+    try{toastO(DataLayer.messageCatalogue(err),"error");}catch(e){}
+  }
+  function _envoieR(promesse, setEtat, cle, precedent){
+    try{
+      if(promesse&&promesse.then){
+        promesse.then(function(res){
+          if(res&&res.error)_annuleR(setEtat,cle,precedent,res.error);
+        }).catch(function(err){_annuleR(setEtat,cle,precedent,err);});
+      }
+    }catch(e){}
+  }
+  function _saveOffers(next,precedent){try{localStorage.setItem(_lk("hp_restoff_offers"),JSON.stringify(next));}catch(e){}_envoieR(DataLayer.saveEstabOffers(_rEstabId,next),setOffers,"hp_restoff_offers",precedent);}
   var tkO=useToast();var toastO=tkO.show;var ToastO=tkO.Toast;
-  function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next);toastO("Offre supprimée","info");}
-  function addOffer(){if(!newOfferName.trim())return;var o={id:_idRessource("o"),name:newOfferName.trim(),price:newOfferPrice?parseFloat(newOfferPrice):null,available:true};var next=offers.concat([o]);setOffers(next);_saveOffers(next);setNewOfferName("");setNewOfferPrice("");setShowAddOffer(false);toastO("Offre ajoutée","success");}
-  function _saveItems(next){try{localStorage.setItem(_lk("hp_restoff_items"),JSON.stringify(next));}catch(e){}try{DataLayer.saveEstabDishes(_rEstabId,next);}catch(e){}}
+  function deleteOffer(id){var next=offers.filter(function(o){return o.id!==id;});setOffers(next);_saveOffers(next,offers);toastO("Offre supprimée","info");}
+  function addOffer(){if(!newOfferName.trim())return;var o={id:_idRessource("o"),name:newOfferName.trim(),price:newOfferPrice?parseFloat(newOfferPrice):null,available:true};var next=offers.concat([o]);setOffers(next);_saveOffers(next,offers);setNewOfferName("");setNewOfferPrice("");setShowAddOffer(false);toastO("Offre ajoutée","success");}
+  function _saveItems(next,precedent){try{localStorage.setItem(_lk("hp_restoff_items"),JSON.stringify(next));}catch(e){}_envoieR(DataLayer.saveEstabDishes(_rEstabId,next),setItems,"hp_restoff_items",precedent);}
   function saveItem(item){
-    if(editItem){setItems(function(is){var next=is.map(function(i){return i.id===item.id?item:i;});_saveItems(next);return next;});toastO("Plat mis a jour","success");}
-    else{setItems(function(is){var next=is.concat([item]);_saveItems(next);return next;});toastO("Plat ajouté","success");}
+    if(editItem){setItems(function(is){var next=is.map(function(i){return i.id===item.id?item:i;});_saveItems(next,is);return next;});toastO("Plat mis a jour","success");}
+    else{setItems(function(is){var next=is.concat([item]);_saveItems(next,is);return next;});toastO("Plat ajouté","success");}
     setEditItem(null);setShowAdd(false);
   }
-  function deleteItem(id){setItems(function(is){var next=is.filter(function(i){return i.id!==id;});_saveItems(next);return next;});toastO("Plat supprimé","info");}
-  function toggleAvail(id){setItems(function(is){var next=is.map(function(i){return i.id===id?Object.assign({},i,{available:!i.available}):i;});_saveItems(next);return next;});}
+  function deleteItem(id){setItems(function(is){var next=is.filter(function(i){return i.id!==id;});_saveItems(next,is);return next;});toastO("Plat supprimé","info");}
+  function toggleAvail(id){setItems(function(is){var next=is.map(function(i){return i.id===id?Object.assign({},i,{available:!i.available}):i;});_saveItems(next,is);return next;});}
   var categories=items.reduce(function(acc,item){if(item.category&&acc.indexOf(item.category)<0)acc.push(item.category);return acc;},[]);
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
