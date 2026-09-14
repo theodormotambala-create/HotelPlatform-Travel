@@ -155,7 +155,7 @@ export default async function handler(req, res) {
     // Réservation concernée
     let resa = null;
     if (resaId) {
-      const r = await supa.from("reservations").select("id,client_id,estab_id,estab_owner_id,estab_type,data").eq("id", resaId).maybeSingle();
+      const r = await supa.from("reservations").select("id,client_id,estab_id,estab_owner_id,estab_type,total_price,data").eq("id", resaId).maybeSingle();
       resa = r.data || null;
     }
 
@@ -193,10 +193,26 @@ export default async function handler(req, res) {
     // 1 chambre). L'écriture de payment_intent_id passe dans tous les cas :
     // l'argent reste rattachable à la réservation même si elle n'est pas
     // confirmée.
+    // Le MONTANT est verifie, comme il l'est deja pour les abonnements et les
+    // campagnes. Le prix qui fait foi est celui porte par la reservation
+    // (total_price), lui-meme impose et verifie en base par
+    // enforce_reservation_price depuis le tarif de la chambre. Sans cette
+    // comparaison, un paiement cree avec un montant arbitraire confirmait la
+    // reservation : la branche reservation ne selectionnait meme pas
+    // total_price. Si la reservation ne porte pas de prix (cas restaurant, ou
+    // le serveur ne peut pas recalculer), le comportement reste inchange.
+    const montantAttendu = (resa && resa.total_price != null)
+      ? Math.round(Number(resa.total_price) * 100) : null;
+    const montantIncoherent = !!(montantAttendu !== null && total !== montantAttendu);
+
     let statutFinal = null;
     if (resa) {
+      const champs = { payment_intent_id: pi.id, updated_at: new Date().toISOString() };
+      // On ne confirme pas une reservation dont le montant paye ne correspond
+      // pas au prix serveur. payment_intent_id est ecrit dans tous les cas.
+      if (!montantIncoherent) champs.status = "confirmed";
       const upd = await supa.from("reservations")
-        .update({ status: "confirmed", payment_intent_id: pi.id, updated_at: new Date().toISOString() })
+        .update(champs)
         .eq("id", resa.id).select("status").maybeSingle();
       statutFinal = (upd.data && upd.data.status) || null;
     }
@@ -213,7 +229,9 @@ export default async function handler(req, res) {
         estab_owner_id: ownerId,
         reservation_id: resa.id,
         payment_intent_id: pi.id,
-        note: "ANOMALIE reservation: paiement encaisse mais reservation en statut '" + statutFinal + "' — confirmation refusee (stock deja libere), remboursement a instruire"
+        note: montantIncoherent
+          ? ("ANOMALIE reservation: montant paye " + total + " cts != prix serveur " + montantAttendu + " cts — confirmation refusee, remboursement a instruire (reservation restee en statut '" + statutFinal + "')")
+          : ("ANOMALIE reservation: paiement encaisse mais reservation en statut '" + statutFinal + "' — confirmation refusee (stock deja libere), remboursement a instruire")
       }]);
     }
 
@@ -255,7 +273,9 @@ export default async function handler(req, res) {
         icon: "Calendar", color: nonConfirmee ? "#F59E0B" : "#22C55E",
         title: nonConfirmee ? "Paiement reçu sans réservation active" : "Paiement reçu",
         body: nonConfirmee
-          ? ("Paiement de " + fmt(total) + " encaissé pour la réservation " + resa.id + ", mais celle-ci est en statut « " + statutFinal + " » : elle n'a pas été confirmée et aucune place n'a été reprise. Un remboursement est à instruire.")
+          ? (montantIncoherent
+              ? ("Paiement de " + fmt(total) + " encaissé pour la réservation " + resa.id + ", mais le prix de cette réservation est " + fmt(montantAttendu) + " : elle n'a pas été confirmée. Un remboursement est à instruire.")
+              : ("Paiement de " + fmt(total) + " encaissé pour la réservation " + resa.id + ", mais celle-ci est en statut « " + statutFinal + " » : elle n'a pas été confirmée et aucune place n'a été reprise. Un remboursement est à instruire."))
           : ("Réservation payée " + fmt(total) + " — commission plateforme " + fmt(commission) + " (" + pct + "%) — net établissement " + fmt(net) + (resa ? " (réf. " + resa.id + ")" : "")),
         time: "maintenant", read: false, tab: "reservations",
         pref_key: "reservation", target_id: resa ? resa.id : null
