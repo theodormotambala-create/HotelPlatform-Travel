@@ -185,9 +185,36 @@ export default async function handler(req, res) {
       }
     } catch (e) { /* non bloquant */ }
 
-    // 1) Confirmation de la réservation — service role : le verrou serveur l'autorise
+    // 1) Confirmation de la réservation.
+    // La base n'accepte « confirmed » par le chemin service que depuis
+    // « pending » (trigger trg_b_protect_confirmation_service) : confirmer une
+    // réservation annulée reconsommerait un stock déjà rendu au marché, et
+    // provoquait une vraie surréservation (mesuré : 2 réservations actives sur
+    // 1 chambre). L'écriture de payment_intent_id passe dans tous les cas :
+    // l'argent reste rattachable à la réservation même si elle n'est pas
+    // confirmée.
+    let statutFinal = null;
     if (resa) {
-      await supa.from("reservations").update({ status: "confirmed", payment_intent_id: pi.id, updated_at: new Date().toISOString() }).eq("id", resa.id);
+      const upd = await supa.from("reservations")
+        .update({ status: "confirmed", payment_intent_id: pi.id, updated_at: new Date().toISOString() })
+        .eq("id", resa.id).select("status").maybeSingle();
+      statutFinal = (upd.data && upd.data.status) || null;
+    }
+    // Paiement encaissé pour une réservation qui n'est plus confirmable :
+    // on ne l'ignore pas en silence. Même traitement que les anomalies déjà
+    // journalisées pour les abonnements et les campagnes.
+    const nonConfirmee = !!(resa && statutFinal && statutFinal !== "confirmed");
+    if (nonConfirmee) {
+      await supa.from("platform_revenues").insert([{
+        kind: "other",
+        amount_cents: total,
+        currency: pi.currency || "eur",
+        user_id: resa.client_id || null,
+        estab_owner_id: ownerId,
+        reservation_id: resa.id,
+        payment_intent_id: pi.id,
+        note: "ANOMALIE reservation: paiement encaisse mais reservation en statut '" + statutFinal + "' — confirmation refusee (stock deja libere), remboursement a instruire"
+      }]);
     }
 
     // 2) Registre d'audit
@@ -225,9 +252,11 @@ export default async function handler(req, res) {
       await supa.from("notifications").insert([{
         id: "srv_tx_" + pi.id,
         user_id: ownerId,
-        icon: "Calendar", color: "#22C55E",
-        title: "Paiement reçu",
-        body: "Réservation payée " + fmt(total) + " — commission plateforme " + fmt(commission) + " (" + pct + "%) — net établissement " + fmt(net) + (resa ? " (réf. " + resa.id + ")" : ""),
+        icon: "Calendar", color: nonConfirmee ? "#F59E0B" : "#22C55E",
+        title: nonConfirmee ? "Paiement reçu sans réservation active" : "Paiement reçu",
+        body: nonConfirmee
+          ? ("Paiement de " + fmt(total) + " encaissé pour la réservation " + resa.id + ", mais celle-ci est en statut « " + statutFinal + " » : elle n'a pas été confirmée et aucune place n'a été reprise. Un remboursement est à instruire.")
+          : ("Réservation payée " + fmt(total) + " — commission plateforme " + fmt(commission) + " (" + pct + "%) — net établissement " + fmt(net) + (resa ? " (réf. " + resa.id + ")" : "")),
         time: "maintenant", read: false, tab: "reservations",
         pref_key: "reservation", target_id: resa ? resa.id : null
       }]);
