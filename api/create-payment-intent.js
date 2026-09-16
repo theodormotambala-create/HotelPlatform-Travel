@@ -99,24 +99,59 @@ export default async function handler(req, res) {
     // peut pas etre dicte par le navigateur, contrairement au nom transmis
     // dans le corps de la requete.
     let estabIdReel = null;
-    if (!isPremiumPayment && resaId) {
+    if (!isPremiumPayment) {
+      // Le commentaire ci-dessus enonce la regle : le montant du navigateur
+      // n'est JAMAIS une source de verite. Elle n'etait pourtant appliquee que
+      // dans le seul cas ou tout se passait bien. QUATRE voies rendaient la
+      // main au navigateur sans que rien ne le signale :
+      //   - resaId absent de la requete ;
+      //   - reservation introuvable ;
+      //   - reservation sans total_price ;
+      //   - cle de service absente, ou erreur reseau avalee par le catch.
+      // Il suffisait d'emprunter l'une d'elles pour fixer soi-meme le prix
+      // d'un sejour. Elles refusent desormais toutes : sans prix serveur,
+      // aucun paiement n'est cree.
+      //
+      // Verifie avant d'imposer ces refus, pour ne casser aucun appel legitime :
+      //   - la route n'a que quatre appelants (App.jsx) ; un seul paie une
+      //     reservation, et il transmet toujours resaId ;
+      //   - createBooking n'a que deux appelants, tous deux dans l'ecran de
+      //     reservation, et le paiement n'est ouvert qu'APRES acceptation de la
+      //     reservation par le serveur ;
+      //   - saveReservation, unique ecriture, renseigne toujours total_price.
+      // Le prix d'une reservation est donc toujours connu du serveur au moment
+      // ou ce paiement est demande.
+      if (!resaId) {
+        return res.status(400).json({ error: "Réservation non identifiée" });
+      }
+      const supaR = serviceClient();
+      if (!supaR) {
+        return res.status(500).json({ error: "Service non configuré" });
+      }
+      let rr;
       try {
-        const supaR = serviceClient();
-        if (supaR) {
-          const rr = await supaR.from("reservations")
-            .select("id,total_price,status,establishment_id").eq("id", String(resaId)).maybeSingle();
-          if (rr.data) {
-            estabIdReel = rr.data.establishment_id || null;
-            if (rr.data.total_price != null) {
-              const serveur = Math.round(Number(rr.data.total_price) * 100);
-              if (!Number.isFinite(serveur) || serveur < 50) {
-                return res.status(400).json({ error: "Montant de réservation invalide" });
-              }
-              amt = serveur;
-            }
-          }
-        }
-      } catch (e) { /* repli sur la validation ci-dessous */ }
+        rr = await supaR.from("reservations")
+          .select("id,total_price,status,establishment_id").eq("id", String(resaId)).maybeSingle();
+      } catch (e) {
+        rr = { error: e };
+      }
+      // Une panne ne doit pas se traduire par « le navigateur decide » : elle
+      // se traduit par « on ne sait pas, donc on ne prend pas d'argent ».
+      if (rr.error) {
+        return res.status(503).json({ error: "Vérification de la réservation impossible — réessayez" });
+      }
+      if (!rr.data) {
+        return res.status(404).json({ error: "Réservation introuvable" });
+      }
+      if (rr.data.total_price == null) {
+        return res.status(400).json({ error: "Réservation sans prix — paiement impossible" });
+      }
+      estabIdReel = rr.data.establishment_id || null;
+      const serveur = Math.round(Number(rr.data.total_price) * 100);
+      if (!Number.isFinite(serveur) || serveur < 50) {
+        return res.status(400).json({ error: "Montant de réservation invalide" });
+      }
+      amt = serveur;
     }
 
     // ---------- MONTANT D'UN ABONNEMENT PREMIUM : IMPOSE PAR LE SERVEUR ----------

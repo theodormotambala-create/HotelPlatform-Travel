@@ -3542,6 +3542,11 @@ function BookM(props){
   var s6=useState("card");var payMethod=s6[0];var setPayMethod=s6[1];
   var spay=useState(false);var paying=spay[0];var setPaying=spay[1];
   var sSCS=useState(null);var stripeClientSecret=sSCS[0];var setStripeClientSecret=sSCS[1];
+  // Montant RETENU PAR LE SERVEUR (centimes), renvoye par la route de paiement.
+  // Le total calcule ici ne sert plus que de repli si la route ne le renvoie
+  // pas encore : l'ecran de paiement doit annoncer ce qui est reellement
+  // preleve, jamais un total recalcule dans le navigateur.
+  var sSAmt=useState(null);var stripeAmtCents=sSAmt[0];var setStripeAmtCents=sSAmt[1];
   var sSM=useState(false);var showStripeModal=sSM[0];var setShowStripeModal=sSM[1];
   var _pendingPaidResa=useRef(null);
   var sC=useState(false);var closing=sC[0];var setClosing=sC[1];
@@ -3574,11 +3579,11 @@ function BookM(props){
         {showStripeModal&&stripeClientSecret&&(
           <StripePaymentModal
             clientSecret={stripeClientSecret}
-            amount={totalPrice.toFixed(0)}
+            amount={(stripeAmtCents!=null?(Number(stripeAmtCents)/100):totalPrice).toFixed(0)}
             color={color}
             DS={DS}
             onClose={function(){
-              setShowStripeModal(false);setStripeClientSecret(null);
+              setShowStripeModal(false);setStripeClientSecret(null);setStripeAmtCents(null);
               if(_pendingPaidResa.current&&_pendingPaidResa.current!=="paid"){
                 DataLayer.updateReservationStatus(resaId,"cancelled");
                 try{var all=BookingService.getAll().map(function(r){return r.id===resaId?Object.assign({},r,{status:"cancelled"}):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(all));BookingService._all=all;}catch(ex){}
@@ -3588,7 +3593,7 @@ function BookM(props){
               }
             }}
             onSuccess={function(){
-              setShowStripeModal(false);setStripeClientSecret(null);
+              setShowStripeModal(false);setStripeClientSecret(null);setStripeAmtCents(null);
               var _r=_pendingPaidResa.current;_pendingPaidResa.current="paid";
               setStep(3);
               toast("Paiement reçu — confirmation automatique en cours","success");
@@ -3794,6 +3799,7 @@ function BookM(props){
                         setPaying(false);
                         if(data.error){toast("Erreur paiement : "+data.error,"error");return;}
                         setStripeClientSecret(data.clientSecret);
+                        setStripeAmtCents(data.amount!=null?Number(data.amount):null);
                         setShowStripeModal(true);
                       })
                       .catch(function(){
