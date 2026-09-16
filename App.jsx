@@ -3505,7 +3505,105 @@ function StripePaymentModal(props){
   );
 }
 
-function QRTicket(props){var id=props.id||"HP-000000";var sz=props.sz||110;return(<div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}><QRCodeSVG value={id} size={sz} level="M" includeMargin={false}/></div>);}
+// Le ticket presente au client porte desormais une SIGNATURE du serveur, et non
+// plus l'identifiant brut de la reservation : celui-ci ne prouvait rien, et
+// quiconque connaissait un identifiant pouvait fabriquer le meme code.
+// La signature est emise par emettre_ticket_reservation, reservee au client de
+// la reservation, et verifiee a la consommation par le serveur.
+// Aucun repli sur l'identifiant : un code non signe ne serait pas consommable,
+// l'afficher reviendrait a presenter un faux ticket.
+function QRTicket(props){
+  var id=props.id||null;var sz=props.sz||110;
+  var s=useState(null);var ticket=s[0];var setTicket=s[1];
+  var se=useState(false);var erreur=se[0];var setErreur=se[1];
+  useEffect(function(){
+    setTicket(null);setErreur(false);
+    if(!id||!DataLayer._client){setErreur(true);return;}
+    var annule=false;
+    DataLayer._client.rpc("emettre_ticket_reservation",{p_reservation_id:String(id)})
+      .then(function(r){
+        if(annule)return;
+        if(r&&!r.error&&r.data)setTicket(r.data); else setErreur(true);
+      })
+      .catch(function(){ if(!annule)setErreur(true); });
+    return function(){annule=true;};
+  },[id]);
+  if(erreur)return(<div style={{display:"inline-flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:10,background:DS.card,border:"1px solid "+DS.border,borderRadius:10,width:sz+20,height:sz+20,textAlign:"center"}}>
+    <AlertTriangle size={18} color={DS.warning}/>
+    <div style={{fontSize:9,color:DS.textMuted,marginTop:6,lineHeight:1.4,padding:"0 6px"}}>Ticket indisponible — vérifiez votre connexion</div>
+  </div>);
+  if(!ticket)return(<div className="hp-sk" style={{width:sz+20,height:sz+20,borderRadius:10}}/>);
+  return(<div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}><QRCodeSVG value={ticket} size={sz} level="M" includeMargin={false}/></div>);
+}
+
+// Lecteur de QR reel : flux camera + decodage image par image.
+// jsQR est charge a la demande (import dynamique) : seul un professionnel qui
+// scanne en paye le poids, le reste de l'application n'en porte rien.
+function ScanCamera(props){
+  var onCode=props.onCode;var actif=props.actif;
+  var videoRef=useRef(null);var canvasRef=useRef(null);
+  var sErr=useState("");var camErr=sErr[0];var setCamErr=sErr[1];
+  var sPret=useState(false);var pret=sPret[0];var setPret=sPret[1];
+  var vu=useRef(false);
+  useEffect(function(){
+    if(!actif)return;
+    var flux=null;var anim=null;var annule=false;var decode=null;
+    vu.current=false;
+    function boucle(){
+      if(annule)return;
+      anim=requestAnimationFrame(boucle);
+      var v=videoRef.current;var c=canvasRef.current;
+      if(!v||!c||!decode||v.readyState!==4||vu.current)return;
+      var w=v.videoWidth,h=v.videoHeight;
+      if(!w||!h)return;
+      c.width=w;c.height=h;
+      var ctx=c.getContext("2d",{willReadFrequently:true});
+      ctx.drawImage(v,0,0,w,h);
+      var img;
+      try{img=ctx.getImageData(0,0,w,h);}catch(e){return;}
+      var res=decode(img.data,w,h,{inversionAttempts:"dontInvert"});
+      if(res&&res.data){vu.current=true;if(onCode)onCode(res.data);}
+    }
+    import("jsqr").then(function(m){
+      if(annule)return;
+      decode=m.default||m;
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+        setCamErr("Cet appareil ne permet pas l'accès à la caméra.");return;
+      }
+      return navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false})
+        .then(function(s){
+          if(annule){s.getTracks().forEach(function(t){t.stop();});return;}
+          flux=s;
+          var v=videoRef.current;
+          if(!v)return;
+          v.srcObject=s;v.setAttribute("playsinline","true");
+          return v.play().then(function(){setPret(true);boucle();});
+        });
+    }).catch(function(e){
+      if(annule)return;
+      var n=(e&&e.name)||"";
+      setCamErr(n==="NotAllowedError"?"Accès à la caméra refusé. Autorisez-le dans les réglages de votre navigateur."
+        :n==="NotFoundError"?"Aucune caméra détectée sur cet appareil."
+        :"Impossible d'ouvrir la caméra.");
+    });
+    return function(){
+      annule=true;
+      if(anim)cancelAnimationFrame(anim);
+      if(flux)flux.getTracks().forEach(function(t){t.stop();});
+      var v=videoRef.current;if(v)try{v.srcObject=null;}catch(e){}
+    };
+  },[actif]);
+  if(camErr)return(<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:12,padding:"14px",textAlign:"center"}}>
+    <Camera size={20} color={DS.error} style={{margin:"0 auto 8px",display:"block"}}/>
+    <div style={{fontSize:12,color:DS.error,lineHeight:1.5}}>{camErr}</div>
+  </div>);
+  return(<div style={{position:"relative",borderRadius:14,overflow:"hidden",background:"#000",aspectRatio:"1/1"}}>
+    <video ref={videoRef} muted playsInline style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+    <canvas ref={canvasRef} style={{display:"none"}}/>
+    <div style={{position:"absolute",inset:"14%",border:"3px solid rgba(255,255,255,.9)",borderRadius:12,pointerEvents:"none"}}/>
+    {!pret&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12}}>Ouverture de la caméra…</div>}
+  </div>);
+}
 // Message d'echec de reservation. Le texte du serveur n'est repris que pour les
 // refus metier (SQLSTATE 23514 : disponibilite, dates, quantite), qui sont ecrits
 // pour l'utilisateur. Toute autre erreur reste generique : on n'expose jamais un
@@ -5367,7 +5465,45 @@ function ProResa(props){
   }
   function confirmResa(id){_appliqueStatut(id,{status:"confirmed"},"Réservation confirmée","success",{status:"pending"});}
   function refuseResa(id){_appliqueStatut(id,{status:"refused"},"Réservation refusée","info",{status:"pending"});}
-  function scanQR(id){setScanTarget(null);_appliqueStatut(id,{status:"consumed",qrScanned:true},"Arrivée confirmée · Client marqué présent","success",{status:"confirmed",qrScanned:false});}
+  // La consommation ne passe plus par une ecriture de statut : elle passe par
+  // consommer_ticket_reservation, qui verifie la SIGNATURE du ticket presente
+  // par le client, l'appartenance de la reservation a cet etablissement et son
+  // statut, le tout sous verrou de ligne. Le declencheur refuse desormais
+  // « consumed » par toute autre voie : marquer une arrivee sans ticket n'est
+  // plus possible.
+  var sScanEtat=useState("");var scanEtat=sScanEtat[0];var setScanEtat=sScanEtat[1];
+  var _scanEnCours=useRef(false);
+  function _consommerTicket(ticket){
+    if(_scanEnCours.current)return;
+    _scanEnCours.current=true;
+    setScanEtat("verification");
+    if(!DataLayer._client){_scanEnCours.current=false;setScanEtat("");toastR("Aucune connexion au serveur","error");return;}
+    DataLayer._client.rpc("consommer_ticket_reservation",{p_ticket:String(ticket||"")})
+      .then(function(r){
+        _scanEnCours.current=false;setScanEtat("");
+        if(!r||r.error){toastR("Vérification impossible — réessayez","error");return;}
+        var d=r.data||{};var etat=d.etat;
+        if(etat==="consommee"){
+          setResas(function(rs){return rs.map(function(x){return x.id===d.reservation?Object.assign({},x,{status:"consumed",qrScanned:true}):x;});});
+          setScanTarget(null);
+          toastR("Arrivée confirmée · Client marqué présent","success");
+          return;
+        }
+        if(etat==="deja_consommee"){
+          setResas(function(rs){return rs.map(function(x){return x.id===d.reservation?Object.assign({},x,{status:"consumed",qrScanned:true}):x;});});
+          setScanTarget(null);
+          toastR("Ce ticket a déjà été utilisé","info");
+          return;
+        }
+        toastR(
+          etat==="invalide"?"Ticket invalide ou falsifié":
+          etat==="introuvable"?"Réservation introuvable":
+          etat==="pas_votre_etablissement"?"Ce ticket ne concerne pas votre établissement":
+          etat==="statut_incompatible"?("Réservation non confirmée (statut : "+(d.statut||"?")+")"):
+          "Ticket refusé","error");
+      })
+      .catch(function(){_scanEnCours.current=false;setScanEtat("");toastR("Vérification impossible — réessayez","error");});
+  }
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
       <ToastR/>
@@ -5379,22 +5515,18 @@ function ProResa(props){
               <div style={{fontSize:11,color:"rgba(255,255,255,.8)",marginTop:2}}>{scanTarget.client}</div>
             </div>
             <div style={{padding:20}}>
-              <div style={{background:"rgba(0,0,0,.6)",borderRadius:14,padding:20,marginBottom:16,textAlign:"center",border:"2px dashed "+color}}>
-                <div style={{fontSize:12,color:DS.textMuted,marginBottom:12}}>Zone de scan (simulation)</div>
-                <div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}>
-                  <div style={{width:100,height:100,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                    {genQRPixels(scanTarget.id).map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
-                  </div>
+              <div style={{marginBottom:16}}>
+                <ScanCamera actif={true} onCode={_consommerTicket}/>
+                <div style={{fontSize:11,color:DS.textMuted,marginTop:10,textAlign:"center",lineHeight:1.5}}>
+                  {scanEtat==="verification"?"Vérification du ticket…":"Présentez le QR code du client devant la caméra"}
                 </div>
-                <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace"}}>{scanTarget.id}</div>
               </div>
               <div style={{background:DS.card,borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:DS.textMuted}}>
                 {scanTarget.service} - {scanTarget.dateIn} au {scanTarget.dateOut} - {scanTarget.guests} pers.
                 <div style={{fontSize:13,fontWeight:800,color:scanTarget.payMode==="avec"?DS.gold:DS.success,marginTop:4}}>{scanTarget.payMode==="avec"?scanTarget.total+" EUR":"Reservation sans paiement"}</div>
               </div>
               <div style={{display:"flex",gap:8}}>
-                <button onClick={function(){setScanTarget(null);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button>
-                <button onClick={function(){scanQR(scanTarget.id);}} style={{flex:2,padding:"11px",background:DS.success,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Confirmer l'arrivée</button>
+                <button onClick={function(){setScanTarget(null);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Fermer</button>
               </div>
             </div>
           </div>
