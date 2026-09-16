@@ -3123,7 +3123,7 @@ function ClientProf(props){
                         ["Nuits",r.nights+" nuit"+(r.nights>1?"s":"")],
                         ["Arrivée",r.dateIn],
                         ["Départ",r.dateOut],
-                      ]).concat([["Paiement",r.payMode==="avec"?((r.total||0).toFixed(0)+" EUR - "+(r.payMethod==="card"?"Carte bancaire":"Mobile Money")):"Sans paiement (à l'arrivée)"]]).map(function(_i){var k=_i[0];var v=_i[1];return(
+                      ]).concat([["Paiement",r.payMode==="avec"?((r.total||0).toFixed(0)+" EUR - "+"Carte bancaire"):"Sans paiement (à l'arrivée)"]]).map(function(_i){var k=_i[0];var v=_i[1];return(
                         <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}>
                           <span style={{color:DS.textMuted}}>{k}</span>
                           <span style={{color:DS.text,fontWeight:700}}>{v}</span>
@@ -3830,10 +3830,10 @@ function BookM(props){
               {payMode==="avec"&&(
                 <div style={{marginTop:8,marginBottom:14}}>
                   <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:8}}>METHODE DE PAIEMENT</div>
-                  {[["card","Carte bancaire","Visa, Mastercard, CB",false],["mobile","Mobile Money","Bientôt disponible",true]].map(function(_i){
+                  {[["card","Carte bancaire","Visa, Mastercard, CB",false]].map(function(_i){
                     var v=_i[0];var l=_i[1];var sub=_i[2];var isDisabled=_i[3];var isSel=payMethod===v;
                     return(
-                      <div key={v} onClick={function(){if(isDisabled){toast("Mobile Money sera bientôt disponible","info");return;}setPayMethod(v);}} style={{padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:isDisabled?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:12,opacity:isDisabled?0.5:1}}>
+                      <div key={v} onClick={function(){if(isDisabled)return;setPayMethod(v);}} style={{padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:isDisabled?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:12,opacity:isDisabled?0.5:1}}>
                         <div style={{width:20,height:20,borderRadius:"50%",border:"2px solid "+(isSel?color:DS.border),background:isSel?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                           {isSel&&<div style={{width:8,height:8,borderRadius:"50%",background:"#fff"}}/>}
                         </div>
@@ -3847,8 +3847,6 @@ function BookM(props){
                 <button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
                 <button onClick={function(){
                   if(paying) return;
-                  // Mobile Money : pas encore branché sur un vrai fournisseur — aucune fausse confirmation
-                  if(payMode==="avec"&&payMethod==="mobile"){toast("Mobile Money sera bientôt disponible. Utilisez la carte bancaire.","info");return;}
                   // Flux sans paiement : demande envoyée à l'établissement (pending)
                   if(payMode==="sans"){
                     setPaying(true);
