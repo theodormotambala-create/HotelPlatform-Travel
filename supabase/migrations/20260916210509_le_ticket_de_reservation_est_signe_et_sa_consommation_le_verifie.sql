@@ -57,6 +57,7 @@ begin
   end if;
   select value into _cle from public.platform_secrets where name = 'ticket_hmac';
   if _cle is null then raise exception 'Signature indisponible'; end if;
+  -- base64url sans remplissage : le code QR reste court et sans caractere ambigu
   return p_reservation_id || '.' ||
          translate(encode(extensions.hmac(p_reservation_id, _cle, 'sha256'), 'base64'), '+/=', '-_');
 end $$;
@@ -83,9 +84,13 @@ begin
     return jsonb_build_object('etat','invalide');
   end if;
 
+-- Verrou : la ligne est prise avant toute decision.
   select * into _r from public.reservations where id = _id for update;
   if not found then return jsonb_build_object('etat','introuvable'); end if;
 
+  -- Le proprietaire fait foi. estab_owner_id est une copie posee a l'insertion ;
+  -- lorsqu'elle est absente, on remonte a l'etablissement, exactement comme le
+  -- fait protect_reservation_status lui-meme.
   _proprio := coalesce(_r.estab_owner_id,
                        (select e.owner_id from public.establishments e where e.id = _r.establishment_id));
   if _proprio is null or _proprio <> auth.uid() then
@@ -140,6 +145,9 @@ begin
     if me=old.client_id then
       if not (new.status='cancelled' and old.status in ('pending','confirmed')) then new.status:=old.status; end if;
     elsif me=old.estab_owner_id then
+      -- « consumed » n'est plus atteignable sans ticket verifie : c'est la
+      -- fonction consommer_ticket_reservation qui pose ce drapeau, apres avoir
+      -- valide la signature du ticket presente par le client.
       if new.status='consumed' and coalesce(current_setting('hp.ticket_verifie', true),'') <> '1' then
         new.status:=old.status;
       elsif new.status not in ('confirmed','refused','consumed') then
