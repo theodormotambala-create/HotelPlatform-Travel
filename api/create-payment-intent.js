@@ -119,6 +119,57 @@ export default async function handler(req, res) {
       } catch (e) { /* repli sur la validation ci-dessous */ }
     }
 
+    // ---------- MONTANT D'UN ABONNEMENT PREMIUM : IMPOSE PAR LE SERVEUR ----------
+    // La relecture serveur ci-dessus exclut explicitement le premium
+    // (« !isPremiumPayment ») : le montant preleve etait donc celui transmis par
+    // le navigateur. Le webhook le verifie bien, mais APRES l'encaissement : un
+    // montant arbitraire etait preleve, l'abonnement refuse, et un remboursement
+    // restait a instruire. Le meme ecart se produisait sans aucune malveillance,
+    // quand la tarification serveur devenait indisponible cote navigateur : il
+    // retombait sur des tarifs par defaut ecrits en dur et le client payait
+    // l'ancien prix sans rien recevoir.
+    // Le prix est desormais calcule ICI, depuis la MEME source
+    // (platform_settings, id 1) et avec EXACTEMENT les memes formules que
+    // stripe-webhook.js : essai 15 jours l.92, abonnement mensuel l.104. Les
+    // deux cotes ne peuvent donc plus diverger. Si le tarif ne peut pas etre
+    // etabli, la demande est refusee : rien n'est preleve.
+    if (isPremiumPayment) {
+      const supaP = serviceClient();
+      if (!supaP) return res.status(500).json({ error: "Service non configuré" });
+      // Le webhook exige l'identifiant du compte pour attribuer l'abonnement :
+      // sans lui, le paiement serait encaisse sans beneficiaire possible.
+      if (!userId) return res.status(403).json({ error: "Non autorisé" });
+      const stP = await supaP.from("platform_settings")
+        .select("premium_prices,premium_discounts").eq("id", 1).maybeSingle();
+      const pricesP = (stP.data && stP.data.premium_prices) || {};
+      const discsP = (stP.data && stP.data.premium_discounts) || {};
+      const joursEssai = parseInt(trialDays || "0", 10);
+      let attendu;
+      if (joursEssai === 15) {
+        // Essai 15 jours : meme repli que le webhook (4,99) si trial15 n'est pas configure.
+        if (!["std", "plus", "biz"].includes(plan)) {
+          return res.status(400).json({ error: "Offre Premium invalide" });
+        }
+        const prixEssai = Number(pricesP.trial15);
+        attendu = Math.round((Number.isFinite(prixEssai) ? prixEssai : 4.99) * 100);
+      } else {
+        const mois = parseInt(months, 10);
+        const prix = Number(pricesP[plan]);
+        const remise = Number(discsP[String(mois)] || 0);
+        // Memes refus que le webhook : plan sans tarif configure, duree hors
+        // des quatre durees servies. Aucun repli en dur cote mensuel — le
+        // webhook n'en a pas non plus.
+        if (!Number.isFinite(prix) || ![1, 3, 6, 12].includes(mois) || !Number.isFinite(remise)) {
+          return res.status(400).json({ error: "Offre Premium invalide" });
+        }
+        attendu = Math.round(prix * mois * (1 - remise) * 100);
+      }
+      if (!Number.isFinite(attendu) || attendu < 50) {
+        return res.status(400).json({ error: "Tarif Premium indisponible" });
+      }
+      amt = attendu;
+    }
+
     // Validation stricte du montant (centimes) : 0.50 EUR min, 99 999.99 EUR max
     if (!amt || amt < 50 || amt > 9999999) {
       return res.status(400).json({ error: "Montant invalide (0.50 EUR – 99 999 EUR)" });
@@ -175,7 +226,10 @@ export default async function handler(req, res) {
 
     const paymentIntent = await stripe.paymentIntents.create(piParams);
 
-    return res.status(200).json({ clientSecret: paymentIntent.client_secret });
+    // Le montant RETENU est renvoye, comme le fait deja la branche campagne
+    // ci-dessus : l'ecran annonce ce qui est reellement preleve, et non un
+    // total recalcule dans le navigateur.
+    return res.status(200).json({ clientSecret: paymentIntent.client_secret, amount: amt });
   } catch (err) {
     console.error("Stripe error:", err.message);
     // Ne jamais exposer les détails internes en production

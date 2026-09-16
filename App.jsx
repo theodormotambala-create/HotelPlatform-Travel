@@ -5986,7 +5986,10 @@ export default function App() {
     .then(function(r){return r.json();})
     .then(function(data){
       if(data.error){tk.show("Erreur paiement : "+data.error,"error");return;}
-      setPremiumPay({plan:plan,durationMonths:durationMonths,amount:total,clientSecret:data.clientSecret,renew:!!isRenew});
+      // Le montant affiche est celui RETENU PAR LE SERVEUR (meme motif que
+      // _startAdPayment ci-dessous) : le total calcule ici ne sert plus que de
+      // repli si la route ne le renvoie pas encore.
+      setPremiumPay({plan:plan,durationMonths:durationMonths,amount:(data.amount!=null?Number(data.amount)/100:total),clientSecret:data.clientSecret,renew:!!isRenew});
     })
     .catch(function(){tk.show("Impossible de contacter le service de paiement","error");});
   }
@@ -6006,7 +6009,7 @@ export default function App() {
       body:JSON.stringify({amount:cents,currency:"eur",type:"premium",plan:plan||"std",trialDays:15,userId:_authForUserData&&_authForUserData.userId,resaId:"PREMIUM-TRIAL-15J-"+Date.now(),estabName:"Essai Premium 15 jours"})
     })
     .then(function(r){return r.json();})
-    .then(function(data){if(data.error){tk.show("Erreur paiement : "+data.error,"error");return;}setPremiumPay({plan:plan||"std",durationMonths:0,amount:trialP,clientSecret:data.clientSecret,trial:true});})
+    .then(function(data){if(data.error){tk.show("Erreur paiement : "+data.error,"error");return;}setPremiumPay({plan:plan||"std",durationMonths:0,amount:(data.amount!=null?Number(data.amount)/100:trialP),clientSecret:data.clientSecret,trial:true});})
     .catch(function(){tk.show("Impossible de contacter le service de paiement","error");});
   }
   // Paiement d'une campagne Sponsor/Boost — circuit SEPARE du Premium et des reservations.
