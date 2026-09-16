@@ -4262,7 +4262,32 @@ function ProFeed(props){
       DataLayer._cache.feed=[newObj].concat(DataLayer.getFeed());
       if(DataLayer._onUpdate)DataLayer._onUpdate();
       try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");localStorage.setItem(_lk("hp_pro_posts"),JSON.stringify([newObj].concat(_pp).slice(0,30)));}catch(_e){}
-      try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,owner_id:selfUserId||null,establishment_id:data.id||null,data:newObj}]).catch(function(){});}catch(e){}
+      // Le SERVEUR fait foi. La publication s'affiche immediatement — meme
+      // discipline optimiste que delPost juste au-dessus — mais si l'insertion
+      // est REFUSEE (enforce_post_rules, droits, RLS), elle est retiree de
+      // l'ecran, du cache du fil ET du magasin local, et l'auteur est prevenu.
+      // Avant, le resultat etait jete (« .catch() » vide) et le succes annonce
+      // sans l'avoir lu ; pire, hp_pro_posts est relu et reinjecte EN TETE du
+      // fil a chaque chargement (l.2481 et l.3948) : une publication refusee
+      // par le serveur restait donc visible indefiniment, sur un fil ou elle
+      // n'existait pas.
+      var _retirePublication=function(){
+        setPosts(function(ps){return ps.filter(function(p){return p.id!==newId;});});
+        try{if(DataLayer._cache&&DataLayer._cache.feed)DataLayer._cache.feed=DataLayer._cache.feed.filter(function(p){return p.id!==newId;});}catch(e){}
+        try{var _pp2=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");localStorage.setItem(_lk("hp_pro_posts"),JSON.stringify(_pp2.filter(function(p){return p.id!==newId;})));}catch(e){}
+        if(DataLayer._onUpdate)DataLayer._onUpdate();
+        toast("Publication refusée par le serveur — elle n'a pas été enregistrée","error");
+      };
+      // Hors connexion (aucun client configure), le comportement reste
+      // strictement celui d'avant : la publication reste locale, comme le font
+      // deja createBooking et confirmShare dans ce cas.
+      try{
+        if(DataLayer._client){
+          DataLayer.create("posts",[{id:newId,author:data.name,type:proType,owner_id:selfUserId||null,establishment_id:data.id||null,data:newObj}])
+            .then(function(r){ if(r&&r.error)_retirePublication(); })
+            .catch(function(){ _retirePublication(); });
+        }
+      }catch(e){ _retirePublication(); }
       try{if(mediaPreview&&mediaUrl!==mediaPreview)URL.revokeObjectURL(mediaPreview);}catch(e){}
       setNewPost("");setShowNew(false);setMediaPreview(null);setMediaType(null);setMediaFile(null);
       toast("Publication publiée avec succès","success");
