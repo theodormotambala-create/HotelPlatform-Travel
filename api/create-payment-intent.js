@@ -94,18 +94,26 @@ export default async function handler(req, res) {
     // elle-meme controlee en base par enforce_reservation_price) : c'est lui
     // qui fait foi des qu'il existe.
     let amt = Math.round(Number(amount));
+    // Identifiant REEL de l'etablissement, lu sur la reservation. C'est
+    // protect_reservation_status qui le resout et l'ecrit cote serveur : il ne
+    // peut pas etre dicte par le navigateur, contrairement au nom transmis
+    // dans le corps de la requete.
+    let estabIdReel = null;
     if (!isPremiumPayment && resaId) {
       try {
         const supaR = serviceClient();
         if (supaR) {
           const rr = await supaR.from("reservations")
-            .select("id,total_price,status").eq("id", String(resaId)).maybeSingle();
-          if (rr.data && rr.data.total_price != null) {
-            const serveur = Math.round(Number(rr.data.total_price) * 100);
-            if (!Number.isFinite(serveur) || serveur < 50) {
-              return res.status(400).json({ error: "Montant de réservation invalide" });
+            .select("id,total_price,status,establishment_id").eq("id", String(resaId)).maybeSingle();
+          if (rr.data) {
+            estabIdReel = rr.data.establishment_id || null;
+            if (rr.data.total_price != null) {
+              const serveur = Math.round(Number(rr.data.total_price) * 100);
+              if (!Number.isFinite(serveur) || serveur < 50) {
+                return res.status(400).json({ error: "Montant de réservation invalide" });
+              }
+              amt = serveur;
             }
-            amt = serveur;
           }
         }
       } catch (e) { /* repli sur la validation ci-dessous */ }
@@ -146,8 +154,16 @@ export default async function handler(req, res) {
     };
     try {
       const supa = serviceClient();
-      if (supa && estabName && !isPremiumPayment) { // jamais de Connect pour un abonnement (100% plateforme)
-        const e = await supa.from("establishments").select("stripe_account_id,type,is_premium").eq("name", String(estabName)).limit(1).maybeSingle();
+      // La DESTINATION DES FONDS est resolue par l'IDENTIFIANT de
+      // l'etablissement porte par la reservation, jamais par le nom transmis
+      // par le navigateur. « establishments.name » n'a aucune contrainte
+      // d'unicite : deux etablissements homonymes faisaient partir l'argent
+      // sur le mauvais compte Connect, et ce nom venait du corps de la requete.
+      // Sans identifiant fiable, aucun Connect n'est pose : la plateforme
+      // encaisse et le webhook trace la repartition — comportement deja prevu
+      // lorsque l'etablissement n'a pas de compte branche.
+      if (supa && estabIdReel && !isPremiumPayment) { // jamais de Connect pour un abonnement (100% plateforme)
+        const e = await supa.from("establishments").select("stripe_account_id,type,is_premium").eq("id", estabIdReel).maybeSingle();
         if (e.data && e.data.stripe_account_id) {
           const s = await supa.from("platform_settings").select("commission").eq("id", 1).maybeSingle();
           const pct = commissionPct(s.data, e.data.type, e.data.is_premium === true);
