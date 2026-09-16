@@ -5487,6 +5487,65 @@ function ProProf(props){
   var _sDraftLoc=useState(data.location||"");var _draftLoc=_sDraftLoc[0];var _setDraftLoc=_sDraftLoc[1];
   var _sProSaving=useState(false);var _proSaving=_sProSaving[0];var _setProSaving=_sProSaving[1];
   var _sAboutSaving=useState(false);var _aboutSaving=_sAboutSaving[0];var _setAboutSaving=_sAboutSaving[1];
+  // --- Heure d'arrivee de l'etablissement ---
+  // La politique d'annulation se compte en heures restantes avant l'arrivee, or
+  // reservations.check_in est une DATE, sans heure. L'etablissement declare donc
+  // ici son heure d'arrivee, et le fuseau dans lequel cette heure se lit : « 14:00 »
+  // a Dakar et « 14:00 » a Tokyo ne sont pas le meme instant, et la plateforme
+  // s'adresse aux etablissements du monde entier.
+  // L'identifiant de la fiche est deduit du compte connecte (prof_<uid>), comme le
+  // fait deja le serveur dans ensure_pro_establishment et enforce_ad_campaign_rules,
+  // et JAMAIS de « data.id » : celui-ci peut encore designer un etablissement de
+  // demonstration lorsque la fiche du professionnel n'est pas dans le cache.
+  var _ficheId=props.authUserId?("prof_"+props.authUserId):null;
+  var _sCheckIn=useState("");var _checkInTime=_sCheckIn[0];var _setCheckInTime=_sCheckIn[1];
+  var _sTz=useState("");var _tzEtab=_sTz[0];var _setTzEtab=_sTz[1];
+  var _sCiSaving=useState(false);var _ciSaving=_sCiSaving[0];var _setCiSaving=_sCiSaving[1];
+  var _sCiEdit=useState(false);var _ciEdit=_sCiEdit[0];var _setCiEdit=_sCiEdit[1];
+  useEffect(function(){
+    if(!DataLayer._client||!_ficheId)return;
+    DataLayer._client.from("establishments").select("check_in_time,timezone").eq("id",_ficheId).maybeSingle()
+      .then(function(r){
+        if(!r||r.error||!r.data)return;
+        _setCheckInTime(r.data.check_in_time?String(r.data.check_in_time).slice(0,5):"");
+        _setTzEtab(r.data.timezone||"");
+      }).catch(function(){});
+  },[_ficheId]);
+  // Fuseau propose : celui de l'appareil, valeur IANA reelle fournie par le
+  // navigateur — pas une valeur inventee. Le professionnel peut la corriger, et
+  // le SERVEUR la valide (trg_valider_fuseau_etablissement) : un nom inconnu est
+  // refuse en base, le frontend n'est pas la frontiere.
+  function _tzPropose(){
+    try{var t=Intl.DateTimeFormat().resolvedOptions().timeZone;return t||"";}catch(e){return "";}
+  }
+  function _saveCheckIn(){
+    if(_ciSaving)return;
+    if(!DataLayer._client||!_ficheId){toastP("Enregistrement impossible — aucune connexion au serveur","error");return;}
+    var h=String(_checkInTime||"").trim();
+    var z=String(_tzEtab||"").trim();
+    if(!/^([01]\d|2[0-3]):([0-5]\d)$/.test(h)){toastP("Heure d'arrivée invalide (format 00:00 à 23:59)","error");return;}
+    if(!z){toastP("Indiquez le fuseau horaire de votre établissement","error");return;}
+    _setCiSaving(true);
+    // Le serveur fait foi : rien n'est annonce avant sa reponse.
+    DataLayer._client.from("establishments").update({check_in_time:h+":00",timezone:z}).eq("id",_ficheId).select("check_in_time,timezone")
+      .then(function(r){
+        _setCiSaving(false);
+        if(r&&r.error){
+          var m=String((r.error&&r.error.message)||"");
+          toastP(m.indexOf("Fuseau horaire inconnu")>=0
+            ? "Fuseau horaire inconnu — vérifiez son nom (exemple : Africa/Dakar)"
+            : "Échec de l'enregistrement — vérifiez votre connexion et réessayez","error");
+          return;
+        }
+        if(!r||!r.data||!r.data.length){
+          toastP("Enregistrement refusé — cette fiche ne vous appartient pas","error");
+          return;
+        }
+        _setCiEdit(false);
+        toastP("Heure d'arrivée enregistrée","success");
+      })
+      .catch(function(){_setCiSaving(false);toastP("Échec de l'enregistrement — vérifiez votre connexion et réessayez","error");});
+  }
   function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>5*1024*1024){toastP("Photo trop volumineuse (maximum 5 Mo)","error");e.target.value="";return;}var r=new FileReader();r.onload=function(ev){_setPPPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
   function _handleProCoverFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>8*1024*1024){toastP("Image de couverture trop volumineuse (maximum 8 Mo)","error");e.target.value="";return;}var r=new FileReader();r.onload=function(ev){_setPCPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
   // Pas de confirmation ici : l'envoi vers Storage est asynchrone et peut echouer.
@@ -5705,6 +5764,53 @@ function ProProf(props){
               </button>
             </div>
           )
+        )}
+        {/* Heure d'arrivee : sert de reference au calcul d'annulation, qui se
+            compte en heures restantes avant l'arrivee. Le fuseau l'accompagne
+            toujours : une heure seule ne designe aucun instant precis a
+            l'echelle du monde. */}
+        {tab==="about"&&(
+          <div style={{marginTop:16,paddingTop:16,borderTop:"1px solid "+DS.border}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+              <Clock size={14} color={color}/>
+              <div style={{fontSize:13,fontWeight:800,color:DS.text}}>Heure d'arrivée</div>
+            </div>
+            <div style={{fontSize:11,color:DS.textMuted,lineHeight:1.6,marginBottom:12}}>
+              L'heure à laquelle vos clients sont attendus. Elle sert de référence au calcul des annulations : le remboursement dépend du temps restant avant cette heure.
+            </div>
+            {_ciEdit?(
+              <div>
+                <div style={{display:"flex",gap:10,marginBottom:10}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:10,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:5}}>HEURE</div>
+                    <input type="time" value={_checkInTime} onChange={function(ev){_setCheckInTime(ev.target.value);}} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+                  </div>
+                  <div style={{flex:2}}>
+                    <div style={{fontSize:10,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:5}}>FUSEAU HORAIRE</div>
+                    <input value={_tzEtab} onChange={function(ev){_setTzEtab(ev.target.value);}} placeholder="Africa/Dakar" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+                  </div>
+                </div>
+                {_tzPropose()&&_tzPropose()!==_tzEtab&&(
+                  <button onClick={function(){_setTzEtab(_tzPropose());}} style={{background:"none",border:"none",color:color,fontSize:11,fontWeight:700,cursor:"pointer",padding:"0 0 10px"}}>
+                    Utiliser le fuseau de cet appareil : {_tzPropose()}
+                  </button>
+                )}
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={function(){_setCiEdit(false);}} style={{flex:1,padding:"9px",background:"transparent",border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Annuler</button>
+                  <button onClick={_saveCheckIn} disabled={_ciSaving} style={{flex:1,padding:"9px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:_ciSaving?"default":"pointer",opacity:_ciSaving?.6:1}}>{_ciSaving?"Enregistrement…":"Enregistrer"}</button>
+                </div>
+              </div>
+            ):(
+              <div>
+                <div style={{fontSize:13,color:_checkInTime?DS.text:DS.textMuted,marginBottom:10}}>
+                  {_checkInTime?(_checkInTime+(_tzEtab?" · "+_tzEtab:"")):"Non renseignée"}
+                </div>
+                <button onClick={function(){if(!_tzEtab)_setTzEtab(_tzPropose());_setCiEdit(true);}} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                  <Edit2 size={12}/>{_checkInTime?"Modifier l'heure d'arrivée":"Renseigner l'heure d'arrivée"}
+                </button>
+              </div>
+            )}
+          </div>
         )}
         {tab==="services"&&(function(){
           var _svcs=[];
