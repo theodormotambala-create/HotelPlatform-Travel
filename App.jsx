@@ -3290,6 +3290,25 @@ function EstabM(props){
   var s9=useState([]);var selectedDishes=s9[0];var setSelectedDishes=s9[1];
   var allItems=(_catMenu||[]).reduce(function(acc,cat){return acc.concat(cat.items.map(function(it){return Object.assign({},it,{cat:cat.cat});}));},[]); 
   var selectedDishesTotal=allItems.filter(function(it){return selectedDishes.indexOf(it.cat+"-"+it.name)>=0;}).reduce(function(sum,it){return sum+(it.price||0);},0);
+  // La commande part au serveur, qui en recalcule le prix depuis son propre
+  // catalogue (declencheur trg_c_enforce_reservation_items) et en conserve
+  // chaque ligne dans reservation_items.
+  // Une ligne n'est transmise que si elle porte un VRAI identifiant de plat.
+  // Le menu de demonstration (e.menu) et les forfaits de repas (e.meals) n'en
+  // ont pas : inventer un identifiant ferait refuser la reservation, et
+  // transmettre une commande partielle ferait calculer un prix faux. Dans ce
+  // cas on ne transmet rien, et le comportement reste celui d'aujourd'hui.
+  function _lignesCommande(choisis){
+    if(!choisis||!choisis.length)return null;
+    var lignes=[];
+    for(var i=0;i<choisis.length;i++){
+      var _id=choisis[i]&&choisis[i].dish_id;
+      if(!_id)return null;
+      lignes.push({dish_id:String(_id),quantity:1});
+    }
+    return lignes;
+  }
+  var _lignesPlats=_lignesCommande(allItems.filter(function(it){return selectedDishes.indexOf(it.cat+"-"+it.name)>=0;}).map(function(it){return{dish_id:it.id||null};}));
   var sr=useState("hotel");var resaType=sr[0];var setResaType=sr[1];
   var scr=useState(null);var comboRoom=scr[0];var setComboRoom=scr[1];
   var scm=useState([]);var comboMeals=scm[0];var setComboMeals=scm[1];
@@ -3317,9 +3336,10 @@ function EstabM(props){
   var comboMealOptions=(e.meals&&e.meals.length>0)
     ? e.meals
     : allItems.filter(function(it){return it.available!==false&&(it.price||0)>0;})
-              .map(function(it){return{id:it.cat+"-"+it.name,name:it.name,price:it.price||0};});
+              .map(function(it){return{id:it.cat+"-"+it.name,name:it.name,price:it.price||0,dish_id:it.id||null};});
   var comboMealsTotal=comboMealOptions.filter(function(m){return comboMeals.indexOf(m.id)>=0;}).reduce(function(s,m){return s+(m.price||0);},0);
   var comboTotal=(comboRoom?comboRoom.price:0)+comboMealsTotal;
+  var _lignesCombo=_lignesCommande(comboMealOptions.filter(function(m){return comboMeals.indexOf(m.id)>=0;}));
   var _sEV=useState(null);var _eViewer=_sEV[0];var _setEViewer=_sEV[1];
   if(!e)return null;
   return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:900,maxWidth:420,margin:"0 auto",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:(closingE?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}><ImgViewer src={_eViewer} onClose={function(){_setEViewer(null);}}/><Toast/><div style={{position:"relative",height:220,flexShrink:0}}><img src={e.img} alt="" onClick={function(){if(e.img)_setEViewer(e.img);}} style={{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}/><div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.2),rgba(0,0,0,.6))",pointerEvents:"none"}}/><div style={{position:"absolute",top:12,left:12}}><BackBtn onClick={onClose} light={true}/></div><div style={{position:"absolute",bottom:-48,left:16,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}} onClick={function(){if(e.img)_setEViewer(e.img);}}><Av sz={68} letter={(e.name[0]||"H").toUpperCase()} img={e.img} verified={e.verified||false}/>{e.verified&&<div style={{background:"#14532d",borderRadius:6,padding:"1px 6px",marginTop:1}}><span style={{fontSize:9,fontWeight:800,color:"#4ade80",letterSpacing:"0.01em"}}>Vérifié</span></div>}</div></div><div style={{padding:"58px 16px 8px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={{fontSize:20,fontWeight:900,color:DS.text}}>{e.name}</div></div><a href={"https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location)} target="_blank" rel="noopener noreferrer" style={{fontSize:12,color:DS.primary,cursor:"pointer",display:"flex",alignItems:"center",gap:4,textDecoration:"none"}}><MapPin size={11}/>{e.location}</a></div><div style={{textAlign:"right"}}>{e.priceFrom?<div style={{fontSize:18,fontWeight:900,color:DS.gold}}>À partir de {e.priceFrom}€</div>:null}</div></div><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><Stars r={e.rating} sz={15}/><span style={{fontSize:13,fontWeight:800,color:DS.text}}>{e.rating}</span><span style={{fontSize:13,color:DS.textDim}}>-</span><span style={{fontSize:13,fontWeight:700,color:DS.text}}>{fmtK(followersCount)}</span><span style={{fontSize:12,color:DS.textMuted}}>abonnes</span></div><div style={{display:"flex",gap:8,marginBottom:16}}>{viewerIsPro
@@ -3361,7 +3381,7 @@ function EstabM(props){
                     <div style={{fontSize:12,color:DS.textMuted}}>{comboRoom?"1 chambre":"Aucune chambre"} + {comboMeals.length} repas{comboTable?" + table":""}</div>
                     <div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{comboTotal.toFixed(0)} EUR / nuit</div>
                   </div>
-                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboMealDetails:comboMealOptions.filter(function(m){return comboMeals.indexOf(m.id)>=0;}),comboTable:comboTable,comboTotal:comboTotal,isCombo:true}));else toast("Sélectionnez d'abord une chambre","error");}} style={{width:"100%",padding:"11px",background:comboRoom?color:DS.textDim,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:comboRoom?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:comboRoom?1:0.6,transition:"background .2s,opacity .2s"}}>
+                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboMealDetails:comboMealOptions.filter(function(m){return comboMeals.indexOf(m.id)>=0;}),comboTable:comboTable,comboTotal:comboTotal,isCombo:true,orderItems:_lignesCombo}));else toast("Sélectionnez d'abord une chambre","error");}} style={{width:"100%",padding:"11px",background:comboRoom?color:DS.textDim,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:comboRoom?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:comboRoom?1:0.6,transition:"background .2s,opacity .2s"}}>
                     <Calendar size={14}/>Réserver le séjour combiné
                   </button>
                 </div>
@@ -3415,7 +3435,7 @@ function EstabM(props){
                   </div>
                   {viewerIsPro
                   ? <div style={{width:"100%",padding:"11px",background:DS.card,border:"1px solid "+DS.border,borderRadius:14,color:DS.textDim,fontSize:12,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><Lock size={13}/>Reservation indisponible entre etablissements</div>
-                  : <button onClick={function(){if(onBook)onBook(Object.assign({},e,{selectedDishes:selectedDishes,dishTotal:selectedDishesTotal}));}} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  : <button onClick={function(){if(onBook)onBook(Object.assign({},e,{selectedDishes:selectedDishes,dishTotal:selectedDishesTotal,orderItems:_lignesPlats}));}} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                     <Calendar size={14}/>Reserver ({selectedDishes.length} plat{selectedDishes.length>1?"s":""})
                   </button>}
                 </div>
@@ -3853,7 +3873,7 @@ function BookM(props){
                     // Plus de delai simule : c'est la reponse reelle du serveur qui
                     // fait foi. Une reservation n'est annoncee que si elle existe
                     // vraiment en base (disponibilite verifiee, droits verifies).
-                    var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,roomId:(e.selectedRoom&&e.selectedRoom.id)||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:null,qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                    var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,roomId:(e.selectedRoom&&e.selectedRoom.id)||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:null,qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null,items:(e.orderItems&&e.orderItems.length>0)?e.orderItems:null};
                     // On passe « resa » et non la valeur de retour : le rappel peut
                     // etre synchrone (hors ligne), la variable ne serait pas encore
                     // affectee. createBooking renvoie de toute facon ce meme objet.
@@ -3894,7 +3914,7 @@ function BookM(props){
                       });
                     };
                     if(!_pendingPaidResa.current){
-                      var resaPre={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,roomId:(e.selectedRoom&&e.selectedRoom.id)||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                      var resaPre={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,roomId:(e.selectedRoom&&e.selectedRoom.id)||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null,items:(e.orderItems&&e.orderItems.length>0)?e.orderItems:null};
                       // La disponibilite est verifiee AVANT d'ouvrir le paiement, et le
                       // paiement n'est demande QU'APRES acceptation par le serveur :
                       // encaisser une chambre deja complete serait la pire des issues.
