@@ -5423,7 +5423,7 @@ function ProResa(props){
         if(res.error||!res.data)return;
         var rows=res.data.map(function(row){
           var d=row.data||{};
-          return{id:row.id,clientId:row.client_id||null,client:d.clientName||"Client",service:d.service||"Reservation",dateIn:d.dateIn||"",dateOut:d.dateOut||d.dateIn||"",nights:d.nights||1,guests:d.guests||1,total:d.total||0,payMode:d.payMode||"sans",status:row.status||"pending",qrScanned:row.status==="consumed"};
+          return{id:row.id,clientId:row.client_id||null,client:d.clientName||"Client",service:d.service||"Reservation",dateIn:d.dateIn||"",dateOut:d.dateOut||d.dateIn||"",nights:d.nights||1,guests:d.guests||1,total:d.total||0,payMode:d.payMode||"sans",status:row.status||"pending",qrScanned:row.status==="consumed",estabType:d.estabType||null,roomCount:d.roomCount||null,tableCount:d.tableCount||null,isCombo:d.isCombo===true,comboMeals:d.comboMeals||null,comboTable:d.comboTable===true};
         });
         setResas(rows);
       }).catch(function(){}).then(function(){setResasEnCours(false);});
@@ -5555,7 +5555,10 @@ function ProResa(props){
                   <span>{r.client}</span>
                 </div>
                 <div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{r.service}</div>
-                <div style={{fontSize:11,color:DS.textDim,marginTop:3}}>{r.dateIn} au {r.dateOut} - {r.guests} pers.</div>
+                <div style={{fontSize:11,color:DS.textDim,marginTop:3}}>{r.estabType==="restaurant"
+                  ?(r.dateIn+" - "+r.guests+" pers."+(r.tableCount?" - "+r.tableCount+" table"+(r.tableCount>1?"s":""):""))
+                  :(r.dateIn+" au "+r.dateOut+" - "+r.nights+" nuit"+(r.nights>1?"s":"")+" - "+r.guests+" pers."+(r.roomCount?" - "+r.roomCount+" chambre"+(r.roomCount>1?"s":""):""))}</div>
+                {r.isCombo&&<div style={{fontSize:10,color:DS.primary,marginTop:2}}>Séjour combiné - {(r.comboMeals||[]).length} repas inclus{r.comboTable?" - Table au restaurant":""}</div>}
               </div>
               <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
                 <div style={{fontSize:16,fontWeight:900,color:r.payMode==="avec"?DS.gold:DS.success}}>{r.payMode==="avec"?r.total+" EUR":"Sans paiement"}</div>
