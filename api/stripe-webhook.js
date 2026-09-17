@@ -155,15 +155,30 @@ export default async function handler(req, res) {
     // Réservation concernée
     let resa = null;
     if (resaId) {
-      const r = await supa.from("reservations").select("id,client_id,estab_id,estab_owner_id,estab_type,total_price,data").eq("id", resaId).maybeSingle();
+      const r = await supa.from("reservations").select("id,client_id,estab_id,establishment_id,estab_owner_id,estab_type,total_price,data").eq("id", resaId).maybeSingle();
       resa = r.data || null;
     }
 
-    // Établissement (type + premium + compte Connect) pour le taux de commission
+    // Établissement (type + premium) pour le taux de commission.
+    // resa.estab_type est DECLARE PAR LE CLIENT : mesure faite, un client peut
+    // enregistrer estab_type='restaurant' sur une reservation d'hotel, et le
+    // taux de commission depend de ce type. Il ne sert donc que de dernier
+    // repli. La verite est lue sur l'etablissement, par son IDENTIFIANT — celui
+    // que protect_reservation_status resout et ecrit cote serveur.
+    // L'ancien chemin (recherche par owner_id, .limit(1) alors que owner_id n'a
+    // aucune contrainte d'unicite) est conserve en repli pour les lignes qui ne
+    // portent pas d'establishment_id, afin de ne rien changer pour elles.
     let estabType = resa ? resa.estab_type : null;
     let isPremium = false;
     let ownerId = resa ? resa.estab_owner_id : null;
-    if (ownerId) {
+    if (resa && resa.establishment_id) {
+      const e = await supa.from("establishments").select("type,is_premium,owner_id").eq("id", resa.establishment_id).maybeSingle();
+      if (e.data) {
+        estabType = e.data.type || estabType;
+        isPremium = e.data.is_premium === true;
+        if (!ownerId) ownerId = e.data.owner_id || null;
+      }
+    } else if (ownerId) {
       const e = await supa.from("establishments").select("type,is_premium").eq("owner_id", ownerId).limit(1).maybeSingle();
       if (e.data) { estabType = e.data.type || estabType; isPremium = e.data.is_premium === true; }
     }

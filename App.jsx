@@ -1192,14 +1192,6 @@ function SplashAd(props){
 
 function OffB(props){return(<button onClick={props.onPress} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid "+DS.border+"20",background:"none",border:"none",cursor:"pointer",textAlign:"left"}}><span style={{fontSize:14,color:DS.text}}>{props.label}</span><ChevronRight size={16} color={DS.textMuted}/></button>);}
 
-function LoyaltyWidget(props){
-  var points=props.points||620;var level=props.level||"silver";
-  var LEVELS=[{id:"bronze",name:"Bronze",min:0,color:"#CD7F32"},{id:"silver",name:"Argent",min:1000,color:"#9CA3AF"},{id:"gold",name:"Or",min:5000,color:DS.gold},{id:"plat",name:"Platine",min:15000,color:"#E5E4E2"}];
-  var lv=LEVELS.find(function(l){return l.id===level;})||LEVELS[0];
-  var next=LEVELS[LEVELS.indexOf(lv)+1];
-  var progress=next?((points-lv.min)/(next.min-lv.min))*100:100;
-  return(<div style={{background:DS.card,border:"1px solid "+lv.color+"33",borderRadius:12,padding:"10px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:10}}><div style={{width:28,height:28,borderRadius:"50%",background:lv.color+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Star size={14} color={lv.color} fill={lv.color}/></div><div style={{flex:1,minWidth:0}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:11,fontWeight:800,color:lv.color}}>Fidelite {lv.name}</span><span style={{fontSize:13,fontWeight:900,color:lv.color}}>{points.toLocaleString()} pts</span></div>{next&&<div style={{height:4,background:DS.border,borderRadius:2}}><div style={{height:4,borderRadius:2,background:lv.color,width:Math.min(100,progress)+"%",transition:"width .5s"}}/></div>}</div></div>);
-}
 
 function TopBar(props){return(<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",background:DS.surface,borderBottom:"1px solid "+DS.border,position:"sticky",top:0,zIndex:50}}><div style={{display:"flex",alignItems:"center",gap:8,minWidth:40}}>{props.left}</div><div style={{flex:1,textAlign:"center"}}>{props.center}</div><div style={{display:"flex",alignItems:"center",gap:8,minWidth:40,justifyContent:"flex-end"}}>{props.right}</div></div>);}
 
@@ -1564,7 +1556,7 @@ function SettingsS(props){
     if(label==="Changer de mot de passe"&&onChangePwd)return onChangePwd();
   }
   var NOTIF_TOGGLES=[["reservation","Réservations","Confirmations, paiements et rappels"],["message","Messages","Nouveaux messages privés"],["comment","Commentaires","Commentaires et réponses sur vos publications"],["reaction","J'aime & partages","Quand on aime ou partage vos publications"],["follow","Abonnés","Nouveaux abonnés"],["promo","Publications & offres","Nouvelles publications des comptes suivis, offres"]];
-  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>Paramètres</div>} right={null}/><div style={{padding:"8px 0 40px"}}><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>ABONNEMENT</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{isPremium?(<div style={{padding:"12px 16px"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontSize:12,fontWeight:800,color:DS.gold}}>Premium actif</div><div style={{fontSize:10,color:DS.textMuted}}>Expire le {premiumExpStr}</div></div><div style={{display:"flex",gap:6}}><VBadge sz={20}/><button onClick={onPremium} style={{padding:"5px 10px",background:DS.gold+"22",border:"1px solid "+DS.gold+"44",borderRadius:16,color:DS.gold,fontSize:10,fontWeight:800,cursor:"pointer"}}>Gerer</button></div></div></div>):(<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px"}}><div><div style={{fontSize:12,fontWeight:700,color:DS.gold}}>Passer Premium</div><div style={{fontSize:10,color:DS.textMuted}}>{accType==="client"?"Sans pub · Confidentialité · Badge éligible":"Vidéo · Badge · Avis clients"}</div></div><button onClick={onPremium} style={{padding:"6px 14px",background:DS.gold,border:"none",borderRadius:20,color:"#000",fontSize:11,fontWeight:800,cursor:"pointer"}}>Voir</button></div>)}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>COMPTE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{[["Changer d'email",Mail],["Changer de mot de passe",Lock]].map(function(_i){var label=_i[0];var Ic=_i[1];return(<div key={label} onClick={function(){accountActions(label);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>{label}</span><ChevronRight size={14} color={DS.textDim}/></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>NOTIFICATIONS</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{NOTIF_TOGGLES.map(function(_i,idx){var key=_i[0];var title=_i[1];var desc=_i[2];var val=notifPrefs[key]!==false;return(<div key={key} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:idx<NOTIF_TOGGLES.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{flex:1}}><div style={{fontSize:13,color:DS.text,fontWeight:600}}>{title}</div><div style={{fontSize:10,color:DS.textMuted}}>{desc}</div></div><div onClick={function(){var patch={};patch[key]=!val;onUpdateNotifPrefs(patch);}} style={{width:40,height:22,borderRadius:11,background:val?color:DS.border,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}><div style={{position:"absolute",top:2,left:val?20:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/></div></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>CONFIDENTIALITE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onPrivacy} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>Paramètres de confidentialité</span><ChevronRight size={14} color={DS.textDim}/></div></div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>ZONE SENSIBLE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.error+"33"}}><div onClick={function(){setShowDelConf(true);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:DS.errorSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={15} color={DS.error}/></div><span style={{flex:1,fontSize:13,color:DS.error}}>Supprimer mon compte</span><ChevronRight size={14} color={DS.error+"88"}/></div></div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onLogout} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:DS.error+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><LogOut size={15} color={DS.error}/></div><span style={{flex:1,fontSize:13,color:DS.error}}>Se déconnecter</span></div></div></div>{showDelConf&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1600,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){setShowDelConf(false);}}><div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:24,animation:"hp-slide-up 0.28s ease"}}><div style={{textAlign:"center",marginBottom:20}}><div style={{width:56,height:56,borderRadius:"50%",background:DS.errorSoft,border:"1px solid "+DS.error+"44",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}><Trash2 size={26} color={DS.error}/></div><div style={{fontSize:16,fontWeight:900,color:DS.text,marginBottom:8}}>Supprimer mon compte</div><div style={{fontSize:12,color:DS.textMuted,lineHeight:1.7}}>Cette action est <span style={{color:DS.error,fontWeight:700}}>irréversible</span>. Toutes vos données personnelles seront supprimées conformément au RGPD dans un délai de 30 jours.</div></div><div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"10px 14px",marginBottom:20,fontSize:11,color:DS.warning}}>Vos réservations en cours, messages et historique seront définitivement supprimés.</div><div style={{display:"flex",gap:10}}><button onClick={function(){setShowDelConf(false);}} style={{flex:1,padding:"13px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer"}}>Annuler</button><button onClick={function(){setShowDelConf(false);if(onDeleteAccount)onDeleteAccount();}} style={{flex:1,padding:"13px",background:DS.error,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Confirmer</button></div></div></div>)}</div>);
+  return(<div style={{background:DS.bg,minHeight:"100vh"}}><TopBar left={<BackBtn onClick={onBack}/>} center={<div style={{fontSize:15,fontWeight:800,color:DS.text}}>Paramètres</div>} right={null}/><div style={{padding:"8px 0 40px"}}><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>ABONNEMENT</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{isPremium?(<div style={{padding:"12px 16px"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><div><div style={{fontSize:12,fontWeight:800,color:DS.gold}}>Premium actif</div><div style={{fontSize:10,color:DS.textMuted}}>Expire le {premiumExpStr}</div></div><div style={{display:"flex",gap:6}}><VBadge sz={20}/><button onClick={onPremium} style={{padding:"5px 10px",background:DS.gold+"22",border:"1px solid "+DS.gold+"44",borderRadius:16,color:DS.gold,fontSize:10,fontWeight:800,cursor:"pointer"}}>Gerer</button></div></div></div>):(<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px"}}><div><div style={{fontSize:12,fontWeight:700,color:DS.gold}}>Passer Premium</div><div style={{fontSize:10,color:DS.textMuted}}>{accType==="client"?"Confidentialité · Verrouillage · Badge éligible":"Vidéo · Badge · Avis clients"}</div></div><button onClick={onPremium} style={{padding:"6px 14px",background:DS.gold,border:"none",borderRadius:20,color:"#000",fontSize:11,fontWeight:800,cursor:"pointer"}}>Voir</button></div>)}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>COMPTE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{[["Changer d'email",Mail],["Changer de mot de passe",Lock]].map(function(_i){var label=_i[0];var Ic=_i[1];return(<div key={label} onClick={function(){accountActions(label);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:"1px solid "+DS.border+"20",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>{label}</span><ChevronRight size={14} color={DS.textDim}/></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>NOTIFICATIONS</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}>{NOTIF_TOGGLES.map(function(_i,idx){var key=_i[0];var title=_i[1];var desc=_i[2];var val=notifPrefs[key]!==false;return(<div key={key} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",borderBottom:idx<NOTIF_TOGGLES.length-1?"1px solid "+DS.border+"20":"none"}}><div style={{flex:1}}><div style={{fontSize:13,color:DS.text,fontWeight:600}}>{title}</div><div style={{fontSize:10,color:DS.textMuted}}>{desc}</div></div><div onClick={function(){var patch={};patch[key]=!val;onUpdateNotifPrefs(patch);}} style={{width:40,height:22,borderRadius:11,background:val?color:DS.border,cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}><div style={{position:"absolute",top:2,left:val?20:2,width:18,height:18,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/></div></div>);})}</div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>CONFIDENTIALITE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onPrivacy} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:color+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><Eye size={15} color={color}/></div><span style={{flex:1,fontSize:13,color:DS.text}}>Paramètres de confidentialité</span><ChevronRight size={14} color={DS.textDim}/></div></div><div style={{padding:"8px 16px",fontSize:10,fontWeight:800,color:DS.textDim,letterSpacing:1.5}}>ZONE SENSIBLE</div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.error+"33"}}><div onClick={function(){setShowDelConf(true);}} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:DS.errorSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={15} color={DS.error}/></div><span style={{flex:1,fontSize:13,color:DS.error}}>Supprimer mon compte</span><ChevronRight size={14} color={DS.error+"88"}/></div></div><div style={{background:DS.card,borderRadius:12,margin:"0 12px 8px",border:"1px solid "+DS.border}}><div onClick={onLogout} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer"}}><div style={{width:32,height:32,borderRadius:9,background:DS.error+"18",display:"flex",alignItems:"center",justifyContent:"center"}}><LogOut size={15} color={DS.error}/></div><span style={{flex:1,fontSize:13,color:DS.error}}>Se déconnecter</span></div></div></div>{showDelConf&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1600,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){setShowDelConf(false);}}><div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:24,animation:"hp-slide-up 0.28s ease"}}><div style={{textAlign:"center",marginBottom:20}}><div style={{width:56,height:56,borderRadius:"50%",background:DS.errorSoft,border:"1px solid "+DS.error+"44",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}><Trash2 size={26} color={DS.error}/></div><div style={{fontSize:16,fontWeight:900,color:DS.text,marginBottom:8}}>Supprimer mon compte</div><div style={{fontSize:12,color:DS.textMuted,lineHeight:1.7}}>Cette action est <span style={{color:DS.error,fontWeight:700}}>irréversible</span>. Toutes vos données personnelles seront supprimées conformément au RGPD dans un délai de 30 jours.</div></div><div style={{background:DS.warningSoft,border:"1px solid "+DS.warning+"33",borderRadius:10,padding:"10px 14px",marginBottom:20,fontSize:11,color:DS.warning}}>Vos réservations en cours, messages et historique seront définitivement supprimés.</div><div style={{display:"flex",gap:10}}><button onClick={function(){setShowDelConf(false);}} style={{flex:1,padding:"13px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,fontWeight:700,cursor:"pointer"}}>Annuler</button><button onClick={function(){setShowDelConf(false);if(onDeleteAccount)onDeleteAccount();}} style={{flex:1,padding:"13px",background:DS.error,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Confirmer</button></div></div></div>)}</div>);
 }
 
 function PremiumModal(props){
@@ -3025,8 +3017,6 @@ function ClientProf(props){
   function _saveClientPhoto(){if(!_cpPend)return;if(onPhotoChange)onPhotoChange(_cpPend);_setCPPend(null);_setCPMenu(false);}
   function _deleteClientPhoto(){if(onPhotoChange)onPhotoChange(null);_setCPMenu(false);}
   if(profSkLoading)return <ProfSkeleton/>;
-  var _loyaltyPoints=resaHistory.length*150;
-  var _loyaltyLevel=_loyaltyPoints>=15000?"plat":_loyaltyPoints>=5000?"gold":_loyaltyPoints>=1000?"silver":"bronze";
   return(<div style={{paddingBottom:20}}><ToastCP/><ImgViewer src={_viewer} onClose={function(){_setViewer(null);}}/><input id="hp-client-photo-input" ref={_uploadRef} type="file" accept="image/*" style={{display:"none"}} onChange={_handlePhotoFile}/>
     {_cpMenu&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:2000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={function(){_setCPMenu(false);_setCPPend(null);}}>
       <div onClick={function(e){e.stopPropagation();}} style={{width:"100%",maxWidth:420,background:DS.surface,borderRadius:"22px 22px 0 0",border:"1px solid "+DS.border,padding:"20px 16px 32px",animation:"hp-slide-up 0.28s ease"}}>
@@ -3073,7 +3063,7 @@ function ClientProf(props){
           </button>
         </div>
       </div>
-    </div>)}<LoyaltyWidget points={_loyaltyPoints} level={_loyaltyLevel}/><div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><div style={{filter:_locked?"blur(3px)":"none",transition:"filter .3s",display:"inline-flex",justifyContent:"center"}}><DualAv sz={72} letter={displayLetter} innerImg={profilePhoto} onClickInner={function(){_setCPMenu(true);}} uploadRef={_uploadRef} verified={isPremium} isClient={true}/></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:10,filter:_locked&&!privacySettings.pseudo?"blur(2px)":"none"}}><span style={{fontSize:18,fontWeight:800,color:DS.text}}>{displayName}</span><button onClick={function(){_setDraftClientName(_rawName);_setShowEditClient(true);}} style={{background:"none",border:"none",cursor:"pointer",padding:"3px 8px",display:"flex",alignItems:"center",gap:4}}><Edit2 size={13} color={DS.client}/><span style={{fontSize:11,color:DS.client,fontWeight:700}}>Modifier</span></button></div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{(privacySettings.pseudo||_locked)?"":selfEmail||""}</div>{(_locked||privacySettings.pseudo)&&<div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,padding:"3px 8px",borderRadius:20,border:"1px solid "+DS.warning+"44",background:DS.warning+"12"}}><Lock size={9} color={DS.warning}/><span style={{fontSize:9,fontWeight:700,color:DS.warning}}>{_locked?"Profil verrouillé":"Mode pseudonyme"}</span></div>}<div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu'au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{([["reservations","Réservations"],["favoris","Favoris"]].concat(isPremium&&premiumData&&premiumData.plan==="plus"?[["statistiques","Statistiques"]]:[])). map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})}</div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
+    </div>)}<div style={{background:"linear-gradient(180deg,"+DS.clientSoft+",transparent)",padding:"16px 16px 12px",textAlign:"center"}}><div style={{filter:_locked?"blur(3px)":"none",transition:"filter .3s",display:"inline-flex",justifyContent:"center"}}><DualAv sz={72} letter={displayLetter} innerImg={profilePhoto} onClickInner={function(){_setCPMenu(true);}} uploadRef={_uploadRef} verified={isPremium} isClient={true}/></div><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,marginTop:10,filter:_locked&&!privacySettings.pseudo?"blur(2px)":"none"}}><span style={{fontSize:18,fontWeight:800,color:DS.text}}>{displayName}</span><button onClick={function(){_setDraftClientName(_rawName);_setShowEditClient(true);}} style={{background:"none",border:"none",cursor:"pointer",padding:"3px 8px",display:"flex",alignItems:"center",gap:4}}><Edit2 size={13} color={DS.client}/><span style={{fontSize:11,color:DS.client,fontWeight:700}}>Modifier</span></button></div><div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{(privacySettings.pseudo||_locked)?"":selfEmail||""}</div>{(_locked||privacySettings.pseudo)&&<div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:4,padding:"3px 8px",borderRadius:20,border:"1px solid "+DS.warning+"44",background:DS.warning+"12"}}><Lock size={9} color={DS.warning}/><span style={{fontSize:9,fontWeight:700,color:DS.warning}}>{_locked?"Profil verrouillé":"Mode pseudonyme"}</span></div>}<div style={{display:"flex",gap:8,marginTop:12,justifyContent:"center"}}>{!isPremium&&<button onClick={function(){if(onPremium)onPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:11,fontWeight:800,cursor:"pointer"}}>Premium & avantages</button>}{isPremium&&premiumData&&<button onClick={function(){if(onRenewPremium)onRenewPremium();}} style={{padding:"6px 14px",background:DS.goldSoft,border:"1px solid "+DS.gold+"33",borderRadius:20,color:DS.gold,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><VBadge sz={11}/>Actif jusqu'au {new Date(premiumData.expiresAt).toLocaleDateString("fr-FR")}</button>}<button onClick={function(){if(onSettings)onSettings();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Settings size={14} color={DS.textMuted}/></button>{onPrivacy&&<button onClick={function(){if(onPrivacy)onPrivacy();}} style={{padding:"7px 10px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,cursor:"pointer",display:"flex",alignItems:"center"}}><Eye size={13} color={DS.textMuted}/></button>}</div></div><div style={{display:"flex",margin:"0 16px 12px",background:DS.card,borderRadius:12,border:"1px solid "+DS.border,overflow:"hidden"}}>{[[String(followingCount),"Suivis",null],[String(favEstabs.length),"Favoris","favoris"],[String(resaHistory.length),"Resas","reservations"]].map(function(_i,i){var n=_i[0];var l=_i[1];var tgt=_i[2];return <div key={l} onClick={function(){if(tgt)setTab(tgt);}} style={{flex:1,padding:"9px 0",textAlign:"center",borderRight:i<2?"1px solid "+DS.border:"none",cursor:tgt?"pointer":"default"}}><div style={{fontSize:18,fontWeight:800,color:tgt&&tab===tgt?DS.client:DS.text}}>{n}</div><div style={{fontSize:10,color:tgt&&tab===tgt?DS.client:DS.textMuted}}>{l}</div></div>;})}</div><div style={{display:"flex",gap:4,padding:"0 16px",marginBottom:12}}>{([["reservations","Réservations"],["favoris","Favoris"]].concat(isPremium&&premiumData&&premiumData.plan==="plus"?[["statistiques","Statistiques"]]:[])). map(function(_i){var t=_i[0];var l=_i[1];var isAct=tab===t;return <button key={t} onClick={function(){setTab(t);}} style={{flex:1,padding:"7px",borderRadius:10,border:"1px solid "+(isAct?DS.client:DS.border),background:isAct?DS.clientSoft:"transparent",color:isAct?DS.client:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer"}}>{l}</button>;})}</div><div style={{padding:"0 16px"}}>{tab==="reservations"&&(
           (resaHistory&&resaHistory.length>0)?resaHistory.map(function(r,i){
             var showQR=activeQR===i;
             var st=r.status||"pending";
@@ -3133,7 +3123,7 @@ function ClientProf(props){
                         ["Nuits",r.nights+" nuit"+(r.nights>1?"s":"")],
                         ["Arrivée",r.dateIn],
                         ["Départ",r.dateOut],
-                      ]).concat([["Paiement",r.payMode==="avec"?((r.total||0).toFixed(0)+" EUR - "+(r.payMethod==="card"?"Carte bancaire":"Mobile Money")):"Sans paiement (à l'arrivée)"]]).map(function(_i){var k=_i[0];var v=_i[1];return(
+                      ]).concat([["Paiement",r.payMode==="avec"?((r.total||0).toFixed(0)+" EUR - "+"Carte bancaire"):"Sans paiement (à l'arrivée)"]]).map(function(_i){var k=_i[0];var v=_i[1];return(
                         <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:11}}>
                           <span style={{color:DS.textMuted}}>{k}</span>
                           <span style={{color:DS.text,fontWeight:700}}>{v}</span>
@@ -3300,6 +3290,25 @@ function EstabM(props){
   var s9=useState([]);var selectedDishes=s9[0];var setSelectedDishes=s9[1];
   var allItems=(_catMenu||[]).reduce(function(acc,cat){return acc.concat(cat.items.map(function(it){return Object.assign({},it,{cat:cat.cat});}));},[]); 
   var selectedDishesTotal=allItems.filter(function(it){return selectedDishes.indexOf(it.cat+"-"+it.name)>=0;}).reduce(function(sum,it){return sum+(it.price||0);},0);
+  // La commande part au serveur, qui en recalcule le prix depuis son propre
+  // catalogue (declencheur trg_c_enforce_reservation_items) et en conserve
+  // chaque ligne dans reservation_items.
+  // Une ligne n'est transmise que si elle porte un VRAI identifiant de plat.
+  // Le menu de demonstration (e.menu) et les forfaits de repas (e.meals) n'en
+  // ont pas : inventer un identifiant ferait refuser la reservation, et
+  // transmettre une commande partielle ferait calculer un prix faux. Dans ce
+  // cas on ne transmet rien, et le comportement reste celui d'aujourd'hui.
+  function _lignesCommande(choisis){
+    if(!choisis||!choisis.length)return null;
+    var lignes=[];
+    for(var i=0;i<choisis.length;i++){
+      var _id=choisis[i]&&choisis[i].dish_id;
+      if(!_id)return null;
+      lignes.push({dish_id:String(_id),quantity:1});
+    }
+    return lignes;
+  }
+  var _lignesPlats=_lignesCommande(allItems.filter(function(it){return selectedDishes.indexOf(it.cat+"-"+it.name)>=0;}).map(function(it){return{dish_id:it.id||null};}));
   var sr=useState("hotel");var resaType=sr[0];var setResaType=sr[1];
   var scr=useState(null);var comboRoom=scr[0];var setComboRoom=scr[1];
   var scm=useState([]);var comboMeals=scm[0];var setComboMeals=scm[1];
@@ -3327,9 +3336,10 @@ function EstabM(props){
   var comboMealOptions=(e.meals&&e.meals.length>0)
     ? e.meals
     : allItems.filter(function(it){return it.available!==false&&(it.price||0)>0;})
-              .map(function(it){return{id:it.cat+"-"+it.name,name:it.name,price:it.price||0};});
+              .map(function(it){return{id:it.cat+"-"+it.name,name:it.name,price:it.price||0,dish_id:it.id||null};});
   var comboMealsTotal=comboMealOptions.filter(function(m){return comboMeals.indexOf(m.id)>=0;}).reduce(function(s,m){return s+(m.price||0);},0);
   var comboTotal=(comboRoom?comboRoom.price:0)+comboMealsTotal;
+  var _lignesCombo=_lignesCommande(comboMealOptions.filter(function(m){return comboMeals.indexOf(m.id)>=0;}));
   var _sEV=useState(null);var _eViewer=_sEV[0];var _setEViewer=_sEV[1];
   if(!e)return null;
   return(<div style={{position:"fixed",inset:0,background:DS.bg,zIndex:900,maxWidth:420,margin:"0 auto",overflowY:"auto",WebkitOverflowScrolling:"touch",touchAction:"pan-y",animation:(closingE?"hp-slide-out-right 0.26s cubic-bezier(0.4,0,1,1) forwards":"hp-slide-right 0.32s cubic-bezier(0.22,1,0.36,1)"),boxShadow:"-8px 0 24px rgba(0,0,0,.35)"}}><ImgViewer src={_eViewer} onClose={function(){_setEViewer(null);}}/><Toast/><div style={{position:"relative",height:220,flexShrink:0}}><img src={e.img} alt="" onClick={function(){if(e.img)_setEViewer(e.img);}} style={{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}/><div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.2),rgba(0,0,0,.6))",pointerEvents:"none"}}/><div style={{position:"absolute",top:12,left:12}}><BackBtn onClick={onClose} light={true}/></div><div style={{position:"absolute",bottom:-48,left:16,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2}} onClick={function(){if(e.img)_setEViewer(e.img);}}><Av sz={68} letter={(e.name[0]||"H").toUpperCase()} img={e.img} verified={e.verified||false}/>{e.verified&&<div style={{background:"#14532d",borderRadius:6,padding:"1px 6px",marginTop:1}}><span style={{fontSize:9,fontWeight:800,color:"#4ade80",letterSpacing:"0.01em"}}>Vérifié</span></div>}</div></div><div style={{padding:"58px 16px 8px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}><div><div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><div style={{fontSize:20,fontWeight:900,color:DS.text}}>{e.name}</div></div><a href={"https://maps.google.com/?q="+encodeURIComponent(e.name+" "+e.location)} target="_blank" rel="noopener noreferrer" style={{fontSize:12,color:DS.primary,cursor:"pointer",display:"flex",alignItems:"center",gap:4,textDecoration:"none"}}><MapPin size={11}/>{e.location}</a></div><div style={{textAlign:"right"}}>{e.priceFrom?<div style={{fontSize:18,fontWeight:900,color:DS.gold}}>À partir de {e.priceFrom}€</div>:null}</div></div><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><Stars r={e.rating} sz={15}/><span style={{fontSize:13,fontWeight:800,color:DS.text}}>{e.rating}</span><span style={{fontSize:13,color:DS.textDim}}>-</span><span style={{fontSize:13,fontWeight:700,color:DS.text}}>{fmtK(followersCount)}</span><span style={{fontSize:12,color:DS.textMuted}}>abonnes</span></div><div style={{display:"flex",gap:8,marginBottom:16}}>{viewerIsPro
@@ -3371,7 +3381,7 @@ function EstabM(props){
                     <div style={{fontSize:12,color:DS.textMuted}}>{comboRoom?"1 chambre":"Aucune chambre"} + {comboMeals.length} repas{comboTable?" + table":""}</div>
                     <div style={{fontSize:14,fontWeight:900,color:DS.gold}}>{comboTotal.toFixed(0)} EUR / nuit</div>
                   </div>
-                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboMealDetails:comboMealOptions.filter(function(m){return comboMeals.indexOf(m.id)>=0;}),comboTable:comboTable,comboTotal:comboTotal,isCombo:true}));else toast("Sélectionnez d'abord une chambre","error");}} style={{width:"100%",padding:"11px",background:comboRoom?color:DS.textDim,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:comboRoom?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:comboRoom?1:0.6,transition:"background .2s,opacity .2s"}}>
+                  <button onClick={function(){if(viewerIsPro)return;if(comboRoom&&onBook)onBook(Object.assign({},e,{selectedRoom:comboRoom,comboMeals:comboMeals,comboMealDetails:comboMealOptions.filter(function(m){return comboMeals.indexOf(m.id)>=0;}),comboTable:comboTable,comboTotal:comboTotal,isCombo:true,orderItems:_lignesCombo}));else toast("Sélectionnez d'abord une chambre","error");}} style={{width:"100%",padding:"11px",background:comboRoom?color:DS.textDim,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:comboRoom?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:8,opacity:comboRoom?1:0.6,transition:"background .2s,opacity .2s"}}>
                     <Calendar size={14}/>Réserver le séjour combiné
                   </button>
                 </div>
@@ -3425,7 +3435,7 @@ function EstabM(props){
                   </div>
                   {viewerIsPro
                   ? <div style={{width:"100%",padding:"11px",background:DS.card,border:"1px solid "+DS.border,borderRadius:14,color:DS.textDim,fontSize:12,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><Lock size={13}/>Reservation indisponible entre etablissements</div>
-                  : <button onClick={function(){if(onBook)onBook(Object.assign({},e,{selectedDishes:selectedDishes,dishTotal:selectedDishesTotal}));}} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  : <button onClick={function(){if(onBook)onBook(Object.assign({},e,{selectedDishes:selectedDishes,dishTotal:selectedDishesTotal,orderItems:_lignesPlats}));}} style={{width:"100%",padding:"11px",background:color,border:"none",borderRadius:14,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                     <Calendar size={14}/>Reserver ({selectedDishes.length} plat{selectedDishes.length>1?"s":""})
                   </button>}
                 </div>
@@ -3505,7 +3515,105 @@ function StripePaymentModal(props){
   );
 }
 
-function QRTicket(props){var id=props.id||"HP-000000";var sz=props.sz||110;return(<div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}><QRCodeSVG value={id} size={sz} level="M" includeMargin={false}/></div>);}
+// Le ticket presente au client porte desormais une SIGNATURE du serveur, et non
+// plus l'identifiant brut de la reservation : celui-ci ne prouvait rien, et
+// quiconque connaissait un identifiant pouvait fabriquer le meme code.
+// La signature est emise par emettre_ticket_reservation, reservee au client de
+// la reservation, et verifiee a la consommation par le serveur.
+// Aucun repli sur l'identifiant : un code non signe ne serait pas consommable,
+// l'afficher reviendrait a presenter un faux ticket.
+function QRTicket(props){
+  var id=props.id||null;var sz=props.sz||110;
+  var s=useState(null);var ticket=s[0];var setTicket=s[1];
+  var se=useState(false);var erreur=se[0];var setErreur=se[1];
+  useEffect(function(){
+    setTicket(null);setErreur(false);
+    if(!id||!DataLayer._client){setErreur(true);return;}
+    var annule=false;
+    DataLayer._client.rpc("emettre_ticket_reservation",{p_reservation_id:String(id)})
+      .then(function(r){
+        if(annule)return;
+        if(r&&!r.error&&r.data)setTicket(r.data); else setErreur(true);
+      })
+      .catch(function(){ if(!annule)setErreur(true); });
+    return function(){annule=true;};
+  },[id]);
+  if(erreur)return(<div style={{display:"inline-flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:10,background:DS.card,border:"1px solid "+DS.border,borderRadius:10,width:sz+20,height:sz+20,textAlign:"center"}}>
+    <AlertTriangle size={18} color={DS.warning}/>
+    <div style={{fontSize:9,color:DS.textMuted,marginTop:6,lineHeight:1.4,padding:"0 6px"}}>Ticket indisponible — vérifiez votre connexion</div>
+  </div>);
+  if(!ticket)return(<div className="hp-sk" style={{width:sz+20,height:sz+20,borderRadius:10}}/>);
+  return(<div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}><QRCodeSVG value={ticket} size={sz} level="M" includeMargin={false}/></div>);
+}
+
+// Lecteur de QR reel : flux camera + decodage image par image.
+// jsQR est charge a la demande (import dynamique) : seul un professionnel qui
+// scanne en paye le poids, le reste de l'application n'en porte rien.
+function ScanCamera(props){
+  var onCode=props.onCode;var actif=props.actif;
+  var videoRef=useRef(null);var canvasRef=useRef(null);
+  var sErr=useState("");var camErr=sErr[0];var setCamErr=sErr[1];
+  var sPret=useState(false);var pret=sPret[0];var setPret=sPret[1];
+  var vu=useRef(false);
+  useEffect(function(){
+    if(!actif)return;
+    var flux=null;var anim=null;var annule=false;var decode=null;
+    vu.current=false;
+    function boucle(){
+      if(annule)return;
+      anim=requestAnimationFrame(boucle);
+      var v=videoRef.current;var c=canvasRef.current;
+      if(!v||!c||!decode||v.readyState!==4||vu.current)return;
+      var w=v.videoWidth,h=v.videoHeight;
+      if(!w||!h)return;
+      c.width=w;c.height=h;
+      var ctx=c.getContext("2d",{willReadFrequently:true});
+      ctx.drawImage(v,0,0,w,h);
+      var img;
+      try{img=ctx.getImageData(0,0,w,h);}catch(e){return;}
+      var res=decode(img.data,w,h,{inversionAttempts:"dontInvert"});
+      if(res&&res.data){vu.current=true;if(onCode)onCode(res.data);}
+    }
+    import("jsqr").then(function(m){
+      if(annule)return;
+      decode=m.default||m;
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+        setCamErr("Cet appareil ne permet pas l'accès à la caméra.");return;
+      }
+      return navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false})
+        .then(function(s){
+          if(annule){s.getTracks().forEach(function(t){t.stop();});return;}
+          flux=s;
+          var v=videoRef.current;
+          if(!v)return;
+          v.srcObject=s;v.setAttribute("playsinline","true");
+          return v.play().then(function(){setPret(true);boucle();});
+        });
+    }).catch(function(e){
+      if(annule)return;
+      var n=(e&&e.name)||"";
+      setCamErr(n==="NotAllowedError"?"Accès à la caméra refusé. Autorisez-le dans les réglages de votre navigateur."
+        :n==="NotFoundError"?"Aucune caméra détectée sur cet appareil."
+        :"Impossible d'ouvrir la caméra.");
+    });
+    return function(){
+      annule=true;
+      if(anim)cancelAnimationFrame(anim);
+      if(flux)flux.getTracks().forEach(function(t){t.stop();});
+      var v=videoRef.current;if(v)try{v.srcObject=null;}catch(e){}
+    };
+  },[actif]);
+  if(camErr)return(<div style={{background:DS.errorSoft,border:"1px solid "+DS.error+"44",borderRadius:12,padding:"14px",textAlign:"center"}}>
+    <Camera size={20} color={DS.error} style={{margin:"0 auto 8px",display:"block"}}/>
+    <div style={{fontSize:12,color:DS.error,lineHeight:1.5}}>{camErr}</div>
+  </div>);
+  return(<div style={{position:"relative",borderRadius:14,overflow:"hidden",background:"#000",aspectRatio:"1/1"}}>
+    <video ref={videoRef} muted playsInline style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+    <canvas ref={canvasRef} style={{display:"none"}}/>
+    <div style={{position:"absolute",inset:"14%",border:"3px solid rgba(255,255,255,.9)",borderRadius:12,pointerEvents:"none"}}/>
+    {!pret&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12}}>Ouverture de la caméra…</div>}
+  </div>);
+}
 // Message d'echec de reservation. Le texte du serveur n'est repris que pour les
 // refus metier (SQLSTATE 23514 : disponibilite, dates, quantite), qui sont ecrits
 // pour l'utilisateur. Toute autre erreur reste generique : on n'expose jamais un
@@ -3542,6 +3650,11 @@ function BookM(props){
   var s6=useState("card");var payMethod=s6[0];var setPayMethod=s6[1];
   var spay=useState(false);var paying=spay[0];var setPaying=spay[1];
   var sSCS=useState(null);var stripeClientSecret=sSCS[0];var setStripeClientSecret=sSCS[1];
+  // Montant RETENU PAR LE SERVEUR (centimes), renvoye par la route de paiement.
+  // Le total calcule ici ne sert plus que de repli si la route ne le renvoie
+  // pas encore : l'ecran de paiement doit annoncer ce qui est reellement
+  // preleve, jamais un total recalcule dans le navigateur.
+  var sSAmt=useState(null);var stripeAmtCents=sSAmt[0];var setStripeAmtCents=sSAmt[1];
   var sSM=useState(false);var showStripeModal=sSM[0];var setShowStripeModal=sSM[1];
   var _pendingPaidResa=useRef(null);
   var sC=useState(false);var closing=sC[0];var setClosing=sC[1];
@@ -3574,11 +3687,11 @@ function BookM(props){
         {showStripeModal&&stripeClientSecret&&(
           <StripePaymentModal
             clientSecret={stripeClientSecret}
-            amount={totalPrice.toFixed(0)}
+            amount={(stripeAmtCents!=null?(Number(stripeAmtCents)/100):totalPrice).toFixed(0)}
             color={color}
             DS={DS}
             onClose={function(){
-              setShowStripeModal(false);setStripeClientSecret(null);
+              setShowStripeModal(false);setStripeClientSecret(null);setStripeAmtCents(null);
               if(_pendingPaidResa.current&&_pendingPaidResa.current!=="paid"){
                 DataLayer.updateReservationStatus(resaId,"cancelled");
                 try{var all=BookingService.getAll().map(function(r){return r.id===resaId?Object.assign({},r,{status:"cancelled"}):r;});localStorage.setItem(_lk("hp_resas_all"),JSON.stringify(all));BookingService._all=all;}catch(ex){}
@@ -3588,7 +3701,7 @@ function BookM(props){
               }
             }}
             onSuccess={function(){
-              setShowStripeModal(false);setStripeClientSecret(null);
+              setShowStripeModal(false);setStripeClientSecret(null);setStripeAmtCents(null);
               var _r=_pendingPaidResa.current;_pendingPaidResa.current="paid";
               setStep(3);
               toast("Paiement reçu — confirmation automatique en cours","success");
@@ -3737,10 +3850,10 @@ function BookM(props){
               {payMode==="avec"&&(
                 <div style={{marginTop:8,marginBottom:14}}>
                   <div style={{fontSize:11,fontWeight:700,color:DS.textMuted,marginBottom:8}}>METHODE DE PAIEMENT</div>
-                  {[["card","Carte bancaire","Visa, Mastercard, CB",false],["mobile","Mobile Money","Bientôt disponible",true]].map(function(_i){
+                  {[["card","Carte bancaire","Visa, Mastercard, CB",false]].map(function(_i){
                     var v=_i[0];var l=_i[1];var sub=_i[2];var isDisabled=_i[3];var isSel=payMethod===v;
                     return(
-                      <div key={v} onClick={function(){if(isDisabled){toast("Mobile Money sera bientôt disponible","info");return;}setPayMethod(v);}} style={{padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:isDisabled?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:12,opacity:isDisabled?0.5:1}}>
+                      <div key={v} onClick={function(){if(isDisabled)return;setPayMethod(v);}} style={{padding:"12px 14px",marginBottom:8,borderRadius:12,border:"1.5px solid "+(isSel?color+"66":DS.border),background:isSel?color+"0C":DS.card,cursor:isDisabled?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:12,opacity:isDisabled?0.5:1}}>
                         <div style={{width:20,height:20,borderRadius:"50%",border:"2px solid "+(isSel?color:DS.border),background:isSel?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                           {isSel&&<div style={{width:8,height:8,borderRadius:"50%",background:"#fff"}}/>}
                         </div>
@@ -3754,15 +3867,13 @@ function BookM(props){
                 <button onClick={function(){setStep(1);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Retour</button>
                 <button onClick={function(){
                   if(paying) return;
-                  // Mobile Money : pas encore branché sur un vrai fournisseur — aucune fausse confirmation
-                  if(payMode==="avec"&&payMethod==="mobile"){toast("Mobile Money sera bientôt disponible. Utilisez la carte bancaire.","info");return;}
                   // Flux sans paiement : demande envoyée à l'établissement (pending)
                   if(payMode==="sans"){
                     setPaying(true);
                     // Plus de delai simule : c'est la reponse reelle du serveur qui
                     // fait foi. Une reservation n'est annoncee que si elle existe
                     // vraiment en base (disponibilite verifiee, droits verifies).
-                    var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,roomId:(e.selectedRoom&&e.selectedRoom.id)||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:null,qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                    var resa={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,roomId:(e.selectedRoom&&e.selectedRoom.id)||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:payMode,payMethod:null,qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null,items:(e.orderItems&&e.orderItems.length>0)?e.orderItems:null};
                     // On passe « resa » et non la valeur de retour : le rappel peut
                     // etre synchrone (hors ligne), la variable ne serait pas encore
                     // affectee. createBooking renvoie de toute facon ce meme objet.
@@ -3794,6 +3905,7 @@ function BookM(props){
                         setPaying(false);
                         if(data.error){toast("Erreur paiement : "+data.error,"error");return;}
                         setStripeClientSecret(data.clientSecret);
+                        setStripeAmtCents(data.amount!=null?Number(data.amount):null);
                         setShowStripeModal(true);
                       })
                       .catch(function(){
@@ -3802,7 +3914,7 @@ function BookM(props){
                       });
                     };
                     if(!_pendingPaidResa.current){
-                      var resaPre={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,roomId:(e.selectedRoom&&e.selectedRoom.id)||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null};
+                      var resaPre={id:resaId,clientName:clientName,estab:e.name,estabType:e.type,estabOwnerId:e.userId||null,roomId:(e.selectedRoom&&e.selectedRoom.id)||null,service:serviceLabel,dateIn:dateIn,dateOut:dateOut,nights:nights,guests:guests,roomCount:isCombo?1:(isHotelBooking?roomCount:null),tableCount:isRestaurantBooking?tableCount:null,total:totalPrice,payMode:"avec",payMethod:"card",qr:resaId,status:"pending",isCombo:isCombo,comboMeals:isCombo?e.comboMeals:null,comboTable:isCombo?e.comboTable:null,items:(e.orderItems&&e.orderItems.length>0)?e.orderItems:null};
                       // La disponibilite est verifiee AVANT d'ouvrir le paiement, et le
                       // paiement n'est demande QU'APRES acceptation par le serveur :
                       // encaisser une chambre deja complete serait la pire des issues.
@@ -4256,7 +4368,32 @@ function ProFeed(props){
       DataLayer._cache.feed=[newObj].concat(DataLayer.getFeed());
       if(DataLayer._onUpdate)DataLayer._onUpdate();
       try{var _pp=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");localStorage.setItem(_lk("hp_pro_posts"),JSON.stringify([newObj].concat(_pp).slice(0,30)));}catch(_e){}
-      try{DataLayer.create("posts",[{id:newId,author:data.name,type:proType,owner_id:selfUserId||null,establishment_id:data.id||null,data:newObj}]).catch(function(){});}catch(e){}
+      // Le SERVEUR fait foi. La publication s'affiche immediatement — meme
+      // discipline optimiste que delPost juste au-dessus — mais si l'insertion
+      // est REFUSEE (enforce_post_rules, droits, RLS), elle est retiree de
+      // l'ecran, du cache du fil ET du magasin local, et l'auteur est prevenu.
+      // Avant, le resultat etait jete (« .catch() » vide) et le succes annonce
+      // sans l'avoir lu ; pire, hp_pro_posts est relu et reinjecte EN TETE du
+      // fil a chaque chargement (l.2481 et l.3948) : une publication refusee
+      // par le serveur restait donc visible indefiniment, sur un fil ou elle
+      // n'existait pas.
+      var _retirePublication=function(){
+        setPosts(function(ps){return ps.filter(function(p){return p.id!==newId;});});
+        try{if(DataLayer._cache&&DataLayer._cache.feed)DataLayer._cache.feed=DataLayer._cache.feed.filter(function(p){return p.id!==newId;});}catch(e){}
+        try{var _pp2=JSON.parse(localStorage.getItem(_lk("hp_pro_posts"))||"[]");localStorage.setItem(_lk("hp_pro_posts"),JSON.stringify(_pp2.filter(function(p){return p.id!==newId;})));}catch(e){}
+        if(DataLayer._onUpdate)DataLayer._onUpdate();
+        toast("Publication refusée par le serveur — elle n'a pas été enregistrée","error");
+      };
+      // Hors connexion (aucun client configure), le comportement reste
+      // strictement celui d'avant : la publication reste locale, comme le font
+      // deja createBooking et confirmShare dans ce cas.
+      try{
+        if(DataLayer._client){
+          DataLayer.create("posts",[{id:newId,author:data.name,type:proType,owner_id:selfUserId||null,establishment_id:data.id||null,data:newObj}])
+            .then(function(r){ if(r&&r.error)_retirePublication(); })
+            .catch(function(){ _retirePublication(); });
+        }
+      }catch(e){ _retirePublication(); }
       try{if(mediaPreview&&mediaUrl!==mediaPreview)URL.revokeObjectURL(mediaPreview);}catch(e){}
       setNewPost("");setShowNew(false);setMediaPreview(null);setMediaType(null);setMediaFile(null);
       toast("Publication publiée avec succès","success");
@@ -5286,7 +5423,7 @@ function ProResa(props){
         if(res.error||!res.data)return;
         var rows=res.data.map(function(row){
           var d=row.data||{};
-          return{id:row.id,clientId:row.client_id||null,client:d.clientName||"Client",service:d.service||"Reservation",dateIn:d.dateIn||"",dateOut:d.dateOut||d.dateIn||"",nights:d.nights||1,guests:d.guests||1,total:d.total||0,payMode:d.payMode||"sans",status:row.status||"pending",qrScanned:row.status==="consumed"};
+          return{id:row.id,clientId:row.client_id||null,client:d.clientName||"Client",service:d.service||"Reservation",dateIn:d.dateIn||"",dateOut:d.dateOut||d.dateIn||"",nights:d.nights||1,guests:d.guests||1,total:d.total||0,payMode:d.payMode||"sans",status:row.status||"pending",qrScanned:row.status==="consumed",estabType:d.estabType||null,roomCount:d.roomCount||null,tableCount:d.tableCount||null,isCombo:d.isCombo===true,comboMeals:d.comboMeals||null,comboTable:d.comboTable===true};
         });
         setResas(rows);
       }).catch(function(){}).then(function(){setResasEnCours(false);});
@@ -5336,7 +5473,45 @@ function ProResa(props){
   }
   function confirmResa(id){_appliqueStatut(id,{status:"confirmed"},"Réservation confirmée","success",{status:"pending"});}
   function refuseResa(id){_appliqueStatut(id,{status:"refused"},"Réservation refusée","info",{status:"pending"});}
-  function scanQR(id){setScanTarget(null);_appliqueStatut(id,{status:"consumed",qrScanned:true},"Arrivée confirmée · Client marqué présent","success",{status:"confirmed",qrScanned:false});}
+  // La consommation ne passe plus par une ecriture de statut : elle passe par
+  // consommer_ticket_reservation, qui verifie la SIGNATURE du ticket presente
+  // par le client, l'appartenance de la reservation a cet etablissement et son
+  // statut, le tout sous verrou de ligne. Le declencheur refuse desormais
+  // « consumed » par toute autre voie : marquer une arrivee sans ticket n'est
+  // plus possible.
+  var sScanEtat=useState("");var scanEtat=sScanEtat[0];var setScanEtat=sScanEtat[1];
+  var _scanEnCours=useRef(false);
+  function _consommerTicket(ticket){
+    if(_scanEnCours.current)return;
+    _scanEnCours.current=true;
+    setScanEtat("verification");
+    if(!DataLayer._client){_scanEnCours.current=false;setScanEtat("");toastR("Aucune connexion au serveur","error");return;}
+    DataLayer._client.rpc("consommer_ticket_reservation",{p_ticket:String(ticket||"")})
+      .then(function(r){
+        _scanEnCours.current=false;setScanEtat("");
+        if(!r||r.error){toastR("Vérification impossible — réessayez","error");return;}
+        var d=r.data||{};var etat=d.etat;
+        if(etat==="consommee"){
+          setResas(function(rs){return rs.map(function(x){return x.id===d.reservation?Object.assign({},x,{status:"consumed",qrScanned:true}):x;});});
+          setScanTarget(null);
+          toastR("Arrivée confirmée · Client marqué présent","success");
+          return;
+        }
+        if(etat==="deja_consommee"){
+          setResas(function(rs){return rs.map(function(x){return x.id===d.reservation?Object.assign({},x,{status:"consumed",qrScanned:true}):x;});});
+          setScanTarget(null);
+          toastR("Ce ticket a déjà été utilisé","info");
+          return;
+        }
+        toastR(
+          etat==="invalide"?"Ticket invalide ou falsifié":
+          etat==="introuvable"?"Réservation introuvable":
+          etat==="pas_votre_etablissement"?"Ce ticket ne concerne pas votre établissement":
+          etat==="statut_incompatible"?("Réservation non confirmée (statut : "+(d.statut||"?")+")"):
+          "Ticket refusé","error");
+      })
+      .catch(function(){_scanEnCours.current=false;setScanEtat("");toastR("Vérification impossible — réessayez","error");});
+  }
   return(
     <div style={{background:DS.bg,paddingBottom:20}}>
       <ToastR/>
@@ -5348,22 +5523,18 @@ function ProResa(props){
               <div style={{fontSize:11,color:"rgba(255,255,255,.8)",marginTop:2}}>{scanTarget.client}</div>
             </div>
             <div style={{padding:20}}>
-              <div style={{background:"rgba(0,0,0,.6)",borderRadius:14,padding:20,marginBottom:16,textAlign:"center",border:"2px dashed "+color}}>
-                <div style={{fontSize:12,color:DS.textMuted,marginBottom:12}}>Zone de scan (simulation)</div>
-                <div style={{display:"inline-flex",padding:10,background:"#fff",borderRadius:10}}>
-                  <div style={{width:100,height:100,display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:1}}>
-                    {genQRPixels(scanTarget.id).map(function(px,i){return <div key={i} style={{background:px?"#000":"#fff"}}/>;  })}
-                  </div>
+              <div style={{marginBottom:16}}>
+                <ScanCamera actif={true} onCode={_consommerTicket}/>
+                <div style={{fontSize:11,color:DS.textMuted,marginTop:10,textAlign:"center",lineHeight:1.5}}>
+                  {scanEtat==="verification"?"Vérification du ticket…":"Présentez le QR code du client devant la caméra"}
                 </div>
-                <div style={{fontSize:10,color:DS.textMuted,marginTop:8,fontFamily:"monospace"}}>{scanTarget.id}</div>
               </div>
               <div style={{background:DS.card,borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:12,color:DS.textMuted}}>
                 {scanTarget.service} - {scanTarget.dateIn} au {scanTarget.dateOut} - {scanTarget.guests} pers.
                 <div style={{fontSize:13,fontWeight:800,color:scanTarget.payMode==="avec"?DS.gold:DS.success,marginTop:4}}>{scanTarget.payMode==="avec"?scanTarget.total+" EUR":"Reservation sans paiement"}</div>
               </div>
               <div style={{display:"flex",gap:8}}>
-                <button onClick={function(){setScanTarget(null);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Annuler</button>
-                <button onClick={function(){scanQR(scanTarget.id);}} style={{flex:2,padding:"11px",background:DS.success,border:"none",borderRadius:12,color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>Confirmer l'arrivée</button>
+                <button onClick={function(){setScanTarget(null);}} style={{flex:1,padding:"11px",background:"transparent",border:"1px solid "+DS.border,borderRadius:12,color:DS.textMuted,fontSize:13,cursor:"pointer"}}>Fermer</button>
               </div>
             </div>
           </div>
@@ -5384,7 +5555,10 @@ function ProResa(props){
                   <span>{r.client}</span>
                 </div>
                 <div style={{fontSize:12,color:DS.textMuted,marginTop:2}}>{r.service}</div>
-                <div style={{fontSize:11,color:DS.textDim,marginTop:3}}>{r.dateIn} au {r.dateOut} - {r.guests} pers.</div>
+                <div style={{fontSize:11,color:DS.textDim,marginTop:3}}>{r.estabType==="restaurant"
+                  ?(r.dateIn+" - "+r.guests+" pers."+(r.tableCount?" - "+r.tableCount+" table"+(r.tableCount>1?"s":""):""))
+                  :(r.dateIn+" au "+r.dateOut+" - "+r.nights+" nuit"+(r.nights>1?"s":"")+" - "+r.guests+" pers."+(r.roomCount?" - "+r.roomCount+" chambre"+(r.roomCount>1?"s":""):""))}</div>
+                {r.isCombo&&<div style={{fontSize:10,color:DS.primary,marginTop:2}}>Séjour combiné - {(r.comboMeals||[]).length} repas inclus{r.comboTable?" - Table au restaurant":""}</div>}
               </div>
               <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
                 <div style={{fontSize:16,fontWeight:900,color:r.payMode==="avec"?DS.gold:DS.success}}>{r.payMode==="avec"?r.total+" EUR":"Sans paiement"}</div>
@@ -5456,6 +5630,65 @@ function ProProf(props){
   var _sDraftLoc=useState(data.location||"");var _draftLoc=_sDraftLoc[0];var _setDraftLoc=_sDraftLoc[1];
   var _sProSaving=useState(false);var _proSaving=_sProSaving[0];var _setProSaving=_sProSaving[1];
   var _sAboutSaving=useState(false);var _aboutSaving=_sAboutSaving[0];var _setAboutSaving=_sAboutSaving[1];
+  // --- Heure d'arrivee de l'etablissement ---
+  // La politique d'annulation se compte en heures restantes avant l'arrivee, or
+  // reservations.check_in est une DATE, sans heure. L'etablissement declare donc
+  // ici son heure d'arrivee, et le fuseau dans lequel cette heure se lit : « 14:00 »
+  // a Dakar et « 14:00 » a Tokyo ne sont pas le meme instant, et la plateforme
+  // s'adresse aux etablissements du monde entier.
+  // L'identifiant de la fiche est deduit du compte connecte (prof_<uid>), comme le
+  // fait deja le serveur dans ensure_pro_establishment et enforce_ad_campaign_rules,
+  // et JAMAIS de « data.id » : celui-ci peut encore designer un etablissement de
+  // demonstration lorsque la fiche du professionnel n'est pas dans le cache.
+  var _ficheId=props.authUserId?("prof_"+props.authUserId):null;
+  var _sCheckIn=useState("");var _checkInTime=_sCheckIn[0];var _setCheckInTime=_sCheckIn[1];
+  var _sTz=useState("");var _tzEtab=_sTz[0];var _setTzEtab=_sTz[1];
+  var _sCiSaving=useState(false);var _ciSaving=_sCiSaving[0];var _setCiSaving=_sCiSaving[1];
+  var _sCiEdit=useState(false);var _ciEdit=_sCiEdit[0];var _setCiEdit=_sCiEdit[1];
+  useEffect(function(){
+    if(!DataLayer._client||!_ficheId)return;
+    DataLayer._client.from("establishments").select("check_in_time,timezone").eq("id",_ficheId).maybeSingle()
+      .then(function(r){
+        if(!r||r.error||!r.data)return;
+        _setCheckInTime(r.data.check_in_time?String(r.data.check_in_time).slice(0,5):"");
+        _setTzEtab(r.data.timezone||"");
+      }).catch(function(){});
+  },[_ficheId]);
+  // Fuseau propose : celui de l'appareil, valeur IANA reelle fournie par le
+  // navigateur — pas une valeur inventee. Le professionnel peut la corriger, et
+  // le SERVEUR la valide (trg_valider_fuseau_etablissement) : un nom inconnu est
+  // refuse en base, le frontend n'est pas la frontiere.
+  function _tzPropose(){
+    try{var t=Intl.DateTimeFormat().resolvedOptions().timeZone;return t||"";}catch(e){return "";}
+  }
+  function _saveCheckIn(){
+    if(_ciSaving)return;
+    if(!DataLayer._client||!_ficheId){toastP("Enregistrement impossible — aucune connexion au serveur","error");return;}
+    var h=String(_checkInTime||"").trim();
+    var z=String(_tzEtab||"").trim();
+    if(!/^([01]\d|2[0-3]):([0-5]\d)$/.test(h)){toastP("Heure d'arrivée invalide (format 00:00 à 23:59)","error");return;}
+    if(!z){toastP("Indiquez le fuseau horaire de votre établissement","error");return;}
+    _setCiSaving(true);
+    // Le serveur fait foi : rien n'est annonce avant sa reponse.
+    DataLayer._client.from("establishments").update({check_in_time:h+":00",timezone:z}).eq("id",_ficheId).select("check_in_time,timezone")
+      .then(function(r){
+        _setCiSaving(false);
+        if(r&&r.error){
+          var m=String((r.error&&r.error.message)||"");
+          toastP(m.indexOf("Fuseau horaire inconnu")>=0
+            ? "Fuseau horaire inconnu — vérifiez son nom (exemple : Africa/Dakar)"
+            : "Échec de l'enregistrement — vérifiez votre connexion et réessayez","error");
+          return;
+        }
+        if(!r||!r.data||!r.data.length){
+          toastP("Enregistrement refusé — cette fiche ne vous appartient pas","error");
+          return;
+        }
+        _setCiEdit(false);
+        toastP("Heure d'arrivée enregistrée","success");
+      })
+      .catch(function(){_setCiSaving(false);toastP("Échec de l'enregistrement — vérifiez votre connexion et réessayez","error");});
+  }
   function _handleProPhotoFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>5*1024*1024){toastP("Photo trop volumineuse (maximum 5 Mo)","error");e.target.value="";return;}var r=new FileReader();r.onload=function(ev){_setPPPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
   function _handleProCoverFile(e){var f=e.target.files&&e.target.files[0];if(!f)return;if(f.size>8*1024*1024){toastP("Image de couverture trop volumineuse (maximum 8 Mo)","error");e.target.value="";return;}var r=new FileReader();r.onload=function(ev){_setPCPend(ev.target.result);};r.readAsDataURL(f);e.target.value="";}
   // Pas de confirmation ici : l'envoi vers Storage est asynchrone et peut echouer.
@@ -5674,6 +5907,53 @@ function ProProf(props){
               </button>
             </div>
           )
+        )}
+        {/* Heure d'arrivee : sert de reference au calcul d'annulation, qui se
+            compte en heures restantes avant l'arrivee. Le fuseau l'accompagne
+            toujours : une heure seule ne designe aucun instant precis a
+            l'echelle du monde. */}
+        {tab==="about"&&(
+          <div style={{marginTop:16,paddingTop:16,borderTop:"1px solid "+DS.border}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+              <Clock size={14} color={color}/>
+              <div style={{fontSize:13,fontWeight:800,color:DS.text}}>Heure d'arrivée</div>
+            </div>
+            <div style={{fontSize:11,color:DS.textMuted,lineHeight:1.6,marginBottom:12}}>
+              L'heure à laquelle vos clients sont attendus. Elle sert de référence au calcul des annulations : le remboursement dépend du temps restant avant cette heure.
+            </div>
+            {_ciEdit?(
+              <div>
+                <div style={{display:"flex",gap:10,marginBottom:10}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:10,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:5}}>HEURE</div>
+                    <input type="time" value={_checkInTime} onChange={function(ev){_setCheckInTime(ev.target.value);}} style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+                  </div>
+                  <div style={{flex:2}}>
+                    <div style={{fontSize:10,fontWeight:700,color:DS.textDim,letterSpacing:1,marginBottom:5}}>FUSEAU HORAIRE</div>
+                    <input value={_tzEtab} onChange={function(ev){_setTzEtab(ev.target.value);}} placeholder="Africa/Dakar" style={{width:"100%",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,padding:"11px 14px",fontSize:13,color:DS.text,outline:"none",boxSizing:"border-box"}}/>
+                  </div>
+                </div>
+                {_tzPropose()&&_tzPropose()!==_tzEtab&&(
+                  <button onClick={function(){_setTzEtab(_tzPropose());}} style={{background:"none",border:"none",color:color,fontSize:11,fontWeight:700,cursor:"pointer",padding:"0 0 10px"}}>
+                    Utiliser le fuseau de cet appareil : {_tzPropose()}
+                  </button>
+                )}
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={function(){_setCiEdit(false);}} style={{flex:1,padding:"9px",background:"transparent",border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,cursor:"pointer"}}>Annuler</button>
+                  <button onClick={_saveCheckIn} disabled={_ciSaving} style={{flex:1,padding:"9px",background:color,border:"none",borderRadius:10,color:"#fff",fontSize:12,fontWeight:800,cursor:_ciSaving?"default":"pointer",opacity:_ciSaving?.6:1}}>{_ciSaving?"Enregistrement…":"Enregistrer"}</button>
+                </div>
+              </div>
+            ):(
+              <div>
+                <div style={{fontSize:13,color:_checkInTime?DS.text:DS.textMuted,marginBottom:10}}>
+                  {_checkInTime?(_checkInTime+(_tzEtab?" · "+_tzEtab:"")):"Non renseignée"}
+                </div>
+                <button onClick={function(){if(!_tzEtab)_setTzEtab(_tzPropose());_setCiEdit(true);}} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",background:DS.card,border:"1px solid "+DS.border,borderRadius:10,color:DS.textMuted,fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                  <Edit2 size={12}/>{_checkInTime?"Modifier l'heure d'arrivée":"Renseigner l'heure d'arrivée"}
+                </button>
+              </div>
+            )}
+          </div>
         )}
         {tab==="services"&&(function(){
           var _svcs=[];
@@ -5986,7 +6266,10 @@ export default function App() {
     .then(function(r){return r.json();})
     .then(function(data){
       if(data.error){tk.show("Erreur paiement : "+data.error,"error");return;}
-      setPremiumPay({plan:plan,durationMonths:durationMonths,amount:total,clientSecret:data.clientSecret,renew:!!isRenew});
+      // Le montant affiche est celui RETENU PAR LE SERVEUR (meme motif que
+      // _startAdPayment ci-dessous) : le total calcule ici ne sert plus que de
+      // repli si la route ne le renvoie pas encore.
+      setPremiumPay({plan:plan,durationMonths:durationMonths,amount:(data.amount!=null?Number(data.amount)/100:total),clientSecret:data.clientSecret,renew:!!isRenew});
     })
     .catch(function(){tk.show("Impossible de contacter le service de paiement","error");});
   }
@@ -6006,7 +6289,7 @@ export default function App() {
       body:JSON.stringify({amount:cents,currency:"eur",type:"premium",plan:plan||"std",trialDays:15,userId:_authForUserData&&_authForUserData.userId,resaId:"PREMIUM-TRIAL-15J-"+Date.now(),estabName:"Essai Premium 15 jours"})
     })
     .then(function(r){return r.json();})
-    .then(function(data){if(data.error){tk.show("Erreur paiement : "+data.error,"error");return;}setPremiumPay({plan:plan||"std",durationMonths:0,amount:trialP,clientSecret:data.clientSecret,trial:true});})
+    .then(function(data){if(data.error){tk.show("Erreur paiement : "+data.error,"error");return;}setPremiumPay({plan:plan||"std",durationMonths:0,amount:(data.amount!=null?Number(data.amount)/100:trialP),clientSecret:data.clientSecret,trial:true});})
     .catch(function(){tk.show("Impossible de contacter le service de paiement","error");});
   }
   // Paiement d'une campagne Sponsor/Boost — circuit SEPARE du Premium et des reservations.
