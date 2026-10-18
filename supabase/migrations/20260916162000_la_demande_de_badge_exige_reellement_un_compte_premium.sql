@@ -1,0 +1,43 @@
+-- La soumission d'une demande de badge est reservee aux comptes Premium actifs.
+-- Cette regle EXISTAIT deja (politique verifreq_insert_premium), mais elle etait
+-- sans effet : la politique verif_requests_own, PERMISSIVE et portant sur TOUTES
+-- les actions, etait combinee avec elle par un OU. Le controle reel se reduisait
+-- donc a « user_id = auth.uid() ».
+--
+-- Mesure faite AVANT, dans une transaction annulee, avec le compte non-Premium
+-- 92b8b2cf (account_type=hotel, is_premium=false) :
+--   INSERT d'une demande                      -> ACCEPTE
+--   UPDATE de sa demande en status='approved' -> ACCEPTE (auto-approbation)
+-- Le badge lui-meme restait protege : passer profiles.verified ou
+-- profiles.is_premium a true est bien refuse par protect_profile_status
+-- (mesure : les deux restent false).
+--
+-- Correction : on retire la politique trop large. Les deux politiques deja
+-- presentes et correctes suffisent alors, sans rien ajouter :
+--   verifreq_insert_premium : INSERT de SA demande, et seulement si Premium actif
+--   verifreq_select_own     : lecture de SES demandes
+-- Aucune politique UPDATE ni DELETE ne subsiste : le demandeur ne peut plus
+-- modifier l'instruction de sa demande. Le panel d'administration passe par le
+-- role de service, non soumis a RLS : son acces est inchange (verifie).
+--
+-- Perimetre : uniquement les politiques de verification_requests. Aucune donnee
+-- touchee, aucune table modifiee, aucune autre politique.
+--
+-- Verifie avant d'agir : l'application ne fait que insert (App.jsx l.4714) et
+-- select (l.5428) sur cette table. Aucun update, aucun delete.
+--
+-- Source de verite du statut Premium : profiles.is_premium, ecrit par
+-- grant_premium / grant_premium_days et remis a false par premium_expire_sweep
+-- (tache pg_cron quotidienne, 03:15 UTC). C'est le critere deja retenu par la
+-- politique existante ; il n'est pas modifie ici.
+--
+-- Mesure APRES (transaction annulee, 7 cas) :
+--   1 INSERT non-Premium          -> REFUSE
+--   2 INSERT Premium actif        -> ACCEPTE
+--   3 SELECT de ses demandes      -> OK
+--   4 UPDATE auto-approbation     -> REFUSE (0 ligne)
+--   5 DELETE de sa demande        -> REFUSE (0 ligne)
+--   6 SELECT des demandes d'autrui-> AUCUNE (cloisonne)
+--   7 UPDATE par le role service  -> ACCEPTE (panel inchange)
+
+drop policy if exists verif_requests_own on public.verification_requests;

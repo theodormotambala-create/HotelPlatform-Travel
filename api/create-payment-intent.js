@@ -94,21 +94,115 @@ export default async function handler(req, res) {
     // elle-meme controlee en base par enforce_reservation_price) : c'est lui
     // qui fait foi des qu'il existe.
     let amt = Math.round(Number(amount));
-    if (!isPremiumPayment && resaId) {
+    // Identifiant REEL de l'etablissement, lu sur la reservation. C'est
+    // protect_reservation_status qui le resout et l'ecrit cote serveur : il ne
+    // peut pas etre dicte par le navigateur, contrairement au nom transmis
+    // dans le corps de la requete.
+    let estabIdReel = null;
+    if (!isPremiumPayment) {
+      // Le commentaire ci-dessus enonce la regle : le montant du navigateur
+      // n'est JAMAIS une source de verite. Elle n'etait pourtant appliquee que
+      // dans le seul cas ou tout se passait bien. QUATRE voies rendaient la
+      // main au navigateur sans que rien ne le signale :
+      //   - resaId absent de la requete ;
+      //   - reservation introuvable ;
+      //   - reservation sans total_price ;
+      //   - cle de service absente, ou erreur reseau avalee par le catch.
+      // Il suffisait d'emprunter l'une d'elles pour fixer soi-meme le prix
+      // d'un sejour. Elles refusent desormais toutes : sans prix serveur,
+      // aucun paiement n'est cree.
+      //
+      // Verifie avant d'imposer ces refus, pour ne casser aucun appel legitime :
+      //   - la route n'a que quatre appelants (App.jsx) ; un seul paie une
+      //     reservation, et il transmet toujours resaId ;
+      //   - createBooking n'a que deux appelants, tous deux dans l'ecran de
+      //     reservation, et le paiement n'est ouvert qu'APRES acceptation de la
+      //     reservation par le serveur ;
+      //   - saveReservation, unique ecriture, renseigne toujours total_price.
+      // Le prix d'une reservation est donc toujours connu du serveur au moment
+      // ou ce paiement est demande.
+      if (!resaId) {
+        return res.status(400).json({ error: "Réservation non identifiée" });
+      }
+      const supaR = serviceClient();
+      if (!supaR) {
+        return res.status(500).json({ error: "Service non configuré" });
+      }
+      let rr;
       try {
-        const supaR = serviceClient();
-        if (supaR) {
-          const rr = await supaR.from("reservations")
-            .select("id,total_price,status").eq("id", String(resaId)).maybeSingle();
-          if (rr.data && rr.data.total_price != null) {
-            const serveur = Math.round(Number(rr.data.total_price) * 100);
-            if (!Number.isFinite(serveur) || serveur < 50) {
-              return res.status(400).json({ error: "Montant de réservation invalide" });
-            }
-            amt = serveur;
-          }
+        rr = await supaR.from("reservations")
+          .select("id,total_price,status,establishment_id").eq("id", String(resaId)).maybeSingle();
+      } catch (e) {
+        rr = { error: e };
+      }
+      // Une panne ne doit pas se traduire par « le navigateur decide » : elle
+      // se traduit par « on ne sait pas, donc on ne prend pas d'argent ».
+      if (rr.error) {
+        return res.status(503).json({ error: "Vérification de la réservation impossible — réessayez" });
+      }
+      if (!rr.data) {
+        return res.status(404).json({ error: "Réservation introuvable" });
+      }
+      if (rr.data.total_price == null) {
+        return res.status(400).json({ error: "Réservation sans prix — paiement impossible" });
+      }
+      estabIdReel = rr.data.establishment_id || null;
+      const serveur = Math.round(Number(rr.data.total_price) * 100);
+      if (!Number.isFinite(serveur) || serveur < 50) {
+        return res.status(400).json({ error: "Montant de réservation invalide" });
+      }
+      amt = serveur;
+    }
+
+    // ---------- MONTANT D'UN ABONNEMENT PREMIUM : IMPOSE PAR LE SERVEUR ----------
+    // La relecture serveur ci-dessus exclut explicitement le premium
+    // (« !isPremiumPayment ») : le montant preleve etait donc celui transmis par
+    // le navigateur. Le webhook le verifie bien, mais APRES l'encaissement : un
+    // montant arbitraire etait preleve, l'abonnement refuse, et un remboursement
+    // restait a instruire. Le meme ecart se produisait sans aucune malveillance,
+    // quand la tarification serveur devenait indisponible cote navigateur : il
+    // retombait sur des tarifs par defaut ecrits en dur et le client payait
+    // l'ancien prix sans rien recevoir.
+    // Le prix est desormais calcule ICI, depuis la MEME source
+    // (platform_settings, id 1) et avec EXACTEMENT les memes formules que
+    // stripe-webhook.js : essai 15 jours l.92, abonnement mensuel l.104. Les
+    // deux cotes ne peuvent donc plus diverger. Si le tarif ne peut pas etre
+    // etabli, la demande est refusee : rien n'est preleve.
+    if (isPremiumPayment) {
+      const supaP = serviceClient();
+      if (!supaP) return res.status(500).json({ error: "Service non configuré" });
+      // Le webhook exige l'identifiant du compte pour attribuer l'abonnement :
+      // sans lui, le paiement serait encaisse sans beneficiaire possible.
+      if (!userId) return res.status(403).json({ error: "Non autorisé" });
+      const stP = await supaP.from("platform_settings")
+        .select("premium_prices,premium_discounts").eq("id", 1).maybeSingle();
+      const pricesP = (stP.data && stP.data.premium_prices) || {};
+      const discsP = (stP.data && stP.data.premium_discounts) || {};
+      const joursEssai = parseInt(trialDays || "0", 10);
+      let attendu;
+      if (joursEssai === 15) {
+        // Essai 15 jours : meme repli que le webhook (4,99) si trial15 n'est pas configure.
+        if (!["std", "plus", "biz"].includes(plan)) {
+          return res.status(400).json({ error: "Offre Premium invalide" });
         }
-      } catch (e) { /* repli sur la validation ci-dessous */ }
+        const prixEssai = Number(pricesP.trial15);
+        attendu = Math.round((Number.isFinite(prixEssai) ? prixEssai : 4.99) * 100);
+      } else {
+        const mois = parseInt(months, 10);
+        const prix = Number(pricesP[plan]);
+        const remise = Number(discsP[String(mois)] || 0);
+        // Memes refus que le webhook : plan sans tarif configure, duree hors
+        // des quatre durees servies. Aucun repli en dur cote mensuel — le
+        // webhook n'en a pas non plus.
+        if (!Number.isFinite(prix) || ![1, 3, 6, 12].includes(mois) || !Number.isFinite(remise)) {
+          return res.status(400).json({ error: "Offre Premium invalide" });
+        }
+        attendu = Math.round(prix * mois * (1 - remise) * 100);
+      }
+      if (!Number.isFinite(attendu) || attendu < 50) {
+        return res.status(400).json({ error: "Tarif Premium indisponible" });
+      }
+      amt = attendu;
     }
 
     // Validation stricte du montant (centimes) : 0.50 EUR min, 99 999.99 EUR max
@@ -146,8 +240,16 @@ export default async function handler(req, res) {
     };
     try {
       const supa = serviceClient();
-      if (supa && estabName && !isPremiumPayment) { // jamais de Connect pour un abonnement (100% plateforme)
-        const e = await supa.from("establishments").select("stripe_account_id,type,is_premium").eq("name", String(estabName)).limit(1).maybeSingle();
+      // La DESTINATION DES FONDS est resolue par l'IDENTIFIANT de
+      // l'etablissement porte par la reservation, jamais par le nom transmis
+      // par le navigateur. « establishments.name » n'a aucune contrainte
+      // d'unicite : deux etablissements homonymes faisaient partir l'argent
+      // sur le mauvais compte Connect, et ce nom venait du corps de la requete.
+      // Sans identifiant fiable, aucun Connect n'est pose : la plateforme
+      // encaisse et le webhook trace la repartition — comportement deja prevu
+      // lorsque l'etablissement n'a pas de compte branche.
+      if (supa && estabIdReel && !isPremiumPayment) { // jamais de Connect pour un abonnement (100% plateforme)
+        const e = await supa.from("establishments").select("stripe_account_id,type,is_premium").eq("id", estabIdReel).maybeSingle();
         if (e.data && e.data.stripe_account_id) {
           const s = await supa.from("platform_settings").select("commission").eq("id", 1).maybeSingle();
           const pct = commissionPct(s.data, e.data.type, e.data.is_premium === true);
@@ -159,7 +261,10 @@ export default async function handler(req, res) {
 
     const paymentIntent = await stripe.paymentIntents.create(piParams);
 
-    return res.status(200).json({ clientSecret: paymentIntent.client_secret });
+    // Le montant RETENU est renvoye, comme le fait deja la branche campagne
+    // ci-dessus : l'ecran annonce ce qui est reellement preleve, et non un
+    // total recalcule dans le navigateur.
+    return res.status(200).json({ clientSecret: paymentIntent.client_secret, amount: amt });
   } catch (err) {
     console.error("Stripe error:", err.message);
     // Ne jamais exposer les détails internes en production
