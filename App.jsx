@@ -5438,6 +5438,31 @@ function ProResa(props){
       .then(function(r){ if(r&&!r.error&&r.data)setStatsResa(r.data); })
       .catch(function(){});
   }
+  // Les lignes de commande de la PAGE affichee, en UNE seule requete groupee
+  // (.in sur au plus RESA_PAGE identifiants), jamais une requete par
+  // reservation : a l'echelle visee un N+1 ici serait intenable. La cle
+  // primaire (reservation_id, ligne) sert cette lecture et son tri.
+  // La politique reservation_items_select_participant n'ouvre ces lignes
+  // qu'au client et au proprietaire de l'etablissement : le filtrage reste
+  // garanti par la base, pas par cet ecran.
+  var sLig=useState({});var lignesParResa=sLig[0];var setLignesParResa=sLig[1];
+  function _chargeLignesCommande(ids,suite){
+    if(!DataLayer._client||!ids||!ids.length)return;
+    DataLayer._client.from("reservation_items")
+      .select("reservation_id,ligne,name,quantity,unit_price")
+      .in("reservation_id",ids)
+      .order("ligne",{ascending:true})
+      .then(function(r){
+        if(r.error||!r.data)return;
+        var parResa={};
+        r.data.forEach(function(x){
+          if(!parResa[x.reservation_id])parResa[x.reservation_id]=[];
+          parResa[x.reservation_id].push(x);
+        });
+        setLignesParResa(function(prev){ return suite?Object.assign({},prev,parResa):parResa; });
+      })
+      .catch(function(){});
+  }
   // « suite » demande la page suivante a partir du curseur ; sinon on repart de
   // la premiere page. Curseur keyset (created_at, id), strictement le motif deja
   // utilise par get_feed_page et get_post_comments_page.
@@ -5463,6 +5488,7 @@ function ProResa(props){
         if(_last)_curseurResa.current={at:_last.created_at,id:_last.id};
         setEncoreResas(res.data.length===RESA_PAGE);
         setResas(function(prev){ return suite?prev.concat(rows):rows; });
+        _chargeLignesCommande(res.data.map(function(x){return x.id;}),suite);
       })
       .catch(function(){})
       .then(function(){ if(suite)setChargeSuiteResa(false); else setResasEnCours(false); });
@@ -5618,6 +5644,15 @@ function ProResa(props){
                   ?(r.dateIn+" - "+r.guests+" pers."+(r.tableCount?" - "+r.tableCount+" table"+(r.tableCount>1?"s":""):""))
                   :(r.dateIn+" au "+r.dateOut+" - "+r.nights+" nuit"+(r.nights>1?"s":"")+" - "+r.guests+" pers."+(r.roomCount?" - "+r.roomCount+" chambre"+(r.roomCount>1?"s":""):""))}</div>
                 {r.isCombo&&<div style={{fontSize:10,color:DS.primary,marginTop:2}}>Séjour combiné - {(r.comboMeals||[]).length} repas inclus{r.comboTable?" - Table au restaurant":""}</div>}
+                {(lignesParResa[r.id]||[]).length>0&&(
+                  <div style={{marginTop:6,paddingTop:6,borderTop:"1px solid "+DS.border+"55"}}>
+                    <div style={{fontSize:9,fontWeight:800,color:DS.textDim,letterSpacing:1,marginBottom:3}}>À PRÉPARER</div>
+                    {(lignesParResa[r.id]||[]).map(function(_l){return(
+                      <div key={_l.ligne} style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,fontSize:11,color:DS.textMuted,marginTop:2}}>
+                        <span style={{minWidth:0,wordBreak:"break-word"}}>{(_l.quantity>1?(_l.quantity+" × "):"")+_l.name}</span>
+                        <span style={{color:DS.gold,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>{Number(_l.unit_price).toFixed(2)} EUR</span>
+                      </div>);})}
+                  </div>)}
               </div>
               <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
                 <div style={{fontSize:16,fontWeight:900,color:r.payMode==="avec"?DS.gold:DS.success}}>{r.payMode==="avec"?r.total+" EUR":"Sans paiement"}</div>
