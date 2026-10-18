@@ -5408,27 +5408,68 @@ function ProResa(props){
   // l'ecran doit afficher un chargement et NON « Aucune reservation », qui
   // serait une affirmation fausse.
   var s1b=useState(false);var resasEnCours=s1b[0];var setResasEnCours=s1b[1];
-  // Source de verite : les reservations de CET etablissement depuis Supabase (pas celles de tout le monde)
-  useEffect(function(){
+  // Source de verite : les reservations de CET etablissement, lues PAGE PAR PAGE.
+  // La requete precedente n'avait ni pagination ni limite, et son plan etait un
+  // BALAYAGE SEQUENTIEL : mesure faite avec enable_seqscan = off, PostgreSQL y
+  // retombait quand meme, faute d'index couvrant « OR estab_id = <nom> ». Cette
+  // branche « nom » ne pouvait d'ailleurs ramener aucune ligne de plus : la
+  // politique reservations_select_participant n'ouvre au professionnel que
+  // estab_owner_id = auth.uid() (mesure : 0 ligne visible par cette voie).
+  // get_pro_reservations_page borne a ce meme ensemble et s'appuie sur
+  // idx_reservations_owner_recent, qui fournit deja l'ordre (plan verifie :
+  // Index Scan puis Limit, sans noeud de tri).
+  var s2=useState("all");var filter=s2[0];var setFilter=s2[1];
+  var RESA_PAGE=30;
+  var _curseurResa=useRef(null);
+  var sEnc=useState(false);var encoreResas=sEnc[0];var setEncoreResas=sEnc[1];
+  var sSui=useState(false);var chargeSuiteResa=sSui[0];var setChargeSuiteResa=sSui[1];
+  // Compteurs tenus par le serveur (establishment_reservation_stats, maintenue
+  // par declencheur). Ils restent EXACTS quel que soit le nombre de pages
+  // chargees ; les calculer sur le tableau local ne porterait que sur la page
+  // affichee, donc produirait des compteurs approximatifs.
+  var sStats=useState(null);var statsResa=sStats[0];var setStatsResa=sStats[1];
+  function _mapResa(row){
+    var d=row.data||{};
+    return{id:row.id,clientId:row.client_id||null,client:d.clientName||"Client",service:d.service||"Reservation",dateIn:d.dateIn||"",dateOut:d.dateOut||d.dateIn||"",nights:d.nights||1,guests:d.guests||1,total:d.total||0,payMode:d.payMode||"sans",status:row.status||"pending",qrScanned:row.status==="consumed",estabType:d.estabType||null,roomCount:d.roomCount||null,tableCount:d.tableCount||null,isCombo:d.isCombo===true,comboMeals:d.comboMeals||null,comboTable:d.comboTable===true};
+  }
+  function _chargeCompteursResa(){
+    if(!DataLayer._client)return;
+    DataLayer._client.rpc("get_pro_reservation_stats")
+      .then(function(r){ if(r&&!r.error&&r.data)setStatsResa(r.data); })
+      .catch(function(){});
+  }
+  // « suite » demande la page suivante a partir du curseur ; sinon on repart de
+  // la premiere page. Curseur keyset (created_at, id), strictement le motif deja
+  // utilise par get_feed_page et get_post_comments_page.
+  function _chargeResas(suite){
     if(!DataLayer._client||!estabName)return;
-    setResasEnCours(true);
-    var _q=props.selfUserId
-      // Colonnes explicitement lues par le mappeur ci-dessous (plus de SELECT *) :
-      // le blob « data » est deja volumineux, inutile d'y ajouter les colonnes
-      // que l'ecran n'affiche pas.
-      ?DataLayer._client.from("reservations").select("id,client_id,status,data,created_at").or("estab_owner_id.eq."+props.selfUserId+",estab_id.eq."+JSON.stringify(estabName).slice(1,-1)).order("created_at",{ascending:false})
-      :DataLayer._client.from("reservations").select("id,client_id,status,data,created_at").eq("estab_id",estabName).order("created_at",{ascending:false});
-    _q
+    var cur=suite?_curseurResa.current:null;
+    if(suite){ if(!cur)return; setChargeSuiteResa(true); }
+    else { _curseurResa.current=null; setResasEnCours(true); }
+    // La projection reste cote appelant : exactement les cinq colonnes lues par
+    // le mappeur, comme avant. La fonction renvoie setof reservations, mais le
+    // navigateur ne demande pas le reste.
+    DataLayer._client.rpc("get_pro_reservations_page",{
+        p_after_created_at:cur?cur.at:null,
+        p_after_id:cur?cur.id:null,
+        p_limit:RESA_PAGE,
+        p_status:filter==="all"?null:filter
+      })
+      .select("id,client_id,status,data,created_at")
       .then(function(res){
         if(res.error||!res.data)return;
-        var rows=res.data.map(function(row){
-          var d=row.data||{};
-          return{id:row.id,clientId:row.client_id||null,client:d.clientName||"Client",service:d.service||"Reservation",dateIn:d.dateIn||"",dateOut:d.dateOut||d.dateIn||"",nights:d.nights||1,guests:d.guests||1,total:d.total||0,payMode:d.payMode||"sans",status:row.status||"pending",qrScanned:row.status==="consumed",estabType:d.estabType||null,roomCount:d.roomCount||null,tableCount:d.tableCount||null,isCombo:d.isCombo===true,comboMeals:d.comboMeals||null,comboTable:d.comboTable===true};
-        });
-        setResas(rows);
-      }).catch(function(){}).then(function(){setResasEnCours(false);});
-  },[estabName]);
-  var s2=useState("all");var filter=s2[0];var setFilter=s2[1];
+        var rows=res.data.map(_mapResa);
+        var _last=res.data[res.data.length-1];
+        if(_last)_curseurResa.current={at:_last.created_at,id:_last.id};
+        setEncoreResas(res.data.length===RESA_PAGE);
+        setResas(function(prev){ return suite?prev.concat(rows):rows; });
+      })
+      .catch(function(){})
+      .then(function(){ if(suite)setChargeSuiteResa(false); else setResasEnCours(false); });
+  }
+  // Le filtre est applique PAR LE SERVEUR : changer de filtre relit la premiere
+  // page. Le tableau local n'est donc jamais refiltre une seconde fois.
+  useEffect(function(){ _chargeResas(false); _chargeCompteursResa(); },[estabName,filter]);
   var s3=useState(null);var scanTarget=s3[0];var setScanTarget=s3[1];
   // Ouverture directe d'une reservation depuis une notification
   useEffect(function(){
@@ -5445,7 +5486,21 @@ function ProResa(props){
   var tkR=useToast();var toastR=tkR.show;var ToastR=tkR.Toast;
   var sRSk=useState(true);var resaSkLoading=sRSk[0];var setResaSkLoading=sRSk[1];
   useEffect(function(){var t=setTimeout(function(){setResaSkLoading(false);},350);return function(){clearTimeout(t);};},[]);
-  var filtered=filter==="all"?resas:resas.filter(function(r){return r.status===filter;});
+  // Tant que les compteurs ne sont pas arrives, on affiche « — » plutot que 0 :
+  // annoncer zero serait une affirmation fausse, exactement comme pour la liste.
+  function _nbStatut(st){
+    if(!statsResa)return "—";
+    var l=statsResa.filter(function(x){return x.status===st;})[0];
+    return l?Number(l.nb):0;
+  }
+  function _revenuTotal(){
+    if(!statsResa)return "—";
+    return statsResa.reduce(function(a,x){return a+Number(x.revenu||0);},0)+" EUR";
+  }
+  // Le serveur a deja applique le filtre (p_status) : refiltrer ici ecrirait
+  // la meme regle a deux endroits, et masquerait des lignes deja payees par
+  // un aller-retour reseau.
+  var filtered=resas;
   var sColors={confirmed:DS.success,pending:DS.warning,refused:DS.error,consumed:DS.textDim,cancelled:DS.warning};
   var sLabels={confirmed:"Confirmée",pending:"En attente",refused:"Refusée",consumed:"Consommée",cancelled:"Annulée par le client"};
   // Le statut d'une reservation RECUE appartient au serveur. Cet ecran l'affiche
@@ -5465,6 +5520,9 @@ function ProResa(props){
         toastR("Mise à jour refusée par le serveur","error");
         return;
       }
+      // Le serveur a accepte : les compteurs et la page courante ne refletent
+      // plus la base. On les relit plutot que de les recalculer ici.
+      _chargeCompteursResa(); _chargeResas(false);
       toastR(libelle,ton);
     }).catch(function(){
       setResas(function(rs){return rs.map(function(x){return x.id===id?Object.assign({},x,ancien):x;});});
@@ -5493,6 +5551,7 @@ function ProResa(props){
         var d=r.data||{};var etat=d.etat;
         if(etat==="consommee"){
           setResas(function(rs){return rs.map(function(x){return x.id===d.reservation?Object.assign({},x,{status:"consumed",qrScanned:true}):x;});});
+          _chargeCompteursResa();
           setScanTarget(null);
           toastR("Arrivée confirmée · Client marqué présent","success");
           return;
@@ -5541,7 +5600,7 @@ function ProResa(props){
         </div>
       )}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,padding:"14px 14px 10px"}}>
-        {[[resas.filter(function(r){return r.status==="pending";}).length,"En attente",DS.warning],[resas.filter(function(r){return r.status==="confirmed";}).length,"Confirmées",DS.success],[resas.reduce(function(a,r){return a+(r.payMode==="avec"&&(r.status==="confirmed"||r.status==="consumed")?r.total:0);},0)+" EUR","Revenus",DS.gold]].map(function(_i,i){var n=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{background:DS.card,borderRadius:10,padding:"10px 6px",border:"1px solid "+DS.border,textAlign:"center"}}><div style={{fontSize:16,fontWeight:900,color:col}}>{n}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
+        {[[_nbStatut("pending"),"En attente",DS.warning],[_nbStatut("confirmed"),"Confirmées",DS.success],[_revenuTotal(),"Revenus",DS.gold]].map(function(_i,i){var n=_i[0];var l=_i[1];var col=_i[2];return <div key={i} style={{background:DS.card,borderRadius:10,padding:"10px 6px",border:"1px solid "+DS.border,textAlign:"center"}}><div style={{fontSize:16,fontWeight:900,color:col}}>{n}</div><div style={{fontSize:10,color:DS.textMuted,marginTop:2}}>{l}</div></div>;})}
       </div>
       <div style={{display:"flex",gap:5,padding:"0 14px",marginBottom:12,overflowX:"auto"}}>
         {[["all","Toutes"],["pending","En attente"],["confirmed","Confirmées"],["consumed","Consommées"],["refused","Refusées"],["cancelled","Annulées"]].map(function(_i){var v=_i[0];var l=_i[1];var isAct=filter===v;return <button key={v} onClick={function(){setFilter(v);}} style={{padding:"6px 12px",borderRadius:20,border:"1px solid "+(isAct?color:DS.border),background:isAct?color+"18":"transparent",color:isAct?color:DS.textMuted,fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{l}</button>;})}
@@ -5577,7 +5636,8 @@ function ProResa(props){
             </div>
           </div>
         );})}
-        {filtered.length===0&&<Emp Icon={Calendar} title="Aucune réservation" sub="Les demandes de vos clients apparaîtront ici"/>}</> }
+        {filtered.length===0&&<Emp Icon={Calendar} title="Aucune réservation" sub="Les demandes de vos clients apparaîtront ici"/>}
+        {encoreResas&&<button onClick={function(){_chargeResas(true);}} disabled={chargeSuiteResa} style={{width:"100%",padding:"12px",marginTop:4,marginBottom:8,background:DS.card,border:"1px solid "+DS.border,borderRadius:12,color:chargeSuiteResa?DS.textDim:color,fontSize:13,fontWeight:700,cursor:chargeSuiteResa?"default":"pointer"}}>{chargeSuiteResa?"Chargement...":"Voir plus de réservations"}</button>}</> }
       </div>
     </div>
   );
